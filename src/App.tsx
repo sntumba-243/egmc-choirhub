@@ -1,3 +1,4 @@
+import '@/lib/supabase'  // This loads Supabase globally
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Login } from './pages/Login';
