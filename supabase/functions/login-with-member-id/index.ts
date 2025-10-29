@@ -1,94 +1,79 @@
-import { createClient } from 'npm:@supabase/supabase-js@2';
+// ============================================
+// FIXED: login-with-member-id Edge Function
+// ============================================
+// Save as: supabase/functions/login-with-member-id/index.ts
+// ============================================
+
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
-};
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
-Deno.serve(async (req: Request) => {
+serve(async (req) => {
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 200,
-      headers: corsHeaders,
-    });
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
-    const { identifier, password } = await req.json();
+    // IMPORTANT: Use service role key to bypass RLS
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    if (!identifier || !password) {
-      return new Response(
-        JSON.stringify({ error: 'Identifier and password are required' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+    const { identifier } = await req.json()
+
+    if (!identifier) {
+      throw new Error('identifier is required')
     }
 
-    let email = identifier;
+    console.log('Looking up member_id:', identifier)
 
-    // Check if identifier is a member_id (not an email format)
-    if (!identifier.includes('@')) {
-      // Look up email by member_id
-      const { data: userData, error: lookupError } = await supabase
-        .from('users')
-        .select('email')
-        .eq('member_id', identifier.toLowerCase())
-        .maybeSingle();
-
-      if (lookupError || !userData) {
-        return new Response(
-          JSON.stringify({ error: 'Invalid member ID' }),
-          {
-            status: 401,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
-        );
-      }
-
-      email = userData.email;
-    }
-
-    // Attempt login with email
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    // Look up user by member_id (case-insensitive)
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('email, member_id, name, id')
+      .ilike('member_id', identifier.trim()) // Trim whitespace
+      .maybeSingle()
 
     if (error) {
-      return new Response(
-        JSON.stringify({ error: error.message }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+      console.error('Database error:', error)
+      throw new Error(`Database error: ${error.message}`)
     }
+
+    if (!user) {
+      console.log('No user found with member_id:', identifier)
+      throw new Error('Invalid member ID')
+    }
+
+    console.log('Found user:', user.name, '-', user.email)
 
     return new Response(
       JSON.stringify({ 
-        session: data.session,
-        user: data.user 
+        email: user.email,
+        member_id: user.member_id,
+        name: user.name
       }),
-      {
-        status: 200,
+      { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200 
       }
-    );
+    )
+
   } catch (error) {
+    console.error('Error:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        status: 500,
+      JSON.stringify({ 
+        error: error.message || 'An error occurred' 
+      }),
+      { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400 
       }
-    );
+    )
   }
-});
+})
