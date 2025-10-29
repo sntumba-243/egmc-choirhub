@@ -1,4 +1,10 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
+
+// If it's in src/utils/supabase.ts:
+import { supabase } from '../utils/supabase';
+
+// If it's directly in src/supabase.ts:
+import { supabase } from '../supabase';
 
 // Get environment variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
