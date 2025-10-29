@@ -1,3 +1,7 @@
+// At the very top of SongList.tsx, add:
+import '../styles/SongComponents.css';
+// Or if your css is in a different folder:
+import '../css/SongComponents.css';
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase'; // Adjust path as needed
 import SongCard from './SongCard';
