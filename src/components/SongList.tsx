@@ -3,7 +3,9 @@ import '../styles/SongComponents.css';
 // Or if your css is in a different folder:
 import '../css/SongComponents.css';
 import React, { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';// Adjust path as needed
+import { supabase } from '../lib/supabase'; // If in lib folder
+// OR
+import { supabase } from '../utils/supabase'; // If in utils folder //import { createClient } from '@supabase/supabase-js';// Adjust path as needed
 import SongCard from './SongCard';
 
 interface Song {
