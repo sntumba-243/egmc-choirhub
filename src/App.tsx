@@ -1,3 +1,7 @@
+import PWAInstallPrompt from './components/PWAInstallPrompt'
+import IOSInstallPrompt from './components/IOSInstallPrompt'
+import PWAUpdateNotification from './components/PWAUpdateNotification'
+import EnhancedOfflineIndicator from './components/EnhancedOfflineIndicator'
 import '@/lib/supabase'  // This loads Supabase globally
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
