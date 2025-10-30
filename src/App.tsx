@@ -207,3 +207,22 @@ function App() {
 }
 
 export default App;
+
+function App() {
+  return (
+    <AuthProvider>
+      {/* ADD THESE 4 LINES HERE - Right at the top! */}
+      <EnhancedOfflineIndicator />
+      <PWAInstallPrompt />
+      <IOSInstallPrompt />
+      <PWAUpdateNotification />
+      
+      <Router>
+        {/* Your existing routes and components stay the same */}
+        <Route path="/" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        {/* etc... */}
+      </Router>
+    </AuthProvider>
+  )
+}
