@@ -1,5 +1,19 @@
 // EnhancedOfflineIndicator.jsx
 // Enhanced version with better UI and sync status
+function App() {
+  return (
+    <>
+      {/* PWA Components */}
+      <EnhancedOfflineIndicator />
+      <PWAInstallPrompt />
+      <IOSInstallPrompt />
+      <PWAUpdateNotification />
+      
+      {/* Your existing app content */}
+      {/* ... rest of your app */}
+    </>
+  )
+}
 
 import { useState, useEffect } from 'react';
 
