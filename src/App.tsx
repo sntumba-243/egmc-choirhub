@@ -201,16 +201,6 @@ const AppContent: React.FC = () => {
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
-    </AuthProvider>
-  );
-}
-
-export default App;
-
-function App() {
-  return (
-    <AuthProvider>
       {/* ADD THESE 4 LINES HERE - Right at the top! */}
       <EnhancedOfflineIndicator />
       <PWAInstallPrompt />
