@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-
+import { createClient } from '@supabase/supabase-js'
 // If it's in src/utils/supabase.ts:
 import { supabase } from '../utils/supabase';
 
