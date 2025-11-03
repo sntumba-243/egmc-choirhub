@@ -9,13 +9,13 @@ import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { MemberLayout } from './layouts/MemberLayout';
-import { MemberDashboard } from './pages/member/Dashboard-MOBILE';
+import { MemberDashboard } from './pages/member/Dashboard';
 import { AdminLayout } from './layouts/AdminLayout';
-import { MemberRepertoire } from './pages/member/Repertoire-MOBILE';
+import { MemberRepertoire } from './pages/member/Repertoire';
 import { SongDetail } from './pages/member/SongDetail';
 import { MemberCalendar } from './pages/member/Calendar';
 import { EventDetail } from './pages/member/EventDetail';
-import { MemberMessages } from './pages/member/Messages-MOBILE';
+import { MemberMessages } from './pages/member/Messages';
 import { MessageDetail } from './pages/member/MessageDetail';
 import { MemberPractice } from './pages/member/Practice';
 import { MemberProfile } from './pages/member/Profile';
@@ -32,7 +32,7 @@ import { MessageForm } from './pages/admin/MessageForm';
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
   const [authView, setAuthView] = useState<'login' | 'register'>('login');
-  const [memberTab, setMemberTab] = useState<'repertoire' | 'calendar' | 'messages' | 'practice' | 'profile'>('repertoire');
+  const [memberTab, setMemberTab] = useState<'dashboard' | 'repertoire' | 'calendar' | 'messages' | 'practice' | 'profile'>('repertoire');
   const [adminPage, setAdminPage] = useState<'dashboard' | 'repertoire' | 'members' | 'events' | 'messages'>('dashboard');
   const [currentSongId, setCurrentSongId] = useState<string | null>(null);
   const [currentEventId, setCurrentEventId] = useState<string | null>(null);
@@ -109,6 +109,7 @@ const AppContent: React.FC = () => {
     return (
       <ProtectedRoute requiredRole="member">
         <MemberLayout activeTab={memberTab} onNavigate={setMemberTab}>
+          {memberTab === 'dashboard' && <MemberDashboard />}
           {memberTab === 'repertoire' && <MemberRepertoire onNavigateToSong={setCurrentSongId} />}
           {memberTab === 'calendar' && <MemberCalendar onNavigateToEvent={setCurrentEventId} />}
           {memberTab === 'messages' && <MemberMessages onNavigateToMessage={setCurrentMessageId} />}

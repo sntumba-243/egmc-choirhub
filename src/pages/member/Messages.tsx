@@ -1,319 +1,288 @@
-import React, { useState, useEffect } from 'react';
-import { Mail, Plus, Send, X, ArrowLeft, Bell } from 'lucide-react';
-import { directMessagesService, membersService, DirectMessage, Member } from '../../lib/database';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
+import { MessageSquare, Plus, ArrowLeft, CheckCheck } from 'lucide-react';
+import toast from 'react-hot-toast';
 
-interface MemberMessagesProps {
-  onNavigateToMessage: (messageId: string) => void;
+interface Message {
+  id: string;
+  subject: string;
+  message: string;
+  admin_id: string;
+  send_to: string;
+  created_at: string;
+  is_read: boolean;
+  admin_name?: string;
 }
 
-export const MemberMessages: React.FC<MemberMessagesProps> = ({ onNavigateToMessage }) => {
-  const [messages, setMessages] = useState<DirectMessage[]>([]);
-  const [admins, setAdmins] = useState<Member[]>([]);
+export const MemberMessages = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCompose, setShowCompose] = useState(false);
-  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
-    recipient_id: '',
-    subject: '',
-    body: '',
-  });
-  const [sending, setSending] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [filter, setFilter] = useState<'all' | 'unread'>('all');
 
   useEffect(() => {
-    loadData();
+    fetchMessages();
+    const interval = setInterval(fetchMessages, 5000);
+    return () => clearInterval(interval);
   }, []);
 
-  const loadData = async () => {
+  const fetchMessages = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setCurrentUserId(user.id);
+      if (!user?.id) return;
+
+      const { data, error } = await supabase
+        .from('messages')
+        .select(`
+          id,
+          subject,
+          message,
+          admin_id,
+          send_to,
+          created_at,
+          is_read,
+          members (name)
+        `)
+        .eq('send_to', 'all_members')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching messages:', error);
+        return;
       }
 
-      const [messagesData, membersData] = await Promise.all([
-        directMessagesService.getDirectMessages(),
-        membersService.getMembers(),
-      ]);
-      setMessages(messagesData);
-      setAdmins(membersData.filter(m => m.role === 'admin'));
+      const messagesWithNames = data?.map(msg => ({
+        ...msg,
+        admin_name: msg.members?.name || 'Admin'
+      })) || [];
+
+      setMessages(messagesWithNames);
+      const unread = messagesWithNames.filter(m => !m.is_read).length;
+      setUnreadCount(unread);
     } catch (error) {
-      console.error('Error loading messages:', error);
+      console.error('Error:', error);
+      toast.error('Failed to load messages');
     } finally {
       setLoading(false);
     }
   };
 
-  const getSenderName = (senderId: string): string => {
-    const sender = admins.find(a => a.id === senderId);
-    return sender ? sender.name : 'Unknown';
-  };
-
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.subject.trim() || !formData.body.trim()) return;
-
-    setSending(true);
+  const markAsRead = async (messageId: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      const { error } = await supabase
+        .from('messages')
+        .update({ is_read: true })
+        .eq('id', messageId);
 
-      await directMessagesService.createDirectMessage({
-        sender_id: user.id,
-        recipient_id: formData.recipient_id || null,
-        subject: formData.subject,
-        body: formData.body,
-      });
+      if (error) throw error;
 
-      setFormData({ recipient_id: '', subject: '', body: '' });
-      setShowCompose(false);
-      await loadData();
+      setMessages(prev => 
+        prev.map(m => m.id === messageId ? { ...m, is_read: true } : m)
+      );
+      setSelectedMessage(prev => 
+        prev && prev.id === messageId ? { ...prev, is_read: true } : prev
+      );
     } catch (error) {
-      console.error('Error sending message:', error);
-      alert('Failed to send message');
-    } finally {
-      setSending(false);
+      console.error('Error marking as read:', error);
     }
   };
 
-  const handleViewMessage = async (message: DirectMessage) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user && message.recipient_id === user.id && !message.is_read) {
-      try {
-        await directMessagesService.markAsRead(message.id);
-        await loadData();
-      } catch (error) {
-        console.error('Error marking message as read:', error);
-      }
-    }
-    setSelectedMessageId(message.id);
-  };
-
-  const formatDate = (dateString: string): string => {
+  const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    } else if (diffDays === 1) {
+      return 'Yesterday';
+    } else if (diffDays < 7) {
+      return `${diffDays}d ago`;
+    } else {
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
   };
+
+  const filteredMessages = filter === 'unread' 
+    ? messages.filter(m => !m.is_read)
+    : messages;
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-gray-600">Loading messages...</div>
+      <div className="flex flex-col items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mb-3"></div>
+        <p className="text-gray-600 text-sm">Loading messages...</p>
       </div>
     );
   }
 
-  if (selectedMessageId) {
-    const message = messages.find(m => m.id === selectedMessageId);
-    if (!message) {
-      setSelectedMessageId(null);
-      return null;
-    }
-
+  // Message Detail View
+  if (selectedMessage) {
     return (
-      <div className="space-y-6">
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <button
-            onClick={() => setSelectedMessageId(null)}
-            className="flex items-center gap-2 text-blue-900 font-semibold hover:text-blue-700 mb-4"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            Back to Messages
-          </button>
+      <div className="space-y-4 pb-4">
+        {/* Header */}
+        <button
+          onClick={() => {
+            setSelectedMessage(null);
+            if (!selectedMessage.is_read) {
+              markAsRead(selectedMessage.id);
+            }
+          }}
+          className="flex items-center gap-2 text-purple-600 hover:text-purple-700 font-medium text-sm"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Messages
+        </button>
 
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-blue-900 mb-2">{message.subject}</h2>
-            <div className="flex items-center gap-4 text-sm text-gray-600">
-              <span>From: {getSenderName(message.sender_id)}</span>
-              <span>•</span>
-              <span>{formatDate(message.created_at || '')}</span>
-            </div>
-          </div>
-
-          <div className="prose max-w-none">
-            <p className="text-gray-700 whitespace-pre-wrap">{message.body}</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (showCompose) {
-    return (
-      <div className="space-y-6">
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-blue-900">New Message to Director</h2>
-            <button
-              onClick={() => setShowCompose(false)}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-
-          <form onSubmit={handleSendMessage} className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Send To
-              </label>
-              <select
-                value={formData.recipient_id}
-                onChange={e => setFormData({ ...formData, recipient_id: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">All Directors</option>
-                {admins.map(admin => (
-                  <option key={admin.id} value={admin.id}>
-                    {admin.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Subject
-              </label>
-              <input
-                type="text"
-                value={formData.subject}
-                onChange={e => setFormData({ ...formData, subject: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Message subject..."
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Message
-              </label>
-              <textarea
-                value={formData.body}
-                onChange={e => setFormData({ ...formData, body: e.target.value })}
-                rows={8}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                placeholder="Type your message here..."
-                required
-              />
-            </div>
-
-            <div className="flex gap-4">
-              <button
-                type="button"
-                onClick={() => setShowCompose(false)}
-                className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={sending}
-                className="flex-1 bg-blue-900 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                <Send className="w-5 h-5" />
-                {sending ? 'Sending...' : 'Send Message'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
-  const unreadCount = messages.filter(m => !m.is_read && m.recipient_id === currentUserId).length;
-
-  return (
-    <div className="space-y-6">
-      <div className="bg-white rounded-xl shadow-md p-6">
-        <div className="flex items-center justify-between mb-6">
+        {/* Message Content */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 space-y-4">
+          {/* Subject */}
           <div>
-            <h2 className="text-2xl font-bold text-blue-900 flex items-center gap-3">
-              Messages
-              {unreadCount > 0 && (
-                <span className="inline-flex items-center justify-center w-8 h-8 text-sm font-bold text-white bg-blue-600 rounded-full">
-                  {unreadCount}
-                </span>
-              )}
-            </h2>
-            <p className="text-gray-600 mt-1">{messages.length} total messages</p>
-            {unreadCount > 0 && (
-              <div className="flex items-center gap-2 mt-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-                <Bell className="w-4 h-4 text-blue-700" />
-                <span className="text-sm font-semibold text-blue-900">
-                  You have {unreadCount} unread message{unreadCount > 1 ? 's' : ''}
-                </span>
-              </div>
-            )}
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
+              {selectedMessage.subject}
+            </h1>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-gray-600">From: {selectedMessage.admin_name}</p>
+              <p className="text-xs text-gray-500">{formatDate(selectedMessage.created_at)}</p>
+            </div>
           </div>
-          <button
-            onClick={() => setShowCompose(true)}
-            className="bg-blue-900 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-800 transition-colors flex items-center gap-2"
-          >
-            <Plus className="w-5 h-5" />
-            New Message
-          </button>
-        </div>
 
-        {messages.length === 0 ? (
-          <div className="text-center py-12">
-            <Mail className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-            <p className="text-gray-600">No messages yet</p>
+          {/* Divider */}
+          <div className="border-t border-gray-200" />
+
+          {/* Message Body */}
+          <div className="bg-gray-50 rounded-lg p-4">
+            <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-wrap">
+              {selectedMessage.message}
+            </p>
+          </div>
+
+          {/* Mark as Read Button */}
+          {!selectedMessage.is_read && (
             <button
-              onClick={() => setShowCompose(true)}
-              className="mt-4 text-blue-900 font-semibold hover:text-blue-700"
+              onClick={() => markAsRead(selectedMessage.id)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors"
             >
-              Send your first message to the director
+              <CheckCheck className="w-4 h-4" />
+              Mark as Read
             </button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {messages.map((message) => (
-              <button
-                key={message.id}
-                onClick={() => handleViewMessage(message)}
-                className={`w-full p-4 rounded-lg hover:shadow-md transition-all text-left border-2 ${
-                  !message.is_read && message.recipient_id === currentUserId
-                    ? 'bg-blue-50 border-blue-300 ring-2 ring-blue-400'
-                    : 'bg-gray-50 border-gray-200'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-4 mb-2">
-                  <div className="flex-1 flex items-center gap-3">
-                    <h3 className="font-bold text-blue-900 text-lg">
-                      {message.subject}
-                    </h3>
-                    {!message.is_read && message.recipient_id === currentUserId && (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-600 text-white text-xs font-bold rounded-full">
-                        <Mail className="w-3 h-3" />
-                        NEW
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-sm text-gray-600 whitespace-nowrap">
-                    {formatDate(message.created_at || '')}
-                  </span>
-                </div>
-                <p className="text-gray-600 text-sm">
-                  {message.sender_id === currentUserId ? (
-                    <>To: {message.recipient_id ? getSenderName(message.recipient_id) : 'All Directors'}</>
-                  ) : (
-                    <>From: {getSenderName(message.sender_id)}</>
-                  )}
-                </p>
-                <p className="text-gray-700 mt-2 line-clamp-2">{message.body}</p>
-              </button>
-            ))}
-          </div>
-        )}
+          )}
+        </div>
       </div>
+    );
+  }
+
+  // Messages List View
+  return (
+    <div className="space-y-4 pb-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
+        <button
+          onClick={() => navigate('/member/messages/compose')}
+          className="flex items-center gap-1 px-3 py-1.5 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          <span className="hidden sm:inline">New</span>
+        </button>
+      </div>
+
+      {/* Filter Tabs */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setFilter('all')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            filter === 'all'
+              ? 'bg-purple-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          All
+        </button>
+        <button
+          onClick={() => setFilter('unread')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all relative ${
+            filter === 'unread'
+              ? 'bg-purple-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          Unread
+          {unreadCount > 0 && (
+            <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+              {unreadCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Messages List */}
+      {filteredMessages.length === 0 ? (
+        <div className="text-center py-12">
+          <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-600 text-sm">
+            {filter === 'unread' ? 'No unread messages' : 'No messages yet'}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filteredMessages.map(message => (
+            <button
+              key={message.id}
+              onClick={() => {
+                setSelectedMessage(message);
+                if (!message.is_read) {
+                  markAsRead(message.id);
+                }
+              }}
+              className={`w-full text-left rounded-lg border transition-all ${
+                message.is_read
+                  ? 'bg-white border-gray-200 hover:border-gray-300'
+                  : 'bg-blue-50 border-blue-200 hover:border-blue-300'
+              }`}
+            >
+              <div className="p-3 sm:p-4">
+                <div className="flex items-start gap-3">
+                  {/* Unread Indicator */}
+                  {!message.is_read && (
+                    <div className="flex-shrink-0 w-2 h-2 bg-blue-600 rounded-full mt-2" />
+                  )}
+                  
+                  <div className="flex-1 min-w-0">
+                    {/* Subject and Meta */}
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <h3 className={`text-sm font-semibold truncate ${
+                        message.is_read ? 'text-gray-900' : 'text-blue-900'
+                      }`}>
+                        {message.subject}
+                      </h3>
+                      <span className="text-xs text-gray-500 flex-shrink-0 whitespace-nowrap">
+                        {formatDate(message.created_at)}
+                      </span>
+                    </div>
+
+                    {/* From and Preview */}
+                    <p className="text-xs text-gray-600 mb-1">From: {message.admin_name}</p>
+                    <p className={`text-xs line-clamp-2 ${
+                      message.is_read ? 'text-gray-600' : 'text-gray-700 font-medium'
+                    }`}>
+                      {message.message}
+                    </p>
+                  </div>
+
+                  {/* Arrow indicator */}
+                  <div className="flex-shrink-0 text-gray-400 mt-1">→</div>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
