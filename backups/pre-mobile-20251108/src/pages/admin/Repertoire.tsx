@@ -1,0 +1,266 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
+import { Music, Search, Plus, Edit, Trash2, X, Grid3x3, List } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+interface Song {
+  id: string;
+  title: string;
+  composer: string;
+  language: string;
+  sheet_music_url?: string;
+}
+
+export const AdminRepertoire = () => {
+  const navigate = useNavigate();
+  const [songs, setSongs] = useState<Song[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewingSong, setViewingSong] = useState<Song | null>(null);
+
+  useEffect(() => {
+    fetchSongs();
+  }, []);
+
+  const fetchSongs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('songs')
+        .select('*')
+        .order('title', { ascending: true });
+
+      if (error) throw error;
+      console.log('Loaded songs:', data?.length);
+      setSongs(data || []);
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Failed to load songs');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this song?')) return;
+    try {
+      const { error } = await supabase.from('songs').delete().eq('id', id);
+      if (error) throw error;
+      setSongs(songs.filter(s => s.id !== id));
+      toast.success('Song deleted');
+    } catch (error) {
+      toast.error('Failed to delete');
+    }
+  };
+
+  const filteredSongs = songs.filter(song => {
+    if (!searchTerm) return true;
+    const search = searchTerm.toLowerCase();
+    const titleMatch = song.title?.toLowerCase().includes(search);
+    const composerMatch = song.composer?.toLowerCase().includes(search);
+    return titleMatch || composerMatch;
+  });
+
+  console.log('Search term:', searchTerm);
+  console.log('Total songs:', songs.length);
+  console.log('Filtered songs:', filteredSongs.length);
+
+  if (loading) {
+    return <div className="flex justify-center p-12">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+    </div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Repertoire</h1>
+          <p className="text-gray-600">{songs.length} songs total, {filteredSongs.length} showing</p>
+        </div>
+        <button
+          onClick={() => navigate('/admin/repertoire/new')}
+          className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:shadow-lg"
+        >
+          <Plus className="w-5 h-5" />
+          Add Song
+        </button>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-md p-4">
+        <div className="flex gap-4">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Search songs..."
+              value={searchTerm}
+              onChange={(e) => {
+                console.log('Search input changed:', e.target.value);
+                setSearchTerm(e.target.value);
+              }}
+              className="w-full pl-10 px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={'px-4 py-3 rounded-lg ' + (viewMode === 'grid' ? 'bg-indigo-600 text-white' : 'bg-gray-100')}
+            >
+              <Grid3x3 className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={'px-4 py-3 rounded-lg ' + (viewMode === 'list' ? 'bg-indigo-600 text-white' : 'bg-gray-100')}
+            >
+              <List className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {filteredSongs.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-md p-12 text-center">
+          <Music className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold mb-2">No songs found</h3>
+          <p className="text-gray-600">
+            {searchTerm ? 'Try a different search term' : 'Sync from Google Drive to add songs'}
+          </p>
+        </div>
+      ) : viewMode === 'grid' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredSongs.map((song) => (
+            <div
+              key={song.id}
+              className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all border cursor-pointer"
+              onClick={() => setViewingSong(song)}
+            >
+              <div className="p-6">
+                <div className="flex justify-between mb-4">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold mb-2">{song.title}</h3>
+                    <p className="text-sm text-gray-600">{song.composer || 'Unknown'}</p>
+                  </div>
+                  <Music className="w-5 h-5 text-indigo-600" />
+                </div>
+                <div className="flex gap-2 pt-4 border-t">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate('/admin/repertoire/' + song.id + '/edit');
+                    }}
+                    className="flex-1 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(song.id);
+                    }}
+                    className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl shadow-md overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="px-6 py-4 text-left font-semibold">Title</th>
+                <th className="px-6 py-4 text-left font-semibold">Composer</th>
+                <th className="px-6 py-4 text-right font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {filteredSongs.map((song) => (
+                <tr 
+                  key={song.id}
+                  className="hover:bg-gray-50 cursor-pointer"
+                  onClick={() => setViewingSong(song)}
+                >
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <Music className="w-4 h-4 text-indigo-600" />
+                      <span className="font-medium">{song.title}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-gray-600">{song.composer || 'Unknown'}</td>
+                  <td className="px-6 py-4">
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate('/admin/repertoire/' + song.id + '/edit');
+                        }}
+                        className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(song.id);
+                        }}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {viewingSong && (
+        <div 
+          className="fixed inset-0 bg-black z-50"
+          onClick={() => setViewingSong(null)}
+        >
+          <div className="h-full flex flex-col">
+            <div className="bg-gray-900 text-white p-4 flex items-center gap-3">
+              <button
+                onClick={() => setViewingSong(null)}
+                className="p-2 hover:bg-gray-800 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <div>
+                <div className="font-semibold">{viewingSong.title}</div>
+                <div className="text-sm text-gray-400">{viewingSong.composer}</div>
+              </div>
+            </div>
+            <div 
+              className="flex-1"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {viewingSong.sheet_music_url ? (
+                <iframe
+                  src={viewingSong.sheet_music_url}
+                  className="w-full h-full border-0"
+                  title={viewingSong.title}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-white">
+                  <div className="text-center">
+                    <Music className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                    <p>No sheet music available</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

@@ -1,0 +1,168 @@
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
+import { Users, Music, Calendar, MessageSquare, TrendingUp, TrendingDown, Settings } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+interface Stats {
+  totalMembers: number;
+  totalSongs: number;
+  upcomingEvents: number;
+  totalMessages: number;
+  membersTrend: number;
+  songsTrend: number;
+  eventsTrend: number;
+  messagesTrend: number;
+}
+
+interface Event {
+  id: string;
+  title: string;
+  date: string;
+  time: string;
+  location: string;
+  rsvp_count?: number;
+  total_capacity?: number;
+}
+
+interface Activity {
+  id: string;
+  user_name: string;
+  action: string;
+  timestamp: string;
+  initial: string;
+  color: string;
+}
+
+export const AdminDashboard = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [stats, setStats] = useState<Stats>({
+    totalMembers: 0,
+    totalSongs: 0,
+    upcomingEvents: 0,
+    totalMessages: 0,
+    membersTrend: 0,
+    songsTrend: 0,
+    eventsTrend: 0,
+    messagesTrend: 0,
+  });
+  const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [adminName, setAdminName] = useState('Admin');
+
+  useEffect(() => {
+    fetchAllData();
+  }, []);
+
+  const fetchAllData = async () => {
+    try {
+      setLoading(true);
+      await Promise.all([
+        fetchStats(),
+        fetchAdminName(),
+        fetchUpcomingEvents(),
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAdminName = async () => {
+    try {
+      if (user?.email) {
+        const { data } = await supabase
+          .from('members')
+          .select('first_name')
+          .eq('email', user.email)
+          .single();
+
+        if (data?.first_name) {
+          setAdminName(data.first_name);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching admin name:', error);
+    }
+  };
+
+  const fetchStats = async () => {
+    try {
+      const [membersRes, songsRes, eventsRes, messagesRes] = await Promise.all([
+        supabase.from('members').select('id, created_at'),
+        supabase.from('songs').select('id, created_at'),
+        supabase.from('events').select('id').gte('date', new Date().toISOString().split('T')[0]),
+        supabase.from('messages').select('id, created_at')
+      ]);
+
+      // Calculate trends (new items in last 7 days)
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+      const membersTrend = membersRes.data?.filter(m => new Date(m.created_at) > sevenDaysAgo).length || 0;
+      const songsTrend = songsRes.data?.filter(s => new Date(s.created_at) > sevenDaysAgo).length || 0;
+      const messagesTrend = messagesRes.data?.filter(m => new Date(m.created_at) > sevenDaysAgo).length || 0;
+
+      setStats({
+        totalMembers: membersRes.data?.length || 0,
+        totalSongs: songsRes.data?.length || 0,
+        upcomingEvents: eventsRes.data?.length || 0,
+        totalMessages: messagesRes.data?.length || 0,
+        membersTrend,
+        songsTrend,
+        eventsTrend: 0,
+        messagesTrend,
+      });
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    }
+  };
+
+  const fetchUpcomingEvents = async () => {
+    try {
+      const { data } = await supabase
+        .from('events')
+        .select('*')
+        .gte('date', new Date().toISOString().split('T')[0])
+        .order('date', { ascending: true })
+        .limit(3);
+
+      setUpcomingEvents(data || []);
+    } catch (error) {
+      console.error('Error fetching events:', error);
+    }
+  };
+
+  if (loading) {
+    return (
+    <div className="space-y-6">
+      {/* Welcome Banner */}
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg p-6 text-white shadow-lg">
+        <h1 className="text-3xl font-bold mb-1">
+          {getGreeting()}, {memberInfo?.first_name || "Admin"}! 👋
+        </h1>
+        <p className="text-indigo-100">Welcome to EGMChoir hub Admin Dashboard</p>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {stats.map((stat) => {
+          const Icon = stat.icon;
+          return (
+            <div
+              key={stat.label}
+              className="bg-white rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <Icon className="w-8 h-8 text-indigo-600" />
+              </div>
+              <p className="text-3xl font-bold text-gray-900 mb-1">{stat.value}</p>
+              <p className="text-sm text-gray-600">{stat.label}</p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+    );
+};

@@ -1,0 +1,202 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
+import { Calendar, Plus, Edit, Trash2, MapPin, Clock, Users } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+interface Event {
+  id: string;
+  title: string;
+  date: string;
+  time: string;
+  location: string;
+  description?: string;
+  type?: string;
+  requires_rsvp: boolean;
+  setlist?: string[];
+}
+
+export const AdminEvents = () => {
+  const navigate = useNavigate();
+  const [events, setEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [rsvpCounts, setRsvpCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    fetchEvents();
+  }, []);
+
+  const fetchEvents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .order('date', { ascending: true });
+
+      if (error) throw error;
+      setEvents(data || []);
+
+      // Fetch RSVP counts for each event
+      if (data) {
+        const counts: Record<string, number> = {};
+        for (const event of data) {
+          if (event.requires_rsvp) {
+            const { count } = await supabase
+              .from('rsvps')
+              .select('*', { count: 'exact', head: true })
+              .eq('event_id', event.id)
+              .eq('status', 'attending');
+            counts[event.id] = count || 0;
+          }
+        }
+        setRsvpCounts(counts);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Failed to load events');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (e: React.MouseEvent, id: string, title: string) => {
+    e.stopPropagation();
+    if (!confirm(`Delete "${title}"?`)) return;
+
+    try {
+      const { error } = await supabase.from('events').delete().eq('id', id);
+      if (error) throw error;
+      setEvents(events.filter(e => e.id !== id));
+      toast.success('Event deleted');
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Failed to delete');
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+  };
+
+  const formatTime = (timeStr: string) => {
+    const [hours, minutes] = timeStr.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
+  };
+
+  if (loading) {
+    return <div className="flex justify-center p-12">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+    </div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Events</h1>
+          <p className="text-gray-600">{events.length} upcoming events</p>
+        </div>
+        <button
+          onClick={() => navigate('/admin/events/new')}
+          className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:shadow-lg"
+        >
+          <Plus className="w-5 h-5" />
+          Add Event
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {events.map((event) => (
+          <div
+            key={event.id}
+            className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all border border-gray-100"
+          >
+            <div 
+              onClick={() => navigate(`/admin/events/${event.id}`)}
+              className="p-6 space-y-4 cursor-pointer"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">{event.title}</h3>
+                  {event.type && (
+                    <span className="inline-block px-3 py-1 bg-indigo-100 text-indigo-800 text-xs font-medium rounded-full">
+                      {event.type}
+                    </span>
+                  )}
+                </div>
+                <Calendar className="w-6 h-6 text-indigo-600" />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-gray-600">
+                  <Calendar className="w-4 h-4" />
+                  <span className="text-sm">{formatDate(event.date)}</span>
+                </div>
+                <div className="flex items-center gap-2 text-gray-600">
+                  <Clock className="w-4 h-4" />
+                  <span className="text-sm">{formatTime(event.time)}</span>
+                </div>
+                <div className="flex items-center gap-2 text-gray-600">
+                  <MapPin className="w-4 h-4" />
+                  <span className="text-sm">{event.location}</span>
+                </div>
+              </div>
+
+              {event.description && (
+                <p className="text-sm text-gray-600 line-clamp-2">{event.description}</p>
+              )}
+
+              {event.requires_rsvp && (
+                <div className="flex items-center gap-2 pt-2 border-t">
+                  <Users className="w-4 h-4 text-green-600" />
+                  <span className="text-sm font-medium text-green-600">
+                    {rsvpCounts[event.id] || 0} RSVPs
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 p-6 pt-0">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/admin/events/${event.id}/edit`);
+                }}
+                className="flex-1 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100"
+              >
+                <Edit className="w-4 h-4 mx-auto" />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(e, event.id, event.title);
+                }}
+                className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {events.length === 0 && (
+        <div className="bg-white rounded-xl shadow-md p-12 text-center">
+          <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">No events yet</h3>
+          <p className="text-gray-600 mb-6">Create your first event to get started</p>
+          <button
+            onClick={() => navigate('/admin/events/new')}
+            className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:shadow-lg"
+          >
+            Add Event
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
