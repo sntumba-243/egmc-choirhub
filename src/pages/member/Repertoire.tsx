@@ -1,278 +1,283 @@
-import { useEffect, useState } from 'react';
-import { Search, Heart, Eye, X, ChevronDown } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { isMobile } from '../../utils/mobile-helpers';
+import '../../styles/mobile-optimization.css';
 
 interface Song {
   id: string;
   title: string;
-  composer?: string;
-  language?: string;
-  sheet_music_url?: string;
+  composer: string | null;
+  language: 'english' | 'french';
+  sheet_music_url: string | null;
+  practice_track_url: string | null;
+  created_at: string;
 }
 
-export const MemberRepertoire = () => {
+interface Favorite {
+  id: string;
+  song_id: string;
+}
+
+export function Repertoire() {
+  const navigate = useNavigate();
   const [songs, setSongs] = useState<Song[]>([]);
-  const [filteredSongs, setFilteredSongs] = useState<Song[]>([]);
+  const [favorites, setFavorites] = useState<Favorite[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [languageFilter, setLanguageFilter] = useState('all');
-  const [viewingSong, setViewingSong] = useState<Song | null>(null);
-  const [favorites, setFavorites] = useState<Set<string>>(new Set());
-  const [userId, setUserId] = useState<string>('');
-  const [showFilters, setShowFilters] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterLanguage, setFilterLanguage] = useState<'all' | 'english' | 'french'>('all');
+  const [userId, setUserId] = useState<string | null>(null);
+  const mobile = isMobile();
 
   useEffect(() => {
-    fetchUserId();
+    loadData();
   }, []);
 
-  useEffect(() => {
-    if (userId) {
-      fetchData();
-    }
-  }, [userId]);
-
-  useEffect(() => {
-    filterSongs();
-  }, [songs, searchTerm, languageFilter]);
-
-  const fetchUserId = async () => {
+  async function loadData() {
     try {
+      setLoading(true);
+      setError(null);
+
+      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) setUserId(user.id);
-    } catch (error) {
-      console.error('Error fetching user:', error);
-    }
-  };
+      if (!user) throw new Error('Not authenticated');
+      setUserId(user.id);
 
-  const fetchData = async () => {
-    try {
-      const [songsRes, favoritesRes] = await Promise.all([
-        supabase.from('songs').select('*').order('title'),
-        supabase.from('favorites').select('song_id').eq('user_id', userId)
-      ]);
+      // Load songs
+      const { data: songData, error: songError } = await supabase
+        .from('songs')
+        .select('*')
+        .order('title');
 
-      if (songsRes.error) throw songsRes.error;
-      setSongs(songsRes.data || []);
-      
-      if (favoritesRes.data) {
-        setFavorites(new Set(favoritesRes.data.map(f => f.song_id)));
-      }
-    } catch (error) {
-      console.error('Error fetching data:', error);
+      if (songError) throw songError;
+      setSongs(songData || []);
+
+      // Load favorites
+      const { data: favData, error: favError } = await supabase
+        .from('favorites')
+        .select('id, song_id')
+        .eq('user_id', user.id);
+
+      if (favError) throw favError;
+      setFavorites(favData || []);
+
+    } catch (err) {
+      console.error('Error loading data:', err);
+      setError('Failed to load songs');
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const filterSongs = () => {
-    let filtered = songs;
+  async function toggleFavorite(songId: string) {
+    if (!userId) return;
 
-    if (searchTerm) {
-      filtered = filtered.filter(song =>
-        song.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        song.composer?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
+    const isFavorite = favorites.some(f => f.song_id === songId);
 
-    if (languageFilter !== 'all') {
-      filtered = filtered.filter(song => song.language === languageFilter);
-    }
-
-    setFilteredSongs(filtered);
-  };
-
-  const toggleFavorite = async (songId: string) => {
     try {
-      if (favorites.has(songId)) {
-        await supabase.from('favorites').delete().eq('user_id', userId).eq('song_id', songId);
-        setFavorites(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(songId);
-          return newSet;
-        });
-      } else {
-        await supabase.from('favorites').insert([{ user_id: userId, song_id: songId }]);
-        setFavorites(prev => new Set(prev).add(songId));
-      }
-    } catch (error) {
-      console.error('Error toggling favorite:', error);
-    }
-  };
+      if (isFavorite) {
+        // Remove favorite
+        const favorite = favorites.find(f => f.song_id === songId);
+        if (favorite) {
+          const { error } = await supabase
+            .from('favorites')
+            .delete()
+            .eq('id', favorite.id);
 
-  const getEmbedUrl = (url: string): string => {
-    try {
-      if (url.includes('drive.google.com')) {
-        const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-        if (fileIdMatch) {
-          return `https://drive.google.com/file/d/${fileIdMatch[1]}/preview`;
+          if (error) throw error;
+          setFavorites(favorites.filter(f => f.id !== favorite.id));
         }
-      }
-      return url;
-    } catch (error) {
-      return '';
-    }
-  };
+      } else {
+        // Add favorite
+        const { data, error } = await supabase
+          .from('favorites')
+          .insert({ user_id: userId, song_id: songId })
+          .select()
+          .single();
 
-  const languages = ['all', ...Array.from(new Set(songs.map(s => s.language).filter(Boolean)))];
+        if (error) throw error;
+        setFavorites([...favorites, data]);
+      }
+    } catch (err) {
+      console.error('Error toggling favorite:', err);
+      setError('Failed to update favorite');
+    }
+  }
+
+  function handleViewSheetMusic(song: Song) {
+    if (!song.sheet_music_url) return;
+    
+    // Navigate to PDF viewer with minimal bezel
+    navigate('/pdf-viewer', {
+      state: {
+        url: song.sheet_music_url,
+        title: song.title
+      }
+    });
+  }
+
+  function getLanguageFlag(language: string) {
+    return language === 'english' ? '🇬🇧' : '🇫🇷';
+  }
+
+  function isFavorite(songId: string) {
+    return favorites.some(f => f.song_id === songId);
+  }
+
+  // Filter songs
+  const filteredSongs = songs.filter(song => {
+    const matchesSearch = 
+      song.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (song.composer && song.composer.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    const matchesLanguage = filterLanguage === 'all' || song.language === filterLanguage;
+
+    return matchesSearch && matchesLanguage;
+  });
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mb-3"></div>
-        <p className="text-gray-600 text-sm">Loading repertoire...</p>
+      <div className={mobile ? 'mobile-container' : 'container mx-auto px-4 py-8'}>
+        <div className="text-center py-12">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <p className="mt-4 text-gray-600">Loading songs...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4 pb-4">
+    <div className={mobile ? 'mobile-container' : 'container mx-auto px-4 py-8'}>
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Repertoire</h1>
-        <div className="text-sm font-medium text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
-          {filteredSongs.length}
-        </div>
-      </div>
+      <h1 className={mobile ? 'text-2xl font-bold text-gray-900 mb-4' : 'text-3xl font-bold text-gray-900 mb-6'}>
+        Repertoire
+      </h1>
 
-      {/* Search Bar */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-        <input
-          type="text"
-          placeholder="Search songs..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
-        />
-      </div>
-
-      {/* Filters Toggle */}
-      <button
-        onClick={() => setShowFilters(!showFilters)}
-        className="w-full flex items-center justify-between px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
-      >
-        <span className="text-sm font-medium text-gray-700">
-          {languageFilter === 'all' ? 'All Languages' : languageFilter}
-        </span>
-        <ChevronDown className={`w-4 h-4 text-gray-600 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
-      </button>
-
-      {/* Language Filter Dropdown */}
-      {showFilters && (
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <label className="block text-xs font-medium text-gray-700 mb-2">Language</label>
-          <select
-            value={languageFilter}
-            onChange={(e) => {
-              setLanguageFilter(e.target.value);
-              setShowFilters(false);
-            }}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
-          >
-            {languages.map(lang => (
-              <option key={lang} value={lang}>
-                {lang === 'all' ? 'All Languages' : lang}
-              </option>
-            ))}
-          </select>
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
+          {error}
         </div>
       )}
 
-      {/* Songs List */}
+      {/* Search */}
+      <div className="mb-4">
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search by title or composer..."
+          className={mobile ? 'mobile-input' : 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'}
+        />
+      </div>
+
+      {/* Language Filter */}
+      <div className={mobile ? 'mobile-tabs mb-4' : 'flex gap-2 mb-6'}>
+        <button
+          onClick={() => setFilterLanguage('all')}
+          className={`${mobile ? 'mobile-tab' : 'px-4 py-2 rounded-lg'} ${
+            filterLanguage === 'all'
+              ? mobile ? 'mobile-tab-active' : 'bg-blue-600 text-white'
+              : mobile ? '' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+          }`}
+        >
+          All
+        </button>
+        <button
+          onClick={() => setFilterLanguage('english')}
+          className={`${mobile ? 'mobile-tab' : 'px-4 py-2 rounded-lg'} ${
+            filterLanguage === 'english'
+              ? mobile ? 'mobile-tab-active' : 'bg-blue-600 text-white'
+              : mobile ? '' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+          }`}
+        >
+          🇬🇧 English
+        </button>
+        <button
+          onClick={() => setFilterLanguage('french')}
+          className={`${mobile ? 'mobile-tab' : 'px-4 py-2 rounded-lg'} ${
+            filterLanguage === 'french'
+              ? mobile ? 'mobile-tab-active' : 'bg-blue-600 text-white'
+              : mobile ? '' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+          }`}
+        >
+          🇫🇷 French
+        </button>
+      </div>
+
+      {/* Song Count */}
+      <div className="mb-4 text-sm text-gray-600">
+        {filteredSongs.length} {filteredSongs.length === 1 ? 'song' : 'songs'}
+      </div>
+
+      {/* Songs List - Clean & Simple */}
       {filteredSongs.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-gray-600 text-sm">
-            {songs.length === 0 ? 'No songs in repertoire yet' : 'No songs found'}
-          </p>
+        <div className={mobile ? 'mobile-card' : 'bg-white rounded-lg shadow-md p-8'}>
+          <div className="text-center text-gray-500">
+            <p className="text-4xl mb-3">🎵</p>
+            <p className="text-lg">No songs found</p>
+          </div>
         </div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-200">
+        <div className="space-y-2">
           {filteredSongs.map((song) => (
             <div
               key={song.id}
-              className="px-4 py-3 hover:bg-gray-50 transition-colors flex items-center justify-between gap-3"
+              className={mobile ? 'mobile-card' : 'bg-white rounded-lg shadow-md p-4'}
             >
-              {/* Song Info */}
-              <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-medium text-gray-900 truncate">
-                  {song.title}
-                </h3>
-                {song.language && (
-                  <span className="inline-block mt-1 px-2 py-0.5 text-xs font-medium text-purple-700 bg-purple-50 rounded-full">
-                    {song.language}
-                  </span>
-                )}
-              </div>
+              {/* Clean Row Layout: Title | Language | Heart | View */}
+              <div className="flex items-center gap-3">
+                {/* Title & Composer */}
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-900 truncate">
+                    {song.title}
+                  </p>
+                  {song.composer && (
+                    <p className="text-sm text-gray-500 truncate">
+                      {song.composer}
+                    </p>
+                  )}
+                </div>
 
-              {/* Actions */}
-              <div className="flex items-center gap-2 flex-shrink-0">
+                {/* Language Flag */}
+                <div className="text-2xl flex-shrink-0">
+                  {getLanguageFlag(song.language)}
+                </div>
+
                 {/* Favorite Button */}
                 <button
                   onClick={() => toggleFavorite(song.id)}
-                  className={`p-2 rounded-lg transition-colors ${
-                    favorites.has(song.id)
-                      ? 'text-red-600 bg-red-50 hover:bg-red-100'
-                      : 'text-gray-400 bg-gray-50 hover:bg-gray-100'
-                  }`}
-                  aria-label="Toggle favorite"
+                  className="text-2xl flex-shrink-0 w-10 h-10 flex items-center justify-center"
                 >
-                  <Heart
-                    className={`w-4 h-4 ${favorites.has(song.id) ? 'fill-current' : ''}`}
-                  />
+                  {isFavorite(song.id) ? '❤️' : '🤍'}
                 </button>
 
-                {/* View Button */}
+                {/* View Button - Only if has sheet music */}
                 {song.sheet_music_url && (
                   <button
-                    onClick={() => setViewingSong(song)}
-                    className="p-2 rounded-lg text-purple-600 bg-purple-50 hover:bg-purple-100 transition-colors"
-                    aria-label="View sheet music"
+                    onClick={() => handleViewSheetMusic(song)}
+                    className={mobile ? 'mobile-button mobile-button-primary text-sm px-3 py-1' : 'px-3 py-1 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700'}
                   >
-                    <Eye className="w-4 h-4" />
+                    👁️ View
                   </button>
+                )}
+
+                {/* Practice Track Icon - Only if has track */}
+                {song.practice_track_url && (
+                  <a
+                    href={song.practice_track_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-2xl flex-shrink-0"
+                  >
+                    🎧
+                  </a>
                 )}
               </div>
             </div>
           ))}
         </div>
       )}
-
-      {/* Fullscreen Sheet Music Viewer */}
-      {viewingSong && viewingSong.sheet_music_url && getEmbedUrl(viewingSong.sheet_music_url) && (
-        <div className="fixed inset-0 bg-black/70 flex items-end sm:items-center justify-center z-50">
-          <div className="bg-white rounded-t-xl sm:rounded-lg w-full sm:w-full sm:max-w-4xl max-h-[90vh] sm:max-h-[90vh] flex flex-col overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-gray-200 flex-shrink-0">
-              <div className="flex-1 min-w-0">
-                <h2 className="text-base sm:text-xl font-bold text-gray-900 truncate">
-                  {viewingSong.title}
-                </h2>
-                {viewingSong.composer && (
-                  <p className="text-xs sm:text-sm text-gray-500 truncate">
-                    {viewingSong.composer}
-                  </p>
-                )}
-              </div>
-              <button
-                onClick={() => setViewingSong(null)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
-                aria-label="Close"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            {/* Sheet Music */}
-            <div className="flex-1 overflow-auto">
-              <iframe
-                src={getEmbedUrl(viewingSong.sheet_music_url)}
-                className="w-full h-full"
-                title={viewingSong.title}
-              />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
-};
+}

@@ -9,6 +9,9 @@ import PWAUpdateNotification from './components/PWAUpdateNotification';
 import EnhancedOfflineIndicator from './components/EnhancedOfflineIndicator';
 
 // Auth Pages
+
+// PDF Viewer
+import { PDFViewerPage } from './components/PDFViewer-MOBILE';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 
@@ -71,6 +74,9 @@ function AppRoutes() {
       {/* Public Routes */}
       <Route path="/login" element={!user ? <Login /> : <Navigate to={user.role === 'admin' ? '/admin' : '/member'} />} />
       <Route path="/register" element={!user ? <Register /> : <Navigate to={user.role === 'admin' ? '/admin' : '/member'} />} />
+
+      {/* PDF Viewer */}
+      <Route path="/pdf-viewer" element={<PDFViewerPage />} />
 
       {/* Member Routes */}
       <Route path="/member" element={

@@ -22,6 +22,7 @@ export const SongDetail = () => {
   const [downloading, setDownloading] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isPracticing, setIsPracticing] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const [practiceTime, setPracticeTime] = useState(0);
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [practiceNotes, setPracticeNotes] = useState('');
@@ -422,6 +423,45 @@ export const SongDetail = () => {
           </div>
         </div>
       )}
+
+      {/* Fullscreen Sheet Music Viewer */}
+      {fullscreen && song?.sheet_music_url && (
+        <div className="fixed inset-0 z-50 bg-black">
+          <div className="h-full flex flex-col">
+            <div className="flex items-center justify-between p-4 bg-gray-900 text-white">
+              <h2 className="text-lg font-semibold">{song.title} - Sheet Music</h2>
+              <button
+                onClick={() => {
+                  if (searchParams.get('fullscreen') === 'true') {
+                    navigate(-1); // Go back to where we came from
+                  } else {
+                    setFullscreen(false); // Just close fullscreen
+                  }
+                }}
+                className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+              >
+                <Minimize className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto bg-gray-100">
+              {song.sheet_music_url.endsWith('.pdf') ? (
+                <iframe
+                  src={song.sheet_music_url}
+                  className="w-full h-full"
+                  title="Sheet Music"
+                />
+              ) : (
+                <img
+                  src={song.sheet_music_url}
+                  alt="Sheet Music"
+                  className="w-full h-full object-contain"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
