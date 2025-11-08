@@ -13,7 +13,7 @@ import {
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 
-const MemberLayout = () => {
+export const MemberLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { signOut } = useAuth();
@@ -54,7 +54,7 @@ const MemberLayout = () => {
       {/* Sticky Header */}
       <div className="sticky top-0 z-40 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
         <h1 className="text-lg font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-          EGMChoir hub
+          ChoirHub
         </h1>
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -141,5 +141,3 @@ const MemberLayout = () => {
     </div>
   );
 };
-
-export default MemberLayout;

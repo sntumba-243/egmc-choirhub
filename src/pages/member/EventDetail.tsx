@@ -1,232 +1,286 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Calendar, MapPin, Clock, Music, Check, X, HelpCircle } from 'lucide-react';
-import { eventsService, songsService, rsvpService, Event, Song, RSVP } from '../../lib/database';
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
+import { Calendar, Clock, MapPin, Music, ArrowLeft, Users } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import toast from 'react-hot-toast';
 
-interface EventDetailProps {
-  eventId: string;
-  onBack: () => void;
-  onNavigateToSong: (songId: string) => void;
+interface Event {
+  id: string;
+  title: string;
+  date: string;
+  time: string;
+  location: string;
+  description?: string;
+  type?: string;
+  requires_rsvp: boolean;
+  setlist?: string[];
 }
 
-export const EventDetail: React.FC<EventDetailProps> = ({ eventId, onBack, onNavigateToSong }) => {
+interface Song {
+  id: string;
+  title: string;
+  composer: string;
+}
+
+export const EventDetail = () => {
+  const { eventId } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
+  
+  console.log('EventDetail - eventId from useParams:', eventId);
+  console.log('EventDetail - user:', user);
+  
   const [event, setEvent] = useState<Event | null>(null);
   const [songs, setSongs] = useState<Song[]>([]);
+  const [rsvpStatus, setRsvpStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [rsvp, setRsvp] = useState<RSVP | null>(null);
-  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    loadEventAndSongs();
-    if (user) {
-      loadRSVP();
+    if (eventId) {
+      fetchEvent();
+      checkRsvpStatus();
     }
-  }, [eventId, user]);
+  }, [eventId]);
 
-  const loadEventAndSongs = async () => {
+  const fetchEvent = async () => {
     try {
-      const [eventsData, songsData] = await Promise.all([
-        eventsService.getEvents(),
-        songsService.getSongs(),
-      ]);
-      const foundEvent = eventsData.find(e => e.id === eventId);
-      setEvent(foundEvent || null);
-      setSongs(songsData);
+      const { data: eventData, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('id', eventId)
+        .single();
+
+      if (error) throw error;
+      setEvent(eventData);
+
+      if (eventData.setlist && eventData.setlist.length > 0) {
+        const { data: songsData } = await supabase
+          .from('songs')
+          .select('id, title, composer')
+          .in('id', eventData.setlist);
+        
+        if (songsData) {
+          const orderedSongs = eventData.setlist
+            .map((songId: string) => songsData.find(s => s.id === songId))
+            .filter(Boolean);
+          setSongs(orderedSongs as Song[]);
+        }
+      }
     } catch (error) {
-      console.error('Error loading event:', error);
+      console.error('Error:', error);
+      toast.error('Failed to load event');
     } finally {
       setLoading(false);
     }
   };
 
-  const loadRSVP = async () => {
+  const checkRsvpStatus = async () => {
     if (!user) return;
+
     try {
-      const userRsvp = await rsvpService.getUserRSVP(eventId, user.id);
-      setRsvp(userRsvp);
+      const { data } = await supabase
+        .from('rsvps')
+        .select('status')
+        .eq('event_id', eventId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (data) {
+        setRsvpStatus(data.status);
+      }
     } catch (error) {
-      console.error('Error loading RSVP:', error);
+      console.log('No RSVP found yet');
     }
   };
 
-  const handleRSVP = async (status: 'yes' | 'no' | 'maybe') => {
-    if (!user) return;
-    setSubmitting(true);
-    try {
-      const newRsvp = await rsvpService.upsertRSVP({
-        event_id: eventId,
-        user_id: user.id,
-        status,
-      });
-      setRsvp(newRsvp);
-    } catch (error) {
-      console.error('Error updating RSVP:', error);
-      alert('Failed to update attendance');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const handleRsvp = async (status: string) => {
+    if (!user || !event) return;
 
-  const getSongById = (id: string): Song | undefined => {
-    return songs.find(s => s.id === id);
-  };
-
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
-
-  const getEventTypeColor = (type: string): string => {
-    const colors: Record<string, string> = {
-      rehearsal: 'bg-blue-100 text-blue-700',
-      concert: 'bg-purple-100 text-purple-700',
-      social: 'bg-green-100 text-green-700',
-      other: 'bg-gray-100 text-gray-700',
+    // Map UI values to database values
+    const dbStatusMap: { [key: string]: string } = {
+      'attending': 'yes',
+      'not attending': 'no',
+      'maybe': 'maybe'
     };
-    return colors[type.toLowerCase()] || 'bg-gray-100 text-gray-700';
+    
+    const dbStatus = dbStatusMap[status] || status;
+
+    try {
+      if (rsvpStatus) {
+        const { error } = await supabase
+          .from('rsvps')
+          .update({ status: dbStatus })
+          .eq('event_id', event.id)
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('rsvps')
+          .insert([{
+            event_id: event.id,
+            user_id: user.id,
+            status: dbStatus
+          }]);
+
+        if (error) throw error;
+      }
+
+      setRsvpStatus(status);
+      toast.success(`RSVP updated: ${status}`);
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Failed to update RSVP');
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  };
+
+  const formatTime = (timeStr: string) => {
+    const [hours, minutes] = timeStr.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-blue-50">
-        <div className="text-blue-900 text-xl">Loading event...</div>
-      </div>
-    );
+    return <div className="flex justify-center p-12">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+    </div>;
   }
 
   if (!event) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-blue-50">
-        <div className="text-red-900 text-xl">Event not found</div>
-      </div>
-    );
+    return <div className="text-center p-12">
+      <h2 className="text-2xl font-bold mb-4">Event not found</h2>
+      <button onClick={() => navigate('/member/calendar')} className="text-indigo-600">Back to Calendar</button>
+    </div>;
   }
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white rounded-xl shadow-md p-6">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-blue-900 font-semibold hover:text-blue-700 mb-4"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          Back to Calendar
-        </button>
+    <div className="max-w-4xl mx-auto space-y-6 p-4">
+      <button onClick={() => navigate('/member/calendar')} className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700">
+        <ArrowLeft className="w-5 h-5" />
+        Back to Calendar
+      </button>
 
-        <div className="flex items-start justify-between gap-4 mb-4">
-          <div className="flex-1">
-            <h2 className="text-3xl font-bold text-blue-900 mb-2">{event.title}</h2>
-            <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${getEventTypeColor(event.type)}`}>
+      <div className="bg-white rounded-xl shadow-md overflow-hidden">
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-8 text-white">
+          <h1 className="text-3xl md:text-4xl font-bold mb-2">{event.title}</h1>
+          {event.type && (
+            <span className="inline-block px-3 py-1 bg-white/20 rounded-full text-sm">
               {event.type}
             </span>
-          </div>
+          )}
         </div>
 
-        <div className="space-y-3 mb-6">
-          <div className="flex items-center gap-3 text-gray-700">
-            <Calendar className="w-5 h-5 text-blue-600" />
-            <span className="font-medium">{formatDate(event.date)}</span>
+        <div className="p-6 md:p-8 space-y-6">
+          <div className="grid md:grid-cols-3 gap-4">
+            <div className="flex items-center gap-3">
+              <Calendar className="w-5 h-5 text-indigo-600" />
+              <div>
+                <div className="text-sm text-gray-600">Date</div>
+                <div className="font-semibold">{formatDate(event.date)}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Clock className="w-5 h-5 text-indigo-600" />
+              <div>
+                <div className="text-sm text-gray-600">Time</div>
+                <div className="font-semibold">{formatTime(event.time)}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <MapPin className="w-5 h-5 text-indigo-600" />
+              <div>
+                <div className="text-sm text-gray-600">Location</div>
+                <div className="font-semibold">{event.location}</div>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-3 text-gray-700">
-            <Clock className="w-5 h-5 text-blue-600" />
-            <span className="font-medium">{event.time}</span>
-          </div>
-          <div className="flex items-center gap-3 text-gray-700">
-            <MapPin className="w-5 h-5 text-blue-600" />
-            <span className="font-medium">{event.location}</span>
-          </div>
-        </div>
 
-        {event.description && (
-          <div className="p-4 bg-gray-50 rounded-lg mb-6">
-            <p className="text-gray-700">{event.description}</p>
-          </div>
-        )}
+          {event.description && (
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Description</h3>
+              <p className="text-gray-700">{event.description}</p>
+            </div>
+          )}
 
-        <div className="border-t pt-6">
-          <h3 className="text-lg font-bold text-blue-900 mb-4">Will you attend?</h3>
-          <div className="flex gap-3">
-            <button
-              onClick={() => handleRSVP('yes')}
-              disabled={submitting}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-semibold transition-all disabled:opacity-50 ${
-                rsvp?.status === 'yes'
-                  ? 'bg-green-600 text-white shadow-lg'
-                  : 'bg-green-100 text-green-700 hover:bg-green-200'
-              }`}
-            >
-              <Check className="w-5 h-5" />
-              Yes
-            </button>
-            <button
-              onClick={() => handleRSVP('maybe')}
-              disabled={submitting}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-semibold transition-all disabled:opacity-50 ${
-                rsvp?.status === 'maybe'
-                  ? 'bg-yellow-600 text-white shadow-lg'
-                  : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
-              }`}
-            >
-              <HelpCircle className="w-5 h-5" />
-              Maybe
-            </button>
-            <button
-              onClick={() => handleRSVP('no')}
-              disabled={submitting}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-semibold transition-all disabled:opacity-50 ${
-                rsvp?.status === 'no'
-                  ? 'bg-red-600 text-white shadow-lg'
-                  : 'bg-red-100 text-red-700 hover:bg-red-200'
-              }`}
-            >
-              <X className="w-5 h-5" />
-              No
-            </button>
-          </div>
-          {rsvp && (
-            <p className="text-center text-sm text-gray-600 mt-3">
-              You responded: <span className="font-semibold capitalize">{rsvp.status}</span>
-            </p>
+          {songs.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <Music className="w-5 h-5 text-indigo-600" />
+                <h3 className="text-lg font-semibold">Setlist ({songs.length} songs)</h3>
+              </div>
+              <div className="space-y-2">
+                {songs.map((song, index) => (
+                  <button
+                    key={song.id}
+                    onClick={() => navigate(`/member/repertoire/${song.id}?fullscreen=true`)}
+                    className="w-full flex items-start gap-3 p-3 bg-gray-50 hover:bg-indigo-50 rounded-lg transition-all text-left"
+                  >
+                    <span className="text-sm font-semibold text-indigo-600 mt-1">#{index + 1}</span>
+                    <div>
+                      <div className="font-medium">{song.title}</div>
+                      <div className="text-sm text-gray-600">{song.composer}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {event.requires_rsvp && (
+            <div className="border-t pt-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Users className="w-5 h-5 text-indigo-600" />
+                <h3 className="text-lg font-semibold">RSVP</h3>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <button
+                  onClick={() => handleRsvp('attending')}
+                  className={`px-4 py-3 rounded-lg font-medium transition-all ${
+                    rsvpStatus === 'attending'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-green-50 text-green-600 hover:bg-green-100'
+                  }`}
+                >
+                  ✓ Attending
+                </button>
+                <button
+                  onClick={() => handleRsvp('maybe')}
+                  className={`px-4 py-3 rounded-lg font-medium transition-all ${
+                    rsvpStatus === 'maybe'
+                      ? 'bg-yellow-600 text-white'
+                      : 'bg-yellow-50 text-yellow-600 hover:bg-yellow-100'
+                  }`}
+                >
+                  ? Maybe
+                </button>
+                <button
+                  onClick={() => handleRsvp('not attending')}
+                  className={`px-4 py-3 rounded-lg font-medium transition-all ${
+                    rsvpStatus === 'not attending'
+                      ? 'bg-red-600 text-white'
+                      : 'bg-red-50 text-red-600 hover:bg-red-100'
+                  }`}
+                >
+                  ✗ Not Attending
+                </button>
+              </div>
+              {rsvpStatus && (
+                <p className="text-sm text-gray-600 mt-3 text-center">
+                  Your RSVP: <strong className="capitalize">{rsvpStatus}</strong>
+                </p>
+              )}
+            </div>
           )}
         </div>
       </div>
-
-      {event.setlist && event.setlist.length > 0 && (
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <h3 className="text-xl font-bold text-blue-900 mb-4 flex items-center gap-2">
-            <Music className="w-6 h-6" />
-            Setlist ({event.setlist.length} songs)
-          </h3>
-          <div className="space-y-2">
-            {event.setlist.map((songId, index) => {
-              const song = getSongById(songId);
-              if (!song) return null;
-              return (
-                <button
-                  key={songId}
-                  onClick={() => onNavigateToSong(songId)}
-                  className="w-full flex items-center gap-3 p-4 bg-gray-50 rounded-lg hover:bg-blue-50 hover:shadow-md transition-all text-left group"
-                >
-                  <span className="text-lg font-bold text-gray-500 w-8 group-hover:text-blue-600">{index + 1}.</span>
-                  <div className="flex-1">
-                    <div className="font-semibold text-gray-900 group-hover:text-blue-900">{song.title}</div>
-                    <div className="text-sm text-gray-600">{song.composer}</div>
-                  </div>
-                  <div className="text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Music className="w-5 h-5" />
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

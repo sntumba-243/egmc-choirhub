@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Download, Check, FileText, Music2, Youtube, ExternalLink, Play, Pause, Clock } from 'lucide-react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, Maximize, Minimize, Download, Check, FileText, Music2, Youtube, ExternalLink, Play, Pause, Clock } from 'lucide-react';
 import { offlineStorage } from '../../lib/offlineStorage';
 import { practiceLogService } from '../../lib/practiceLog';
 import { useAuth } from '../../contexts/AuthContext';
@@ -10,7 +11,10 @@ interface SongDetailProps {
   onBack: () => void;
 }
 
-export const SongDetail: React.FC<SongDetailProps> = ({ songId, onBack }) => {
+export const SongDetail = () => {
+  const { id: songId } = useParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const [song, setSong] = useState<Song | null>(null);
   const [loading, setLoading] = useState(true);
@@ -18,6 +22,7 @@ export const SongDetail: React.FC<SongDetailProps> = ({ songId, onBack }) => {
   const [downloading, setDownloading] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isPracticing, setIsPracticing] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const [practiceTime, setPracticeTime] = useState(0);
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [practiceNotes, setPracticeNotes] = useState('');
@@ -26,6 +31,13 @@ export const SongDetail: React.FC<SongDetailProps> = ({ songId, onBack }) => {
   useEffect(() => {
     loadSong();
   }, [songId]);
+
+  // Auto-open fullscreen if URL parameter is set
+  useEffect(() => {
+    if (song && searchParams.get('fullscreen') === 'true') {
+      setFullscreen(true);
+    }
+  }, [song, searchParams]);
 
   const loadSong = async () => {
     try {
@@ -118,6 +130,8 @@ export const SongDetail: React.FC<SongDetailProps> = ({ songId, onBack }) => {
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const isFullscreenMode = searchParams.get('fullscreen') === 'true';
+  
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-blue-50">
@@ -135,10 +149,10 @@ export const SongDetail: React.FC<SongDetailProps> = ({ songId, onBack }) => {
   }
 
   return (
-    <div className="space-y-6">
+    <div style={{ display: !fullscreen && isFullscreenMode ? 'none' : 'block' }} className="space-y-6">
       <div className="bg-white rounded-xl shadow-md p-6">
         <button
-          onClick={onBack}
+          onClick={() => navigate('/member/repertoire')}
           className="flex items-center gap-2 text-blue-900 font-semibold hover:text-blue-700 mb-4"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -211,37 +225,29 @@ export const SongDetail: React.FC<SongDetailProps> = ({ songId, onBack }) => {
 
         <div className="space-y-3">
           {song.sheet_music_url && (
-            <a
-              href={isOnline || isDownloaded ? song.sheet_music_url : '#'}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`flex items-center gap-3 p-4 rounded-lg transition-colors ${
+            <button
+              onClick={() => {
+                if (isOnline || isDownloaded) {
+                  setFullscreen(true);
+                } else {
+                  alert('This resource is not available offline');
+                }
+              }}
+              className={`flex items-center gap-3 p-4 rounded-lg transition-colors w-full text-left ${
                 isOnline || isDownloaded
                   ? 'bg-slate-50 hover:bg-slate-100 border border-slate-200'
                   : 'bg-gray-100 opacity-50 cursor-not-allowed'
               }`}
-              onClick={(e) => {
-                if (!isOnline && !isDownloaded) {
-                  e.preventDefault();
-                  alert('This resource is not available offline');
-                }
-              }}
             >
               <div className="p-2 bg-blue-100 rounded-lg">
                 <FileText className="w-6 h-6 text-blue-700" />
               </div>
               <div className="flex-1">
                 <p className="font-semibold text-slate-900">Sheet Music</p>
-                <p className="text-sm text-slate-600">
-                  {song.sheet_music_url.endsWith('.pdf') && 'PDF Document'}
-                  {song.sheet_music_url.endsWith('.html') && 'HTML Document'}
-                  {(song.sheet_music_url.endsWith('.doc') || song.sheet_music_url.endsWith('.docx')) && 'Word Document'}
-                  {(song.sheet_music_url.endsWith('.png') || song.sheet_music_url.endsWith('.jpg') || song.sheet_music_url.endsWith('.jpeg')) && 'Image File'}
-                  {!song.sheet_music_url.match(/\.(pdf|html|doc|docx|png|jpg|jpeg)$/i) && 'View or download'}
-                </p>
+                <p className="text-sm text-slate-600">Click to view fullscreen</p>
               </div>
-              <ExternalLink className="w-5 h-5 text-slate-400" />
-            </a>
+              <Maximize className="w-5 h-5 text-slate-400" />
+            </button>
           )}
 
           {song.youtube_link && (
@@ -417,6 +423,45 @@ export const SongDetail: React.FC<SongDetailProps> = ({ songId, onBack }) => {
           </div>
         </div>
       )}
+
+      {/* Fullscreen Sheet Music Viewer */}
+      {fullscreen && song?.sheet_music_url && (
+        <div className="fixed inset-0 z-50 bg-black">
+          <div className="h-full flex flex-col">
+            <div className="flex items-center justify-between p-4 bg-gray-900 text-white">
+              <h2 className="text-lg font-semibold">{song.title} - Sheet Music</h2>
+              <button
+                onClick={() => {
+                  if (searchParams.get('fullscreen') === 'true') {
+                    navigate(-1); // Go back to where we came from
+                  } else {
+                    setFullscreen(false); // Just close fullscreen
+                  }
+                }}
+                className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+              >
+                <Minimize className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto bg-gray-100">
+              {song.sheet_music_url.endsWith('.pdf') ? (
+                <iframe
+                  src={song.sheet_music_url}
+                  className="w-full h-full"
+                  title="Sheet Music"
+                />
+              ) : (
+                <img
+                  src={song.sheet_music_url}
+                  alt="Sheet Music"
+                  className="w-full h-full object-contain"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

@@ -45,7 +45,7 @@ export const AdminEvents = () => {
               .from('rsvps')
               .select('*', { count: 'exact', head: true })
               .eq('event_id', event.id)
-              .eq('status', 'yes');
+              .eq('status', 'attending');
             counts[event.id] = count || 0;
           }
         }

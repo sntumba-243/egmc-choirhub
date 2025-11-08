@@ -13,8 +13,8 @@ import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 
 // Layouts
-import MemberLayout from './layouts/MemberLayout';
-import AdminLayout from './layouts/AdminLayout';
+import { MemberLayout } from './layouts/MemberLayout';
+import { AdminLayout } from './layouts/AdminLayout';
 
 // Member Pages
 import { MemberDashboard } from './pages/member/Dashboard-MOBILE';
@@ -24,7 +24,6 @@ import { EventDetail } from './pages/member/EventDetail';
 import { MemberMessages } from './pages/member/Messages-MOBILE';
 import { MemberPractice } from './pages/member/Practice';
 import { MemberProfile } from './pages/member/Profile';
-import { SongDetail } from './pages/member/SongDetail';
 
 // Admin Pages
 import { AdminDashboard } from './pages/admin/Dashboard';
@@ -32,12 +31,6 @@ import { AdminRepertoire } from './pages/admin/Repertoire';
 import { AdminMembers } from './pages/admin/Members';
 import { AdminEvents } from './pages/admin/Events';
 import { AdminMessages } from './pages/admin/Messages';
-import { AdminSettings } from './pages/admin/Settings';
-import { SongForm } from './pages/admin/SongForm';
-import { MemberForm } from './pages/admin/MemberForm';
-import { EventForm } from './pages/admin/EventForm';
-import { AdminEventDetail } from './pages/admin/EventDetail';
-import { MessageForm } from './pages/admin/MessageForm';
 
 // Protected Route Component
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -80,7 +73,6 @@ function AppRoutes() {
       }>
         <Route index element={<MemberDashboard />} />
         <Route path="repertoire" element={<MemberRepertoire />} />
-        <Route path="repertoire/:id" element={<SongDetail />} />
         <Route path="calendar" element={<MemberCalendar />} />
         <Route path="calendar/:eventId" element={<EventDetail />} />
         <Route path="messages" element={<MemberMessages />} />
@@ -99,15 +91,6 @@ function AppRoutes() {
         <Route path="members" element={<AdminMembers />} />
         <Route path="events" element={<AdminEvents />} />
         <Route path="messages" element={<AdminMessages />} />
-        <Route path="settings" element={<AdminSettings />} />
-        <Route path="repertoire/new" element={<SongForm />} />
-        <Route path="repertoire/:id/edit" element={<SongForm />} />
-        <Route path="members/new" element={<MemberForm />} />
-        <Route path="members/:id/edit" element={<MemberForm />} />
-        <Route path="events/new" element={<EventForm />} />
-        <Route path="events/:id" element={<AdminEventDetail />} />
-        <Route path="events/:id/edit" element={<EventForm />} />
-        <Route path="messages/new" element={<MessageForm />} />
       </Route>
 
       {/* Root redirect */}

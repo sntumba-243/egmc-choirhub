@@ -53,7 +53,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister }) => {
           <div className="flex justify-center mb-3 sm:mb-4">
             <img src="/image.png" alt="EGMC Logo" className="w-20 h-20 sm:w-24 sm:h-24 object-contain" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-blue-900 mb-2">EGMC ChoirHub</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-blue-900 mb-2">EGMC EGMChoir hub</h1>
           <p className="text-sm sm:text-base text-gray-600">Sign in to your account</p>
         </div>
 

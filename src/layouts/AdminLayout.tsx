@@ -1,86 +1,65 @@
-import React from 'react';
-import { LayoutDashboard, Music, Users, Calendar, Mail, LogOut } from 'lucide-react';
+import { Link, useLocation, Outlet } from 'react-router-dom';
+import { LayoutDashboard, Music, Users, Calendar, MessageSquare, Settings, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { GlobalSearch } from '../components/GlobalSearch';
 
-interface AdminLayoutProps {
-  activePage: string;
-  onNavigate: (page: string) => void;
-  children: React.ReactNode;
-}
+export default function AdminLayout() {
+  const location = useLocation();
+  const { signOut } = useAuth();
 
-export const AdminLayout: React.FC<AdminLayoutProps> = ({ activePage, onNavigate, children }) => {
-  const { user, logout } = useAuth();
-
-  const pages = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'repertoire', label: 'Repertoire', icon: Music },
-    { id: 'members', label: 'Members', icon: Users },
-    { id: 'events', label: 'Events', icon: Calendar },
-    { id: 'messages', label: 'Messages', icon: Mail },
+  const navItems = [
+    { path: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { path: '/admin/repertoire', icon: Music, label: 'Repertoire' },
+    { path: '/admin/members', icon: Users, label: 'Members' },
+    { path: '/admin/events', icon: Calendar, label: 'Events' },
+    { path: '/admin/messages', icon: MessageSquare, label: 'Messages' },
+    { path: '/admin/settings', icon: Settings, label: 'Settings' },
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      <header className="bg-white shadow-md sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 flex-shrink-0">
-              <img src="/image.png" alt="EGMC Logo" className="w-12 h-12 object-contain" />
-              <div>
-                <h1 className="text-2xl font-bold text-blue-900">EGMC ChoirHub</h1>
-                <p className="text-sm text-gray-600">Welcome, {user?.name}</p>
-              </div>
-            </div>
-            <div className="flex-1 max-w-md">
-              <GlobalSearch onNavigate={(type, id) => console.log('Navigate to:', type, id)} />
-            </div>
-            <div className="flex items-center gap-4 flex-shrink-0">
-              <button
-                onClick={logout}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
-              >
-                <LogOut className="w-4 h-4" />
-                Logout
-              </button>
-            </div>
-          </div>
+    <div className="flex h-screen bg-gray-50">
+      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
+        <div className="p-6 border-b border-gray-200">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+            EGMC EGMChoir hub
+          </h1>
+          <p className="text-sm text-gray-600 mt-1">Admin Panel</p>
         </div>
 
-        <nav className="border-t border-gray-200">
-          <div className="max-w-7xl mx-auto px-4">
-            <div className="flex gap-2 overflow-x-auto overflow-y-hidden scrollbar-hide scroll-smooth -webkit-overflow-scrolling-touch">
-              {pages.map((page) => {
-                const Icon = page.icon;
-                const isActive = activePage === page.id;
-                return (
-                  <button
-                    key={page.id}
-                    onClick={() => onNavigate(page.id)}
-                    className={`flex items-center justify-center gap-2 px-4 py-3 font-semibold transition-colors whitespace-nowrap border-b-2 flex-shrink-0 group ${
-                      isActive
-                        ? 'text-blue-900 border-blue-900'
-                        : 'text-gray-600 border-transparent hover:text-blue-700'
-                    }`}
-                    title={page.label}
-                  >
-                    <Icon className="w-5 h-5" />
-                    <span className={`${
-                      isActive ? 'inline' : 'hidden md:inline'
-                    }`}>
-                      {page.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+        <nav className="flex-1 p-4 space-y-2">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = location.pathname.startsWith(item.path);
+            
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={'flex items-center gap-3 px-4 py-3 rounded-lg transition-all ' +
+                  (isActive
+                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                    : 'text-gray-700 hover:bg-gray-100')}
+              >
+                <Icon className="w-5 h-5" />
+                <span className="font-medium">{item.label}</span>
+              </Link>
+            );
+          })}
         </nav>
-      </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-6">
-        {children}
+        <div className="p-4 border-t border-gray-200">
+          <button
+            onClick={signOut}
+            className="flex items-center gap-3 px-4 py-3 rounded-lg text-red-600 hover:bg-red-50 w-full transition-colors"
+          >
+            <LogOut className="w-5 h-5" />
+            <span className="font-medium">Sign Out</span>
+          </button>
+        </div>
+      </aside>
+
+      <main className="flex-1 overflow-auto p-8">
+        <Outlet />
       </main>
     </div>
   );
-};
+}

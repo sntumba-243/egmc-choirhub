@@ -4,9 +4,6 @@ import '../styles/SongComponents.css';
 import '../css/SongComponents.css';
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase'; // If in lib folder
-// OR
-import { supabase } from '../utils/supabase'; // If in utils folder //import { createClient } from '@supabase/supabase-js';// Adjust path as needed
-import SongCard from './SongCard';
 
 interface Song {
   id: string;

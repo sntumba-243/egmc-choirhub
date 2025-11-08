@@ -8,6 +8,7 @@ type Tab = 'overview' | 'favorites' | 'practice';
 export const MemberDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('overview');
 
   const stats = [
@@ -38,7 +39,7 @@ export const MemberDashboard = () => {
                 <p className="text-xs text-gray-600">{stat.label}</p>
               </div>
               <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-            </button>
+            </div>
           );
         })}
       </div>
