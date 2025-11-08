@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
+import { Search, Heart, Eye, X, ChevronDown } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { Eye, X, Search, Heart, ChevronDown } from 'lucide-react';
-import toast from 'react-hot-toast';
 
 interface Song {
   id: string;
@@ -9,7 +8,6 @@ interface Song {
   composer?: string;
   language?: string;
   sheet_music_url?: string;
-  audio_url?: string;
 }
 
 export const MemberRepertoire = () => {
@@ -40,59 +38,34 @@ export const MemberRepertoire = () => {
   const fetchUserId = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUserId(user.id);
-      }
+      if (user) setUserId(user.id);
     } catch (error) {
-      console.error('Error fetching user ID:', error);
+      console.error('Error fetching user:', error);
     }
   };
 
   const fetchData = async () => {
     try {
-      setLoading(true);
+      const [songsRes, favoritesRes] = await Promise.all([
+        supabase.from('songs').select('*').order('title'),
+        supabase.from('favorites').select('song_id').eq('user_id', userId)
+      ]);
+
+      if (songsRes.error) throw songsRes.error;
+      setSongs(songsRes.data || []);
       
-      const { data: songsData, error: songsError } = await supabase
-        .from('songs')
-        .select('id, title, composer, language, sheet_music_url, audio_url')
-        .order('title', { ascending: true });
-
-      if (songsError) {
-        console.error('Songs error:', songsError);
-        toast.error('Failed to load songs');
-        setLoading(false);
-        return;
+      if (favoritesRes.data) {
+        setFavorites(new Set(favoritesRes.data.map(f => f.song_id)));
       }
-
-      const { data: favoritesData, error: favoritesError } = await supabase
-        .from('song_favorites')
-        .select('song_id')
-        .eq('member_id', userId);
-
-      if (favoritesError) {
-        console.error('Favorites error:', favoritesError);
-      } else if (favoritesData) {
-        const favoriteIds = new Set(favoritesData.map(f => f.song_id));
-        setFavorites(favoriteIds);
-      }
-
-      if (!songsData || songsData.length === 0) {
-        setSongs([]);
-        setLoading(false);
-        return;
-      }
-
-      setSongs(songsData);
     } catch (error) {
-      console.error('Unexpected error:', error);
-      toast.error('An error occurred');
+      console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
     }
   };
 
   const filterSongs = () => {
-    let filtered = [...songs];
+    let filtered = songs;
 
     if (searchTerm) {
       filtered = filtered.filter(song =>
@@ -109,60 +82,28 @@ export const MemberRepertoire = () => {
   };
 
   const toggleFavorite = async (songId: string) => {
-    if (!userId) {
-      toast.error('Please log in to save favorites');
-      return;
-    }
-
-    const isFavorited = favorites.has(songId);
-
     try {
-      if (isFavorited) {
-        const { error } = await supabase
-          .from('song_favorites')
-          .delete()
-          .eq('member_id', userId)
-          .eq('song_id', songId);
-
-        if (error) throw error;
-
+      if (favorites.has(songId)) {
+        await supabase.from('favorites').delete().eq('user_id', userId).eq('song_id', songId);
         setFavorites(prev => {
-          const newFavorites = new Set(prev);
-          newFavorites.delete(songId);
-          return newFavorites;
+          const newSet = new Set(prev);
+          newSet.delete(songId);
+          return newSet;
         });
-        toast.success('Removed from favorites');
       } else {
-        const { error } = await supabase
-          .from('song_favorites')
-          .insert({
-            member_id: userId,
-            song_id: songId,
-            notes: ''
-          });
-
-        if (error) throw error;
-
-        setFavorites(prev => {
-          const newFavorites = new Set(prev);
-          newFavorites.add(songId);
-          return newFavorites;
-        });
-        toast.success('Added to favorites');
+        await supabase.from('favorites').insert([{ user_id: userId, song_id: songId }]);
+        setFavorites(prev => new Set(prev).add(songId));
       }
     } catch (error) {
       console.error('Error toggling favorite:', error);
-      toast.error('Failed to update favorites');
     }
   };
 
-  const getEmbedUrl = (url: string | undefined) => {
-    if (!url || typeof url !== 'string') return '';
-    
+  const getEmbedUrl = (url: string): string => {
     try {
       if (url.includes('drive.google.com')) {
-        const fileIdMatch = url.match(/\/d\/([^\/]+)/) || url.match(/id=([^&]+)/);
-        if (fileIdMatch && fileIdMatch[1]) {
+        const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+        if (fileIdMatch) {
           return `https://drive.google.com/file/d/${fileIdMatch[1]}/preview`;
         }
       }
@@ -205,39 +146,39 @@ export const MemberRepertoire = () => {
         />
       </div>
 
-      {/* Mobile Filters Toggle */}
+      {/* Filters Toggle */}
       <button
         onClick={() => setShowFilters(!showFilters)}
         className="w-full flex items-center justify-between px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
       >
-        <span className="text-sm font-medium text-gray-700">Filters</span>
+        <span className="text-sm font-medium text-gray-700">
+          {languageFilter === 'all' ? 'All Languages' : languageFilter}
+        </span>
         <ChevronDown className={`w-4 h-4 text-gray-600 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
       </button>
 
-      {/* Expandable Filters */}
+      {/* Language Filter Dropdown */}
       {showFilters && (
-        <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-2">Language</label>
-            <select
-              value={languageFilter}
-              onChange={(e) => {
-                setLanguageFilter(e.target.value);
-                setShowFilters(false);
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
-            >
-              {languages.map(lang => (
-                <option key={lang} value={lang}>
-                  {lang === 'all' ? 'All Languages' : lang}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <label className="block text-xs font-medium text-gray-700 mb-2">Language</label>
+          <select
+            value={languageFilter}
+            onChange={(e) => {
+              setLanguageFilter(e.target.value);
+              setShowFilters(false);
+            }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+          >
+            {languages.map(lang => (
+              <option key={lang} value={lang}>
+                {lang === 'all' ? 'All Languages' : lang}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 
-      {/* Songs Display */}
+      {/* Songs List */}
       {filteredSongs.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-gray-600 text-sm">
@@ -245,133 +186,83 @@ export const MemberRepertoire = () => {
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {/* Desktop Table - Hidden on Mobile */}
-          <div className="hidden sm:block bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Title
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Composer
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Language
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredSongs.map((song) => (
-                    <tr key={song.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">{song.title}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {song.composer || 'Unknown'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {song.language || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => toggleFavorite(song.id)}
-                            className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-lg transition-colors ${
-                              favorites.has(song.id)
-                                ? 'text-red-600 bg-red-50 hover:bg-red-100'
-                                : 'text-gray-600 bg-gray-50 hover:bg-gray-100'
-                            }`}
-                          >
-                            <Heart 
-                              className={`w-3 h-3 ${favorites.has(song.id) ? 'fill-current' : ''}`}
-                            />
-                          </button>
-                          {song.sheet_music_url && (
-                            <button
-                              onClick={() => setViewingSong(song)}
-                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-purple-600 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
-                            >
-                              <Eye className="w-3 h-3" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+        <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-200">
+          {filteredSongs.map((song) => (
+            <div
+              key={song.id}
+              className="px-4 py-3 hover:bg-gray-50 transition-colors flex items-center justify-between gap-3"
+            >
+              {/* Song Info */}
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-medium text-gray-900 truncate">
+                  {song.title}
+                </h3>
+                {song.language && (
+                  <span className="inline-block mt-1 px-2 py-0.5 text-xs font-medium text-purple-700 bg-purple-50 rounded-full">
+                    {song.language}
+                  </span>
+                )}
+              </div>
 
-          {/* Mobile Card Layout - Visible on Mobile */}
-          <div className="sm:hidden space-y-3">
-            {filteredSongs.map((song) => (
-              <div key={song.id} className="bg-white rounded-lg border border-gray-200 p-4">
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 text-sm break-words">{song.title}</h3>
-                    {song.composer && (
-                      <p className="text-xs text-gray-600 mt-1">{song.composer}</p>
-                    )}
-                    {song.language && (
-                      <p className="text-xs text-gray-500 mt-1 bg-gray-100 inline-block px-2 py-1 rounded mt-2">
-                        {song.language}
-                      </p>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => toggleFavorite(song.id)}
-                    className={`flex-shrink-0 p-2 rounded-lg transition-colors ${
-                      favorites.has(song.id)
-                        ? 'text-red-600 bg-red-50 hover:bg-red-100'
-                        : 'text-gray-600 bg-gray-50 hover:bg-gray-100'
-                    }`}
-                  >
-                    <Heart 
-                      className={`w-5 h-5 ${favorites.has(song.id) ? 'fill-current' : ''}`}
-                    />
-                  </button>
-                </div>
+              {/* Actions */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {/* Favorite Button */}
+                <button
+                  onClick={() => toggleFavorite(song.id)}
+                  className={`p-2 rounded-lg transition-colors ${
+                    favorites.has(song.id)
+                      ? 'text-red-600 bg-red-50 hover:bg-red-100'
+                      : 'text-gray-400 bg-gray-50 hover:bg-gray-100'
+                  }`}
+                  aria-label="Toggle favorite"
+                >
+                  <Heart
+                    className={`w-4 h-4 ${favorites.has(song.id) ? 'fill-current' : ''}`}
+                  />
+                </button>
 
+                {/* View Button */}
                 {song.sheet_music_url && (
                   <button
                     onClick={() => setViewingSong(song)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-purple-600 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
+                    className="p-2 rounded-lg text-purple-600 bg-purple-50 hover:bg-purple-100 transition-colors"
+                    aria-label="View sheet music"
                   >
                     <Eye className="w-4 h-4" />
-                    View Sheet Music
                   </button>
                 )}
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Sheet Music Viewer Modal - Mobile Optimized */}
+      {/* Fullscreen Sheet Music Viewer */}
       {viewingSong && viewingSong.sheet_music_url && getEmbedUrl(viewingSong.sheet_music_url) && (
         <div className="fixed inset-0 bg-black/70 flex items-end sm:items-center justify-center z-50">
           <div className="bg-white rounded-t-xl sm:rounded-lg w-full sm:w-full sm:max-w-4xl max-h-[90vh] sm:max-h-[90vh] flex flex-col overflow-hidden">
+            {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-gray-200 flex-shrink-0">
-              <div className="flex-1">
-                <h2 className="text-base sm:text-xl font-bold text-gray-900 truncate">{viewingSong.title}</h2>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-base sm:text-xl font-bold text-gray-900 truncate">
+                  {viewingSong.title}
+                </h2>
                 {viewingSong.composer && (
-                  <p className="text-xs sm:text-sm text-gray-500 truncate">{viewingSong.composer}</p>
+                  <p className="text-xs sm:text-sm text-gray-500 truncate">
+                    {viewingSong.composer}
+                  </p>
                 )}
               </div>
-              <button 
-                onClick={() => setViewingSong(null)} 
+              <button
+                onClick={() => setViewingSong(null)}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
+                aria-label="Close"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
+            
+            {/* Sheet Music */}
             <div className="flex-1 overflow-auto">
               <iframe
                 src={getEmbedUrl(viewingSong.sheet_music_url)}

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Music, Calendar, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Music, Calendar, MessageSquare, ArrowRight, Heart, Mic, Eye } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 type Tab = 'overview' | 'favorites' | 'practice';
 
@@ -9,11 +10,53 @@ export const MemberDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('overview');
+  
+  // Real counts from database
+  const [songsCount, setSongsCount] = useState<number>(0);
+  const [eventsCount, setEventsCount] = useState<number>(0);
+  const [messagesCount, setMessagesCount] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchCounts();
+  }, [user]);
+
+  const fetchCounts = async () => {
+    try {
+      // Fetch songs count
+      const { count: songs } = await supabase
+        .from('songs')
+        .select('*', { count: 'exact', head: true });
+      setSongsCount(songs || 0);
+
+      // Fetch upcoming events count (events with date >= today)
+      const today = new Date().toISOString().split('T')[0];
+      const { count: events } = await supabase
+        .from('events')
+        .select('*', { count: 'exact', head: true })
+        .gte('date', today);
+      setEventsCount(events || 0);
+
+      // Fetch unread messages count
+      if (user?.id) {
+        const { data: messages } = await supabase
+          .from('direct_messages')
+          .select('id')
+          .eq('recipient_id', user.id)
+          .eq('is_read', false);
+        setMessagesCount(messages?.length || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching counts:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const stats = [
-    { label: 'Total Songs', value: '381', icon: Music, route: '/member/repertoire' },
-    { label: 'Upcoming Events', value: '1', icon: Calendar, route: '/member/calendar' },
-    { label: 'Unread Messages', value: '2', icon: MessageSquare, route: '/member/messages' },
+    { label: 'Total Songs', value: loading ? '...' : songsCount.toString(), icon: Music, route: '/member/repertoire' },
+    { label: 'Upcoming Events', value: loading ? '...' : eventsCount.toString(), icon: Calendar, route: '/member/calendar' },
+    { label: 'Unread Messages', value: loading ? '...' : messagesCount.toString(), icon: MessageSquare, route: '/member/messages' },
   ];
 
   const favoriteSongs = [
@@ -43,65 +86,24 @@ export const MemberDashboard = () => {
         })}
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-        <div className="flex border-b border-gray-200">
-          {(['overview', 'favorites', 'practice'] as Tab[]).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-3 text-sm font-medium capitalize transition-colors ${
-                activeTab === tab
-                  ? 'text-purple-600 border-b-2 border-purple-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-
-        <div className="p-4">
-          {activeTab === 'overview' && (
-            <div className="space-y-3">
-              <p className="text-sm text-gray-600">Your choir dashboard overview with key stats and recent activity.</p>
-              <div className="bg-purple-50 rounded-lg p-3">
-                <p className="text-sm font-medium text-purple-700">381 songs</p>
-                <p className="text-xs text-purple-600 mt-1">in your repertoire</p>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'favorites' && (
-            <div className="space-y-3">
-              {favoriteSongs.map((song) => (
-                <button 
-                  key={song.id} 
-                  onClick={() => navigate(`/member/repertoire/${song.id}?fullscreen=true`)}
-                  className="border border-gray-200 rounded-lg p-3 hover:border-purple-300 hover:shadow-md transition-all text-left w-full"
-                >
-                  <h3 className="font-semibold text-gray-900 text-sm">{song.title}</h3>
-                  <p className="text-xs text-gray-600">{song.composer}</p>
-                  <div className="flex items-center gap-1 mt-2 text-xs text-red-600">
-                    <Heart className="w-3 h-3 fill-current" />
-                    {song.favorites} favorites
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {activeTab === 'practice' && (
-            <div className="space-y-3">
-              <p className="text-sm text-gray-600">Practice tips and resources to improve your singing skills.</p>
-              <div className="bg-blue-50 rounded-lg p-3 flex items-start gap-2">
-                <Mic className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-blue-700">Warm-up exercises</p>
-                  <p className="text-xs text-blue-600">5-10 minutes daily</p>
-                </div>
-              </div>
-            </div>
-          )}
+      {/* Rest of your dashboard content... */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+        <h2 className="text-lg font-bold text-gray-900 mb-3">Quick Access</h2>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => navigate('/member/repertoire')}
+            className="p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
+          >
+            <Music className="w-6 h-6 text-purple-600 mb-2" />
+            <p className="text-sm font-medium text-gray-900">Repertoire</p>
+          </button>
+          <button
+            onClick={() => navigate('/member/calendar')}
+            className="p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+          >
+            <Calendar className="w-6 h-6 text-blue-600 mb-2" />
+            <p className="text-sm font-medium text-gray-900">Calendar</p>
+          </button>
         </div>
       </div>
     </div>
