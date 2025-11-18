@@ -12,19 +12,57 @@ export interface DriveFile {
 export const googleDriveService = {
   async listFilesInFolder(): Promise<DriveFile[]> {
     try {
-      const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files?` +
-        `q='${FOLDER_ID}'+in+parents+and+trashed=false+and+(mimeType='application/pdf'+or+mimeType contains 'image/')` +
-        `&key=${GOOGLE_API_KEY}` +
-        `&fields=files(id,name,mimeType,webViewLink,webContentLink)`
-      );
+      let allFiles: DriveFile[] = [];
+      let pageToken: string | null = null;
+      
+      // Keep fetching until no more pages
+      do {
+        const url = new URL('https://www.googleapis.com/drive/v3/files');
+        
+        // Build query parameters
+        const params = {
+          q: `'${FOLDER_ID}' in parents and trashed=false and (mimeType='application/pdf' or mimeType contains 'image/')`,
+          key: GOOGLE_API_KEY || '',
+          fields: 'files(id,name,mimeType,webViewLink,webContentLink),nextPageToken',
+          pageSize: '1000', // Max allowed by Google Drive API
+        };
+        
+        // Add pageToken if we have one (for subsequent pages)
+        if (pageToken) {
+          (params as any).pageToken = pageToken;
+        }
+        
+        // Add all params to URL
+        Object.entries(params).forEach(([key, value]) => {
+          url.searchParams.append(key, value);
+        });
+        
+        console.log('Fetching page from Google Drive...', pageToken ? `(page token: ${pageToken.substring(0, 20)}...)` : '(first page)');
+        
+        const response = await fetch(url.toString());
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch files from Google Drive');
-      }
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Google Drive API error:', errorText);
+          throw new Error(`Failed to fetch files from Google Drive: ${response.status} ${response.statusText}`);
+        }
 
-      const data = await response.json();
-      return data.files || [];
+        const data = await response.json();
+        
+        // Add files from this page to our collection
+        if (data.files && data.files.length > 0) {
+          allFiles = allFiles.concat(data.files);
+          console.log(`Fetched ${data.files.length} files (total so far: ${allFiles.length})`);
+        }
+        
+        // Get the next page token (null if no more pages)
+        pageToken = data.nextPageToken || null;
+        
+      } while (pageToken); // Continue while there are more pages
+      
+      console.log(`✅ Finished! Total files fetched: ${allFiles.length}`);
+      return allFiles;
+      
     } catch (error) {
       console.error('Error listing Google Drive files:', error);
       throw error;

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { Calendar, Clock, MapPin, Music, ArrowLeft, Users } from 'lucide-react';
+import { Calendar, Clock, MapPin, Music, ArrowLeft, Users, Eye } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -14,13 +14,18 @@ interface Event {
   description?: string;
   type?: string;
   requires_rsvp: boolean;
-  setlist?: string[];
 }
 
-interface Song {
+interface EventSong {
   id: string;
-  title: string;
-  composer: string;
+  song_id: string;
+  songs: {
+    id: string;
+    title: string;
+    composer: string;
+    language: string;
+    sheet_music_url?: string;
+  };
 }
 
 export const EventDetail = () => {
@@ -32,13 +37,14 @@ export const EventDetail = () => {
   console.log('EventDetail - user:', user);
   
   const [event, setEvent] = useState<Event | null>(null);
-  const [songs, setSongs] = useState<Song[]>([]);
+  const [eventSongs, setEventSongs] = useState<EventSong[]>([]);
   const [rsvpStatus, setRsvpStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (eventId) {
       fetchEvent();
+      fetchEventSongs();
       checkRsvpStatus();
     }
   }, [eventId]);
@@ -53,25 +59,37 @@ export const EventDetail = () => {
 
       if (error) throw error;
       setEvent(eventData);
-
-      if (eventData.setlist && eventData.setlist.length > 0) {
-        const { data: songsData } = await supabase
-          .from('songs')
-          .select('id, title, composer')
-          .in('id', eventData.setlist);
-        
-        if (songsData) {
-          const orderedSongs = eventData.setlist
-            .map((songId: string) => songsData.find(s => s.id === songId))
-            .filter(Boolean);
-          setSongs(orderedSongs as Song[]);
-        }
-      }
     } catch (error) {
       console.error('Error:', error);
       toast.error('Failed to load event');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchEventSongs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('event_songs')
+        .select(`
+          id,
+          song_id,
+          songs (
+            id,
+            title,
+            composer,
+            language,
+            sheet_music_url
+          )
+        `)
+        .eq('event_id', eventId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      console.log('Event songs loaded:', data?.length);
+      setEventSongs(data || []);
+    } catch (error) {
+      console.error('Error loading event songs:', error);
     }
   };
 
@@ -135,6 +153,19 @@ export const EventDetail = () => {
     }
   };
 
+  const viewPDF = (song: any) => {
+    if (song.sheet_music_url) {
+      navigate('/pdf-viewer', {
+        state: {
+          url: song.sheet_music_url,
+          title: song.title,
+        },
+      });
+    } else {
+      toast.error('No PDF available for this song');
+    }
+  };
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -156,7 +187,7 @@ export const EventDetail = () => {
 
   if (!event) {
     return <div className="text-center p-12">
-      <h2 className="text-2xl font-bold mb-4">Event not found</h2>
+      <p className="text-gray-600 mb-4">Event not found</p>
       <button onClick={() => navigate('/member/calendar')} className="text-indigo-600">Back to Calendar</button>
     </div>;
   }
@@ -210,26 +241,67 @@ export const EventDetail = () => {
             </div>
           )}
 
-          {songs.length > 0 && (
-            <div>
+          {/* Songs Section */}
+          {eventSongs.length > 0 && (
+            <div className="border-t pt-6">
               <div className="flex items-center gap-2 mb-4">
                 <Music className="w-5 h-5 text-indigo-600" />
-                <h3 className="text-lg font-semibold">Setlist ({songs.length} songs)</h3>
+                <h3 className="text-lg font-semibold">Songs for This Event ({eventSongs.length})</h3>
               </div>
-              <div className="space-y-2">
-                {songs.map((song, index) => (
-                  <button
-                    key={song.id}
-                    onClick={() => navigate(`/member/repertoire/${song.id}?fullscreen=true`)}
-                    className="w-full flex items-start gap-3 p-3 bg-gray-50 hover:bg-indigo-50 rounded-lg transition-all text-left"
-                  >
-                    <span className="text-sm font-semibold text-indigo-600 mt-1">#{index + 1}</span>
-                    <div>
-                      <div className="font-medium">{song.title}</div>
-                      <div className="text-sm text-gray-600">{song.composer}</div>
+              <div className="space-y-3">
+                {eventSongs.map((eventSong, index) => {
+                  const song = eventSong.songs;
+                  if (!song) return null;
+
+                  return (
+                    <div
+                      key={eventSong.id}
+                      onClick={() => song.sheet_music_url && viewPDF(song)}
+                      className={`flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-indigo-50 transition-all ${
+                        song.sheet_music_url ? 'cursor-pointer' : ''
+                      }`}
+                      title={song.sheet_music_url ? 'Click to view sheet music' : ''}
+                    >
+                      <div className="flex items-center gap-3 flex-1">
+                        <span className="text-sm font-semibold text-indigo-600 bg-indigo-100 w-8 h-8 rounded-full flex items-center justify-center">
+                          #{index + 1}
+                        </span>
+                        <Music className="w-5 h-5 text-gray-400" />
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-gray-900">{song.title}</h4>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-sm text-gray-600">{song.composer}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                              song.language === 'English' ? 'bg-blue-100 text-blue-800' :
+                              song.language === 'French' ? 'bg-purple-100 text-purple-800' :
+                              song.language === 'Lingala' ? 'bg-green-100 text-green-800' :
+                              song.language === 'Tshiluba' ? 'bg-yellow-100 text-yellow-800' :
+                              song.language === 'Swahili' ? 'bg-teal-100 text-teal-800' :
+                              song.language === 'Kikongo' ? 'bg-orange-100 text-orange-800' :
+                              song.language === 'Portuguese' ? 'bg-pink-100 text-pink-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {song.language}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {song.sheet_music_url && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            viewPDF(song);
+                          }}
+                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                          title="View sheet music"
+                        >
+                          <Eye className="w-5 h-5" />
+                        </button>
+                      )}
                     </div>
-                  </button>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

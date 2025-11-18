@@ -31,9 +31,9 @@ export const SongDetail = () => {
     loadSong();
   }, [songId]);
 
-  // Auto-open fullscreen if URL parameter is set
+  // Removed fullscreen auto-open - now using PDF viewer route
   useEffect(() => {
-    if (song && searchParams.get('fullscreen') === 'true') {
+    if (false) {
       navigate("/pdf-viewer", { state: { url: song.sheet_music_url, title: song.title } });
     }
   }, [song, searchParams]);
@@ -129,7 +129,6 @@ export const SongDetail = () => {
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const isFullscreenMode = searchParams.get('fullscreen') === 'true';
   
   if (loading) {
     return (
@@ -148,8 +147,8 @@ export const SongDetail = () => {
   }
 
   return (
-    <div style={{ display: !fullscreen && isFullscreenMode ? 'none' : 'block' }} className="space-y-6">
-      <div className="bg-white rounded-xl shadow-md p-6">
+      <div className="space-y-6">
+        <div className="bg-white rounded-xl shadow-md p-6">
         <button
           onClick={() => navigate('/member/repertoire')}
           className="flex items-center gap-2 text-blue-900 font-semibold hover:text-blue-700 mb-4"
@@ -243,7 +242,7 @@ export const SongDetail = () => {
               </div>
               <div className="flex-1">
                 <p className="font-semibold text-slate-900">Sheet Music</p>
-                <p className="text-sm text-slate-600">Click to view fullscreen</p>
+                <p className="text-sm text-slate-600">Click to view sheet music</p>
               </div>
               <Maximize className="w-5 h-5 text-slate-400" />
             </button>
@@ -422,6 +421,8 @@ export const SongDetail = () => {
           </div>
         </div>
       )}
+
+
     </div>
   );
 };
