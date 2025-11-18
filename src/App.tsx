@@ -13,6 +13,7 @@ import EnhancedOfflineIndicator from './components/EnhancedOfflineIndicator';
 // PDF Viewer
 import { PDFViewerPage } from './components/PDFViewer-MOBILE';
 import { Login } from './pages/Login';
+import { ChangePassword } from './pages/ChangePassword';
 import { Register } from './pages/Register';
 
 // Layouts
