@@ -58,11 +58,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           role: (profile.role || 'member') as 'admin' | 'member' | 'guest',
           force_password_change: profile.force_password_change || false
         });
-
-        // If force_password_change is true, redirect to change password
-        if (profile.force_password_change) {
-          window.location.href = '/change-password';
-        }
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -72,6 +67,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const checkUser = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      toast.success('Password changed successfully! Please login with your new password.');
+      
+      // Sign out and redirect to login
+      setTimeout(async () => {
+        await logout();
+        navigate('/login');
+      }, 1500);
       if (session?.user) {
         await fetchUserProfile(session.user.id);
       }

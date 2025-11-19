@@ -130,7 +130,7 @@ export const MemberRepertoire = () => {
       case 'recent':
         return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
       case 'language':
-        return a.language.localeCompare(b.language);
+        return (a.language || "").localeCompare(b.language || "");
       default:
         return 0;
     }
@@ -291,7 +291,7 @@ export const MemberRepertoire = () => {
                       song.language === 'Portuguese' ? 'bg-pink-100 text-pink-800' :
                       'bg-gray-100 text-gray-800'
                     }`}>
-                      {song.language.slice(0, 2)}
+                      {(song.language || "??").slice(0, 2)}
                     </span>
                   </td>
 

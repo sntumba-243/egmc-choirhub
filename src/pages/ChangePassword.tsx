@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 export const ChangePassword = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -64,15 +64,11 @@ export const ChangePassword = () => {
 
       toast.success('Password changed successfully!');
       
-      // Redirect based on role
-      setTimeout(() => {
-        if (user?.role === 'admin') {
-          navigate('/admin');
-        } else {
-          navigate('/member');
-        }
-      }, 1000);
-
+      // Sign out and redirect to login
+      setTimeout(async () => {
+        await logout();
+        navigate('/login');
+      }, 1500);
     } catch (error: any) {
       console.error('Password change error:', error);
       toast.error(error.message || 'Failed to change password');

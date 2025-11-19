@@ -457,14 +457,14 @@ export const AdminRepertoire = () => {
                       </button>
                     )}
                     <button
-                      onClick={() => navigate(`/admin/repertoire/${song.id}/edit`)}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/admin/repertoire/${song.id}/edit`); }}                     
                       className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                       title="Edit"
                     >
                       <Edit className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => handleDelete(song.id)}
+                      onClick={(e) => { e.stopPropagation(); handleDelete(song.id); }}
                       className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                       title="Delete"
                     >
@@ -586,14 +586,14 @@ export const AdminRepertoire = () => {
                           </button>
                         )}
                         <button
-                          onClick={() => navigate(`/admin/repertoire/${song.id}/edit`)}
+                          onClick={(e) => { e.stopPropagation(); navigate(`/admin/repertoire/${song.id}/edit`); }}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                           title="Edit"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => handleDelete(song.id)}
+                          onClick={(e) => { e.stopPropagation(); handleDelete(song.id); }}
                           className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           title="Delete"
                         >

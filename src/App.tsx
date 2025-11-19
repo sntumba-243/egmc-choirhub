@@ -77,6 +77,7 @@ function AppRoutes() {
       {/* Public Routes */}
       <Route path="/login" element={!user ? <Login /> : <Navigate to={user.role === 'admin' ? '/admin' : '/member'} />} />
       <Route path="/register" element={!user ? <Register /> : <Navigate to={user.role === 'admin' ? '/admin' : '/member'} />} />
+      <Route path="/change-password" element={<ChangePassword />} />
 
       {/* PDF Viewer */}
       <Route path="/pdf-viewer" element={<PDFViewerPage />} />
