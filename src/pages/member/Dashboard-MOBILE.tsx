@@ -59,7 +59,7 @@ export const MemberDashboard = () => {
         supabase.from('songs').select('id'),
         supabase.from('events').select('id, title, date, time, location').gte('date', new Date().toISOString().split('T')[0]).order('date', { ascending: true }).limit(3),
         supabase.from('messages').select('id').eq('send_to', 'all_members').eq('is_read', false),
-        supabase.from('song_favorites').select('id').eq('member_id', user?.id || '')
+        supabase.from('user_favorites').select('id').eq('user_id', user?.id || '')
       ]);
 
       setStats({
@@ -165,14 +165,14 @@ export const MemberDashboard = () => {
       <div className="bg-white rounded-xl shadow-md p-5 border border-gray-100">
         <h2 className="text-lg font-bold text-gray-900 mb-4">Your Stats</h2>
         <div className="grid grid-cols-2 gap-4">
-          <div className="text-center p-3 bg-purple-50 rounded-lg">
+          <button onClick={() => navigate("/member/repertoire")} className="text-center p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors w-full">
             <div className="text-2xl font-bold text-purple-600">{stats.totalSongs}</div>
             <div className="text-xs text-gray-600 mt-1">Songs</div>
-          </div>
-          <div className="text-center p-3 bg-blue-50 rounded-lg">
+          </button>
+          <button onClick={() => navigate("/member/repertoire")} className="text-center p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors w-full">
             <div className="text-2xl font-bold text-blue-600">{stats.favoriteSongs}</div>
             <div className="text-xs text-gray-600 mt-1">Favorites</div>
-          </div>
+          </button>
         </div>
       </div>
     </div>

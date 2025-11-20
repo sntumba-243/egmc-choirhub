@@ -13,6 +13,7 @@ export const MemberDashboard = () => {
   
   // Real counts from database
   const [songsCount, setSongsCount] = useState<number>(0);
+  const [favoritesCount, setFavoritesCount] = useState<number>(0);
   const [eventsCount, setEventsCount] = useState<number>(0);
   const [messagesCount, setMessagesCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
@@ -27,6 +28,15 @@ export const MemberDashboard = () => {
       const { count: songs } = await supabase
         .from('songs')
         .select('*', { count: 'exact', head: true });
+
+      // Fetch user favorites count
+      if (user?.id) {
+        const { count: favorites } = await supabase
+          .from('user_favorites')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id);
+        setFavoritesCount(favorites || 0);
+      }
       setSongsCount(songs || 0);
 
       // Fetch upcoming events count (events with date >= today)
@@ -62,6 +72,8 @@ export const MemberDashboard = () => {
   const favoriteSongs = [
     { id: '1', title: 'Amazing Grace', composer: 'John Newton', favorites: 45 },
     { id: '2', title: 'Hallelujah', composer: 'Leonard Cohen', favorites: 32 },
+
+      {/* Your Stats Card */}
   ];
 
   return (
