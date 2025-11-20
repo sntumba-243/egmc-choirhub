@@ -3,8 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Mail, Phone, Lock, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
+import { generateMemorablePassword } from '../../lib/passwordUtils';
 
-const DEFAULT_PASSWORD = 'egmc@Choir2025';
 
 export const MemberForm: React.FC = () => {
   const navigate = useNavigate();
@@ -19,6 +19,7 @@ export const MemberForm: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [createAuthAccount, setCreateAuthAccount] = useState(true);
 
+  const [generatedPassword, setGeneratedPassword] = useState<string>("");
   useEffect(() => {
     if (memberId) {
       loadMember();
@@ -127,7 +128,9 @@ export const MemberForm: React.FC = () => {
         // Step 1: Create auth account if checkbox is checked
         if (createAuthAccount) {
           try {
-            await createAuthUser(email, DEFAULT_PASSWORD, role);
+      const newPassword = generateMemorablePassword();
+      setGeneratedPassword(newPassword);
+      await createAuthUser(email, newPassword, role);
             toast.success('Auth account created with default password');
           } catch (authError: any) {
             console.error('Auth creation failed:', authError);
@@ -143,7 +146,7 @@ export const MemberForm: React.FC = () => {
         
         toast.success(
           createAuthAccount 
-            ? `Member added! Login: ${email} / ${DEFAULT_PASSWORD}` 
+            ? `Member added! Login: ${email} / ${generatedPassword}` 
             : 'Member added (no auth account)'
         );
       }
@@ -307,7 +310,7 @@ export const MemberForm: React.FC = () => {
                     </p>
                     <div className="bg-white rounded p-2 border border-yellow-300 mb-2 font-mono text-xs">
                       <div><strong>Email:</strong> {email || '(enter email above)'}</div>
-                      <div><strong>Password:</strong> {DEFAULT_PASSWORD}</div>
+                      <div><strong>Password:</strong> {generatedPassword}</div>
                     </div>
                     <div className="flex items-start gap-2 text-xs text-yellow-800">
                       <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
