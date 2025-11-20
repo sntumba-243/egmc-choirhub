@@ -59,15 +59,16 @@ export const MemberForm: React.FC = () => {
 
   const createAuthUser = async (email: string, password: string, userRole: string) => {
     try {
-      // Create auth user using Supabase Admin API
-      // Note: This requires admin privileges, so we'll use a workaround
+      // Save current admin session before creating new user
+      const { data: { session: adminSession } } = await supabase.auth.getSession();
+      
+      // Create auth user (this temporarily switches sessions)
       const { data: { user }, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             role: userRole,
-            force_password_change: true,
             first_login: true
           }
         }
@@ -76,19 +77,28 @@ export const MemberForm: React.FC = () => {
       if (error) throw error;
       
       if (user) {
-        // Create/update profile with role and force password change flag
+        // Create/update profile with role
         const { error: profileError } = await supabase
           .from('profiles')
           .upsert({
             id: user.id,
             email: email,
             role: userRole,
-            force_password_change: true,
+            force_password_change: false, // Don't force - they have a secure random password
             created_at: new Date().toISOString()
           });
 
         if (profileError) {
           console.error('Profile creation error:', profileError);
+        }
+        
+        // CRITICAL: Restore admin session immediately
+        if (adminSession) {
+          await supabase.auth.setSession({
+            access_token: adminSession.access_token,
+            refresh_token: adminSession.refresh_token
+          });
+          console.log('✅ Admin session restored');
         }
       }
 
