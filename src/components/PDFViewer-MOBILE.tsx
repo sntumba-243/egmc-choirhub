@@ -64,6 +64,15 @@ export function PDFViewer({ url: googleDriveUrl, title: songTitle }: PDFViewerPr
     }
   }, [controlsVisible]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      console.log("🧹 PDF Viewer unmounting - cleaning up");
+      setIframeUrl("");
+      setIsLoading(true);
+    };
+  }, []);
+
   function showControls() {
     setControlsVisible(true);
   }

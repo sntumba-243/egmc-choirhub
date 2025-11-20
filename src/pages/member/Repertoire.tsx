@@ -19,6 +19,7 @@ export const MemberRepertoire = () => {
   const { user } = useAuth();
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pdfLoading, setPdfLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
@@ -102,10 +103,13 @@ export const MemberRepertoire = () => {
   };
 
   const handleViewPDF = (song: Song) => {
-    if (song.sheet_music_url) {
-      navigate('/pdf-viewer', {
+    if (song.sheet_music_url && !pdfLoading) {
+      setPdfLoading(true);
+      navigate("/pdf-viewer", {
         state: { url: song.sheet_music_url, title: song.title }
       });
+      // Reset after navigation
+      setTimeout(() => setPdfLoading(false), 1000);
     }
   };
 
