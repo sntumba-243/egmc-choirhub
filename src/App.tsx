@@ -1,12 +1,17 @@
+import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 
 // PWA Components
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import IOSInstallPrompt from './components/IOSInstallPrompt';
 import PWAUpdateNotification from './components/PWAUpdateNotification';
 import EnhancedOfflineIndicator from './components/EnhancedOfflineIndicator';
+
+// Firebase Notifications
+import { requestNotificationPermission, setupMessageListener, storeDeviceToken } from './lib/firebase';
 
 // Auth Pages
 
@@ -63,6 +68,13 @@ function App() {
 
 function AppRoutes() {
   const { user, loading } = useAuth();
+
+  // Initialize notifications
+  useEffect(() => {
+    if (user?.id) {
+      initializeNotifications(user.id);
+    }
+  }, [user?.id]);
 
   if (loading) {
     return (
@@ -134,6 +146,29 @@ function AppRoutes() {
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
+}
+
+// Initialize push notifications
+async function initializeNotifications(userId: string) {
+  try {
+    // Request notification permission
+    const token = await requestNotificationPermission();
+    
+    if (token) {
+      // Store device token in database
+      await storeDeviceToken(userId, token);
+      console.log('✅ Notifications enabled');
+      
+      // Set up listener for foreground messages
+      setupMessageListener((payload) => {
+        console.log('📨 Notification received:', payload);
+      });
+    } else {
+      console.log('⚠️ Notifications not enabled');
+    }
+  } catch (error) {
+    console.error('❌ Error initializing notifications:', error);
+  }
 }
 
 export default App;
