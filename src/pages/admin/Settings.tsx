@@ -30,18 +30,29 @@ export const AdminSettings: React.FC = () => {
         .select('title, sheet_music_url');
 
       const existingUrls = new Set(existingSongs?.map(s => s.sheet_music_url) || []);
+      const existingTitles = new Set(existingSongs?.map(s => s.title.toLowerCase()) || []);
 
       for (const file of files) {
         try {
           const embedUrl = googleDriveService.getEmbedUrl(file.id);
+          
+          // Check if URL already exists
           if (existingUrls.has(embedUrl)) {
             skipped++;
             continue;
           }
+          
+          // Parse filename to get title and composer
           const fileName = file.name.replace(/\.(pdf|png|jpg|jpeg)$/i, '');
           const parts = fileName.split('-').map(p => p.trim());
           const title = parts[0] || fileName;
           const composer = parts[1] || 'Unknown';
+          
+          // Check if title already exists (case-insensitive)
+          if (existingTitles.has(title.toLowerCase())) {
+            skipped++;
+            continue;
+          }
           
           const { error } = await supabase.from('songs').insert([{
             title, 
@@ -55,7 +66,8 @@ export const AdminSettings: React.FC = () => {
           if (error) { 
             errors++; 
           } else { 
-            added++; 
+            added++;
+            existingTitles.add(title.toLowerCase()); // Add to set to prevent duplicates in same sync
           }
         } catch (error) { 
           errors++; 
@@ -65,12 +77,13 @@ export const AdminSettings: React.FC = () => {
       setSyncResult({ added, skipped, errors });
       
       if (added > 0) {
-        toast.success('Successfully synced ' + added + ' songs!');
+        toast.success(`Successfully synced ${added} songs!`);
       } else if (skipped > 0) {
-        toast('All songs already synced');
+        toast.info(`All ${skipped} songs already exist`);
       }
     } catch (error: any) {
-      toast.error(error.message || 'Failed to sync');
+      console.error('Sync error:', error);
+      toast.error('Failed to sync: ' + error.message);
     } finally {
       setSyncing(false);
     }
