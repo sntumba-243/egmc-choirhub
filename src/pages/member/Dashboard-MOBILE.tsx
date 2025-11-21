@@ -105,7 +105,7 @@ export const MemberDashboard = () => {
   const quickActions = [
     { title: 'Repertoire', description: `${stats.totalSongs} songs • ${stats.favoriteSongs} favorites`, icon: Music, color: 'from-purple-500 to-purple-600', bgColor: 'bg-purple-50', iconColor: 'text-purple-600', route: '/member/repertoire' },
     { title: 'Calendar', description: `${stats.upcomingEvents} upcoming events`, icon: Calendar, color: 'from-blue-500 to-blue-600', bgColor: 'bg-blue-50', iconColor: 'text-blue-600', route: '/member/calendar' },
-    { title: 'AI Practice', description: 'Smart assistant ready', icon: Lightbulb, color: 'from-green-500 to-green-600', bgColor: 'bg-green-50', iconColor: 'text-green-600', route: '/member/practice' },
+    { title: 'AI Practice', description: 'Smart assistant ready', icon: Lightbulb, color: 'from-green-500 to-green-600', bgColor: 'bg-green-50', iconColor: 'text-green-600', route: '/member/vocal-coach' },
     { title: 'Messages', description: stats.unreadMessages > 0 ? `${stats.unreadMessages} unread` : 'No new messages', icon: MessageSquare, color: 'from-orange-500 to-orange-600', bgColor: 'bg-orange-50', iconColor: 'text-orange-600', route: '/member/messages', badge: stats.unreadMessages > 0 ? stats.unreadMessages : undefined }
   ];
 

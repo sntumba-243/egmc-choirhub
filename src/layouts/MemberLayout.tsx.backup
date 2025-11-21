@@ -100,10 +100,32 @@ export default function MemberLayout() {
           <p className="text-sm text-gray-600 mt-1">Member Portal</p>
         </div>
 
-        {/* Mobile User Info */}
+        {/* Mobile User Info with Role Badge */}
         <div className="lg:hidden p-4 border-b border-gray-200 bg-gray-50">
           <p className="text-sm font-medium text-gray-900">{user?.email}</p>
-          <p className="text-xs text-gray-600 mt-1">Choir Member</p>
+          <div className="mt-2">
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold shadow-sm ${
+              user?.role === 'guest' 
+                ? 'bg-blue-100 text-blue-800 ring-1 ring-blue-200' 
+                : 'bg-green-100 text-green-800 ring-1 ring-green-200'
+            }`}>
+              <span>👤</span>
+              {user?.role === 'guest' ? 'Guest' : 'Member'}
+            </span>
+          </div>
+        </div>
+
+        {/* Desktop User Info with Role Badge */}
+        <div className="hidden lg:block p-4 border-b border-gray-200 bg-gray-50">
+          <p className="text-sm font-medium text-gray-900 mb-2">{user?.email}</p>
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm ${
+            user?.role === 'guest' 
+              ? 'bg-blue-100 text-blue-800 ring-1 ring-blue-200' 
+              : 'bg-green-100 text-green-800 ring-1 ring-green-200'
+          }`}>
+            <span>👤</span>
+            {user?.role === 'guest' ? 'Guest Access' : 'Choir Member'}
+          </span>
         </div>
 
         {/* Navigation */}

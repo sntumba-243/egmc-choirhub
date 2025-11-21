@@ -1,5 +1,5 @@
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Music, Users, Calendar, MessageSquare, Settings, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Music, Users, Calendar, MessageSquare, Mic, Settings, LogOut, Menu, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
@@ -51,6 +51,7 @@ export default function AdminLayout() {
     { path: '/admin/members', icon: Users, label: 'Members' },
     { path: '/admin/events', icon: Calendar, label: 'Events' },
     { path: '/admin/messages', icon: MessageSquare, label: 'Messages' },
+    { path: '/admin/vocal-coach', icon: Mic, label: 'Vocal Coach' },
     { path: '/admin/settings', icon: Settings, label: 'Settings' },
   ];
 

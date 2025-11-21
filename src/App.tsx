@@ -35,6 +35,13 @@ import { MemberPractice } from './pages/member/Practice';
 import { MemberProfile } from './pages/member/Profile';
 import { SongDetail } from './pages/member/SongDetail';
 
+// Vocal Coach Components
+import { 
+  VocalCoach, 
+  PracticeSession, 
+  VocalProgress 
+} from './components/VocalCoach';
+
 // Admin Pages
 import { AdminDashboard } from './pages/admin/Dashboard';
 import { AdminRepertoire } from './pages/admin/Repertoire';
@@ -43,6 +50,8 @@ import { AdminMembers } from './pages/admin/Members';
 import { AdminEvents } from './pages/admin/Events';
 import { AdminMessages } from './pages/admin/Messages';
 import { AdminSettings } from './pages/admin/Settings';
+import AdminVocalCoach from './pages/admin/VocalCoach';
+import VocalCoachAssignments from './pages/admin/VocalCoachAssignments';
 import { BulkSongEditor } from './pages/admin/BulkSongEditor';
 import { SongForm } from './pages/admin/SongForm';
 import { MemberForm } from './pages/admin/MemberForm';
@@ -108,6 +117,11 @@ function AppRoutes() {
         <Route path="messages" element={<MemberMessages />} />
         <Route path="practice" element={<MemberPractice />} />
         <Route path="profile" element={<MemberProfile />} />
+        
+        {/* Vocal Coach Routes */}
+        <Route path="vocal-coach" element={<VocalCoach />} />
+        <Route path="vocal-coach/practice/:id" element={<PracticeSession />} />
+        <Route path="vocal-coach/progress" element={<VocalProgress />} />
       </Route>
 
       {/* Admin Routes */}
@@ -130,7 +144,7 @@ function AppRoutes() {
         <Route path="events/new" element={<EventForm />} />
         <Route path="events/:id" element={<AdminEventDetail />} />
         <Route path="events/:id/edit" element={<EventForm />} />
-        <Route path="messages/new" element={<MessageForm />} />
+        <Route path="messages/new" element={<MessageForm />} />        <Route path="vocal-coach" element={<AdminVocalCoach />} />        <Route path="vocal-coach/assignments" element={<VocalCoachAssignments />} />
       </Route>
 
       {/* Root redirect */}
