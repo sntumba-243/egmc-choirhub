@@ -11,7 +11,7 @@ import EnhancedOfflineIndicator from './components/EnhancedOfflineIndicator';
 // Auth Pages
 
 // PDF Viewer
-import { PDFViewerPage } from './components/PDFViewer-MOBILE';
+import { PDFViewerPage } from './components/PDFViewer';
 import { Login } from './pages/Login';
 import { ChangePassword } from './pages/ChangePassword';
 import { Register } from './pages/Register';
