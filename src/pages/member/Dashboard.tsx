@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Music, Calendar, MessageSquare } from 'lucide-react';
+import { Music, Calendar, MessageSquare, Heart } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 
@@ -64,30 +64,29 @@ export const MemberDashboard = () => {
   };
 
   const stats = [
-    { label: 'Total Songs', value: loading ? '...' : songsCount.toString(), icon: Music, route: '/member/repertoire' },
-    { label: 'Upcoming Events', value: loading ? '...' : eventsCount.toString(), icon: Calendar, route: '/member/calendar' },
-    { label: 'Unread Messages', value: loading ? '...' : messagesCount.toString(), icon: MessageSquare, route: '/member/messages' },
-  ];
-
-  const favoriteSongs = [
-    { id: '1', title: 'Amazing Grace', composer: 'John Newton', favorites: 45 },
-    { id: '2', title: 'Hallelujah', composer: 'Leonard Cohen', favorites: 32 },
-
-      {/* Your Stats Card */}
+    { label: 'Total Songs', value: loading ? '...' : songsCount.toString(), icon: Music, onClick: () => navigate('/member/repertoire') },
+    { label: 'Upcoming Events', value: loading ? '...' : eventsCount.toString(), icon: Calendar, onClick: () => navigate('/member/calendar') },
+    { label: 'Unread Messages', value: loading ? '...' : messagesCount.toString(), icon: MessageSquare, onClick: () => navigate('/member/messages') },
   ];
 
   return (
     <div className="space-y-4 pb-4">
+      {/* Welcome Card */}
       <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg p-4 sm:p-6 text-white shadow-md">
         <h1 className="text-2xl sm:text-3xl font-bold mb-1">Welcome back! 👋</h1>
         <p className="text-sm text-purple-100">{user?.name || 'Member'}</p>
       </div>
 
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <button key={stat.label} onClick={() => navigate(stat.route)} className="bg-white rounded-lg p-4 shadow-sm border border-gray-100 hover:shadow-md hover:border-purple-200 transition-all text-left w-full">
+            <button 
+              key={stat.label} 
+              onClick={stat.onClick} 
+              className="bg-white rounded-lg p-4 shadow-sm border border-gray-100 hover:shadow-md hover:border-purple-200 transition-all text-left w-full active:scale-95"
+            >
               <div className="flex items-center gap-2 mb-2">
                 <Icon className="w-5 h-5 text-purple-600" />
                 <p className="text-xs text-gray-600">{stat.label}</p>
@@ -98,23 +97,48 @@ export const MemberDashboard = () => {
         })}
       </div>
 
-      {/* Rest of your dashboard content... */}
+      {/* Quick Access Section */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
         <h2 className="text-lg font-bold text-gray-900 mb-3">Quick Access</h2>
         <div className="grid grid-cols-2 gap-3">
+          {/* Repertoire Button */}
           <button
             onClick={() => navigate('/member/repertoire')}
-            className="p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
+            className="p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors active:scale-95"
           >
             <Music className="w-6 h-6 text-purple-600 mb-2" />
             <p className="text-sm font-medium text-gray-900">Repertoire</p>
+            <p className="text-xs text-gray-500 mt-1">{songsCount} songs</p>
           </button>
+
+          {/* Favorites Button - goes to repertoire with favorites tab */}
+          <button
+            onClick={() => navigate('/member/repertoire', { state: { activeTab: 'favorites' } })}
+            className="p-4 bg-red-50 rounded-lg hover:bg-red-100 transition-colors active:scale-95"
+          >
+            <Heart className="w-6 h-6 text-red-600 mb-2" />
+            <p className="text-sm font-medium text-gray-900">Favorites</p>
+            <p className="text-xs text-gray-500 mt-1">{favoritesCount} songs</p>
+          </button>
+
+          {/* Calendar Button */}
           <button
             onClick={() => navigate('/member/calendar')}
-            className="p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+            className="p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors active:scale-95"
           >
             <Calendar className="w-6 h-6 text-blue-600 mb-2" />
             <p className="text-sm font-medium text-gray-900">Calendar</p>
+            <p className="text-xs text-gray-500 mt-1">{eventsCount} events</p>
+          </button>
+
+          {/* Messages Button */}
+          <button
+            onClick={() => navigate('/member/messages')}
+            className="p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors active:scale-95"
+          >
+            <MessageSquare className="w-6 h-6 text-green-600 mb-2" />
+            <p className="text-sm font-medium text-gray-900">Messages</p>
+            <p className="text-xs text-gray-500 mt-1">{messagesCount} unread</p>
           </button>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Music, Search, Eye, Star, ArrowUpAZ, ArrowDownAZ } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -16,6 +16,7 @@ interface Song {
 
 export const MemberRepertoire = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,7 +24,15 @@ export const MemberRepertoire = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
-  const [sortBy, setSortBy] = useState<'a-z' | 'z-a' | 'recent' | 'language'>('a-z');
+  const [sortBy, setSortBy] = useState<'a-z' | 'z-a' | 'recent'>('a-z');
+  const [languageFilter, setLanguageFilter] = useState<'all' | 'english' | 'french' | 'portuguese' | 'lingala' | 'tshiluba' | 'kikongo' | 'swahili'>('all');
+
+  // Check if coming from Dashboard with favorites tab request
+  useEffect(() => {
+    if (location.state?.activeTab === 'favorites') {
+      setShowFavoritesOnly(true);
+    }
+  }, [location.state]);
 
   useEffect(() => {
     fetchSongs();
@@ -113,18 +122,32 @@ export const MemberRepertoire = () => {
     }
   };
 
+  // Filter songs by language
+  const filterByLanguage = (song: Song): boolean => {
+    if (languageFilter === 'all') return true;
+    if (languageFilter === 'english') return song.language === 'English';
+    if (languageFilter === 'french') return song.language === 'French';
+    if (languageFilter === 'portuguese') return song.language === 'Portuguese';
+    if (languageFilter === 'lingala') return song.language === 'Lingala';
+    if (languageFilter === 'tshiluba') return song.language === 'Tshiluba';
+    if (languageFilter === 'kikongo') return song.language === 'Kikongo';
+    if (languageFilter === 'swahili') return song.language === 'Swahili';
+    return true;
+  };
+
   // Filter and sort songs
   const filteredSongs = songs.filter(song => {
     const search = searchTerm.toLowerCase();
     const titleMatch = song.title.toLowerCase().includes(search);
     const composerMatch = song.composer?.toLowerCase().includes(search);
     const matchesSearch = titleMatch || composerMatch;
+    const matchesLanguage = filterByLanguage(song);
     
     if (showFavoritesOnly) {
-      return matchesSearch && favorites.has(song.id);
+      return matchesSearch && matchesLanguage && favorites.has(song.id);
     }
     
-    return matchesSearch;
+    return matchesSearch && matchesLanguage;
   }).sort((a, b) => {
     switch (sortBy) {
       case 'a-z':
@@ -133,8 +156,6 @@ export const MemberRepertoire = () => {
         return b.title.localeCompare(a.title);
       case 'recent':
         return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-      case 'language':
-        return (a.language || "").localeCompare(b.language || "");
       default:
         return 0;
     }
@@ -189,7 +210,6 @@ export const MemberRepertoire = () => {
               <option value="a-z">A → Z</option>
               <option value="z-a">Z → A</option>
               <option value="recent">Recent</option>
-              <option value="language">Language</option>
             </select>
             <div className="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none">
               {sortBy === 'a-z' ? (
@@ -201,6 +221,29 @@ export const MemberRepertoire = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               )}
+            </div>
+          </div>
+
+          {/* Language Filter Dropdown */}
+          <div className="relative">
+            <select
+              value={languageFilter}
+              onChange={(e) => setLanguageFilter(e.target.value as any)}
+              className="appearance-none pl-3 pr-8 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer font-medium text-gray-700"
+            >
+              <option value="all">All Languages</option>
+              <option value="english">English</option>
+              <option value="french">French</option>
+              <option value="portuguese">Portuguese</option>
+              <option value="lingala">Lingala</option>
+              <option value="tshiluba">Tshiluba</option>
+              <option value="kikongo">Kikongo</option>
+              <option value="swahili">Swahili</option>
+            </select>
+            <div className="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none">
+              <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
             </div>
           </div>
         </div>
@@ -330,7 +373,7 @@ export const MemberRepertoire = () => {
             <p className="text-sm text-gray-500">
               {showFavoritesOnly
                 ? 'Star some songs to add them to your favorites!'
-                : 'Try adjusting your search'}
+                : 'Try adjusting your filters'}
             </p>
           </div>
         )}
