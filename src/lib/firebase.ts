@@ -71,3 +71,19 @@ export function setupMessageListener(callback: (payload: any) => void) {
     }
   });
 }
+
+// Store device token in database
+export async function storeDeviceToken(userId: string, token: string) {
+  try {
+    const response = await fetch('/api/notifications/register-device', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, token })
+    });
+    
+    if (!response.ok) throw new Error('Failed to store device token');
+    return await response.json();
+  } catch (error) {
+    console.error('❌ Error storing device token:', error);
+  }
+}
