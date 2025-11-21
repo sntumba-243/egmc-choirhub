@@ -22,3 +22,10 @@ dist-ssr
 *.sw?
 .env
 .vercel
+.env.local
+.env
+
+# Utility scripts (contain sensitive info)
+create-*.js
+reset-*.js
+test-*.js
