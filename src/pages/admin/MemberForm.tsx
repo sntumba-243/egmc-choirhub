@@ -4,7 +4,7 @@ import { ArrowLeft, Mail, Phone, Lock, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 import { generateMemorablePassword } from '../../lib/passwordUtils';
-
+import { PasswordModal } from '../../components/PasswordModal';
 
 export const MemberForm: React.FC = () => {
   const navigate = useNavigate();
@@ -18,12 +18,13 @@ export const MemberForm: React.FC = () => {
   const [status, setStatus] = useState('active');
   const [loading, setLoading] = useState(false);
   const [createAuthAccount, setCreateAuthAccount] = useState(true);
-
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [generatedPassword, setGeneratedPassword] = useState<string>("");
+
   useEffect(() => {
     if (memberId) {
       loadMember();
-      setCreateAuthAccount(false); // Don't create auth for existing members
+      setCreateAuthAccount(false);
     }
   }, [memberId]);
 
@@ -59,10 +60,8 @@ export const MemberForm: React.FC = () => {
 
   const createAuthUser = async (email: string, password: string, userRole: string) => {
     try {
-      // Save current admin session before creating new user
       const { data: { session: adminSession } } = await supabase.auth.getSession();
       
-      // Create auth user (this temporarily switches sessions)
       const { data: { user }, error } = await supabase.auth.signUp({
         email,
         password,
@@ -77,14 +76,13 @@ export const MemberForm: React.FC = () => {
       if (error) throw error;
       
       if (user) {
-        // Create/update profile with role
         const { error: profileError } = await supabase
           .from('profiles')
           .upsert({
             id: user.id,
             email: email,
             role: userRole,
-            force_password_change: false, // Don't force - they have a secure random password
+            force_password_change: false,
             created_at: new Date().toISOString()
           });
 
@@ -92,7 +90,6 @@ export const MemberForm: React.FC = () => {
           console.error('Profile creation error:', profileError);
         }
         
-        // CRITICAL: Restore admin session immediately
         if (adminSession) {
           await supabase.auth.setSession({
             access_token: adminSession.access_token,
@@ -126,48 +123,43 @@ export const MemberForm: React.FC = () => {
       };
 
       if (memberId) {
-        // UPDATE existing member
         const { error } = await supabase
           .from('members')
           .update(memberData)
           .eq('id', memberId);
         if (error) throw error;
         toast.success('Member updated');
+        navigate('/admin/members');
       } else {
-        // CREATE new member
-        // Step 1: Create auth account if checkbox is checked
         if (createAuthAccount) {
           try {
-      const newPassword = generateMemorablePassword();
-      setGeneratedPassword(newPassword);
-      await createAuthUser(email, newPassword, role);
-            toast.success('Auth account created with default password');
+            const newPassword = generateMemorablePassword();
+            setGeneratedPassword(newPassword);
+            await createAuthUser(email, newPassword, role);
           } catch (authError: any) {
             console.error('Auth creation failed:', authError);
             toast.error(`Member added, but auth account failed: ${authError.message}`);
           }
         }
 
-        // Step 2: Create member record
         const { error } = await supabase
           .from('members')
           .insert([memberData]);
         if (error) throw error;
         
-        toast.success(
-          createAuthAccount 
-            ? `Member added! Login: ${email} / ${generatedPassword}` 
-            : 'Member added (no auth account)'
-        );
+        setShowPasswordModal(true);
       }
-
-      navigate('/admin/members');
     } catch (error: any) {
       console.error('Error:', error);
       toast.error(error.message || 'Failed to save');
-    } finally {
       setLoading(false);
     }
+  };
+
+  const handleClosePasswordModal = () => {
+    setShowPasswordModal(false);
+    setGeneratedPassword('');
+    navigate('/admin/members');
   };
 
   return (
@@ -286,7 +278,6 @@ export const MemberForm: React.FC = () => {
           </div>
         </div>
 
-        {/* Auth Account Creation */}
         {!memberId && (
           <div className="border-t pt-6">
             <div className="flex items-start gap-3 mb-4">
@@ -352,6 +343,14 @@ export const MemberForm: React.FC = () => {
           </button>
         </div>
       </form>
+
+      <PasswordModal
+        isOpen={showPasswordModal}
+        email={email}
+        password={generatedPassword}
+        memberName={`${firstName} ${lastName}`}
+        onClose={handleClosePasswordModal}
+      />
     </div>
   );
 };
