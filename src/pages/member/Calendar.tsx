@@ -52,7 +52,7 @@ export const MemberCalendar: React.FC = () => {
   };
 
   const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
+    const date = new Date(dateString + 'T00:00:00');
     return date.toLocaleDateString('en-US', {
       weekday: 'short',
       year: 'numeric',
@@ -112,7 +112,7 @@ export const MemberCalendar: React.FC = () => {
   const filteredEvents = events.filter(event => {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
-    const eventDate = new Date(event.date);
+    const eventDate = new Date(event.date + 'T00:00:00');
     if (filter === 'upcoming') {
       return eventDate >= now;
     } else if (filter === 'past') {
@@ -120,15 +120,15 @@ export const MemberCalendar: React.FC = () => {
     }
     return true;
   }).sort((a, b) => {
-    const dateA = new Date(a.date).getTime();
-    const dateB = new Date(b.date).getTime();
+    const dateA = new Date(a.date + 'T00:00:00').getTime();
+    const dateB = new Date(b.date + 'T00:00:00').getTime();
     return filter === 'past' ? dateB - dateA : dateA - dateB;
   });
 
   const upcomingEventsNeedingResponse = filteredEvents.filter(event => {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
-    const eventDate = new Date(event.date);
+    const eventDate = new Date(event.date + 'T00:00:00');
     return eventDate >= now && needsResponse(event.id);
   }).length;
 

@@ -89,6 +89,22 @@ export const smartCoachService = {
    */
   async generateSmartCoachExercises(memberId: string) {
     try {
+      // Check if member already has recent exercises (generated in last 7 days)
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+      const { data: existingExercises } = await supabase
+        .from('smart_coach_exercises')
+        .select('id')
+        .eq('member_id', memberId)
+        .gte('created_at', sevenDaysAgo.toISOString());
+
+      // If member has recent exercises, return without generating
+      if (existingExercises && existingExercises.length >= 3) {
+        console.log('Member already has recent exercises, skipping generation');
+        return;
+      }
+
       const weakAreas = await this.analyzeMemberPerformance(memberId);
 
       // Get member's voice type

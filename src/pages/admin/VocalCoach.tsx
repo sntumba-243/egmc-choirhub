@@ -316,12 +316,20 @@ export default function AdminVocalCoach() {
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-gray-900">Recent Practice Sessions</h2>
-            <Link
-              to="/admin/vocal-coach/assignments"
-              className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
-            >
-              Manage Assignments →
-            </Link>
+            <div className="flex space-x-4">
+              <Link
+                to="/admin/vocal-coach/submissions"
+                className="text-purple-600 hover:text-purple-800 text-sm font-medium"
+              >
+                Song Submissions →
+              </Link>
+              <Link
+                to="/admin/vocal-coach/assignments"
+                className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+              >
+                Assignments →
+              </Link>
+            </div>
           </div>
         </div>
 

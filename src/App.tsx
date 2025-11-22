@@ -37,10 +37,10 @@ import { SongDetail } from './pages/member/SongDetail';
 
 // Vocal Coach Components
 import { 
-  VocalCoach, 
   PracticeSession, 
   VocalProgress 
 } from './components/VocalCoach';
+import { VocalCoach } from './pages/member/VocalCoach';
 
 // Admin Pages
 import { AdminDashboard } from './pages/admin/Dashboard';
@@ -52,6 +52,7 @@ import { AdminMessages } from './pages/admin/Messages';
 import { AdminSettings } from './pages/admin/Settings';
 import AdminVocalCoach from './pages/admin/VocalCoach';
 import VocalCoachAssignments from './pages/admin/VocalCoachAssignments';
+import SongSubmissions from './pages/admin/SongSubmissions';
 import { BulkSongEditor } from './pages/admin/BulkSongEditor';
 import { SongForm } from './pages/admin/SongForm';
 import { MemberForm } from './pages/admin/MemberForm';
