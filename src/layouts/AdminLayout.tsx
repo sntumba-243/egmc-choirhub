@@ -52,7 +52,7 @@ export default function AdminLayout() {
     { path: '/admin/events', icon: Calendar, label: 'Events' },
     { path: '/admin/attendance', icon: BarChart3, label: 'Attendance' },
     { path: '/admin/messages', icon: MessageSquare, label: 'Messages' },
-    { path: '/admin/vocal-coach', icon: Mic, label: 'Vocal Coach' },
+    { path: '/admin/vocal-coach/assignments', icon: Mic, label: 'Vocal Coach' },
     { path: '/admin/settings', icon: Settings, label: 'Settings' },
   ];
 
