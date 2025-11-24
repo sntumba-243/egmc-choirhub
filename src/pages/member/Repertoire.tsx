@@ -115,7 +115,7 @@ export const MemberRepertoire = () => {
     if (song.sheet_music_url && !pdfLoading) {
       setPdfLoading(true);
       navigate("/pdf-viewer", {
-        state: { url: song.sheet_music_url, title: song.title }
+        state: { url: song.sheet_music_url, title: song.title, songId: song.id }
       });
       // Reset after navigation
       setTimeout(() => setPdfLoading(false), 1000);

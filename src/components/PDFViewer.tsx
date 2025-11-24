@@ -1,17 +1,21 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Mic } from 'lucide-react';
+import { SongRecorder } from './SongRecorder';
 
 interface PDFViewerProps {
   url: string;
   title?: string;
+  songId?: string;
+  assignmentId?: string;
 }
 
-export function PDFViewer({ url: googleDriveUrl, title: songTitle }: PDFViewerProps) {
+export function PDFViewer({ url: googleDriveUrl, title: songTitle, songId, assignmentId }: PDFViewerProps) {
   const navigate = useNavigate();
   const [controlsVisible, setControlsVisible] = useState(true);
   const [iframeUrl, setIframeUrl] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [showRecorder, setShowRecorder] = useState(false);
   const [hasError, setHasError] = useState(false);
 
   console.log('🎵 PDF Viewer - Google Drive Iframe');
@@ -183,6 +187,28 @@ export function PDFViewer({ url: googleDriveUrl, title: songTitle }: PDFViewerPr
           </div>
         </div>
       )}
+
+      {/* Record Button - Always visible at bottom */}
+      {songId && (
+        <button
+          onClick={() => setShowRecorder(true)}
+          className="fixed bottom-6 right-6 z-[10003] bg-red-600 hover:bg-red-700 text-white p-4 rounded-full shadow-lg flex items-center gap-2 transition-all"
+        >
+          <Mic className="w-6 h-6" />
+          <span className="font-medium">Record</span>
+        </button>
+      )}
+
+      {/* Song Recorder Modal */}
+      {showRecorder && songId && (
+        <SongRecorder
+          songId={songId}
+          songTitle={songTitle || 'Song'}
+          assignmentId={assignmentId}
+          onClose={() => setShowRecorder(false)}
+          onSuccess={() => setShowRecorder(false)}
+        />
+      )}
     </div>
   );
 }
@@ -191,7 +217,7 @@ export function PDFViewer({ url: googleDriveUrl, title: songTitle }: PDFViewerPr
 export function PDFViewerPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const state = location.state as { url?: string; title?: string } | null;
+  const state = location.state as { url?: string; title?: string; songId?: string; assignmentId?: string } | null;
 
   console.log('🎬 PDFViewerPage mounted');
 
@@ -211,5 +237,5 @@ export function PDFViewerPage() {
     );
   }
 
-  return <PDFViewer url={state.url} title={state.title} />;
+  return <PDFViewer url={state.url} title={state.title} songId={state.songId} assignmentId={state.assignmentId} />;
 }
