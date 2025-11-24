@@ -284,10 +284,28 @@ export function VocalCoach() {
                   {assignment.assignment_type === 'song' ? (
                     <>
                       <button
-                        onClick={() => navigate(`/member/repertoire/${assignment.song?.id}`)}
+                        onClick={async () => {
+                          const { data: song } = await supabase
+                            .from('songs')
+                            .select('sheet_music_url')
+                            .eq('id', assignment.song?.id)
+                            .single();
+                          if (song?.sheet_music_url) {
+                            navigate('/pdf-viewer', {
+                              state: {
+                                url: song.sheet_music_url,
+                                title: assignment.song?.title,
+                                songId: assignment.song?.id,
+                                assignmentId: assignment.id
+                              }
+                            });
+                          } else {
+                            navigate(`/member/repertoire/${assignment.song?.id}`);
+                          }
+                        }}
                         className="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm"
                       >
-                        View Song
+                        View & Record
                       </button>
                       <button
                         onClick={(e) => {
