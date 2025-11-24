@@ -1,4 +1,7 @@
 {
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/" }
+  ],
   "crons": [
     {
       "path": "/api/notifications/send-event-reminders",
