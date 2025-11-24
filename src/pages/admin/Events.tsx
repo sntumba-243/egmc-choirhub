@@ -59,6 +59,27 @@ export const AdminEvents = () => {
     }
   };
 
+
+  const handleResetRsvps = async (eventId: string, eventTitle: string) => {
+    if (!confirm(`Reset all RSVPs for "${eventTitle}"? This will remove all member responses.`)) return;
+
+    try {
+      const { error } = await supabase
+        .from('rsvps')
+        .delete()
+        .eq('event_id', eventId);
+
+      if (error) throw error;
+
+      toast.success('RSVPs reset successfully');
+      // Refresh RSVP counts
+      setRsvpCounts(prev => ({ ...prev, [eventId]: 0 }));
+    } catch (error) {
+      console.error('Error resetting RSVPs:', error);
+      toast.error('Failed to reset RSVPs');
+    }
+  };
+
   const handleDelete = async (e: React.MouseEvent, id: string, title: string) => {
     e.stopPropagation();
     if (!confirm(`Delete "${title}"?`)) return;
@@ -155,6 +176,18 @@ export const AdminEvents = () => {
                   <Users className="w-4 h-4 text-green-600" />
                   <span className="text-sm font-medium text-green-600">
                     {rsvpCounts[event.id] || 0} RSVPs
+                      {rsvpCounts[event.id] > 0 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleResetRsvps(event.id, event.title);
+                          }}
+                          className="ml-2 text-xs text-red-500 hover:text-red-700"
+                          title="Reset RSVPs"
+                        >
+                          (Reset)
+                        </button>
+                      )}
                   </span>
                 </div>
               )}

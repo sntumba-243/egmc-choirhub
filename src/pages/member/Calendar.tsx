@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Calendar as CalendarIcon, MapPin, Clock, Music, Check, X, HelpCircle, Bell } from 'lucide-react';
 import { eventsService, rsvpService, Event, RSVP } from '../../lib/database';
 import { useAuth } from '../../contexts/AuthContext';
@@ -7,11 +7,15 @@ import toast from 'react-hot-toast';
 
 export const MemberCalendar: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const selectedDateFromState = location.state?.selectedDate;
   const { user } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
   const [rsvps, setRsvps] = useState<Record<string, RSVP>>({});
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('upcoming');
+  const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>(
+    selectedDateFromState ? 'all' : 'upcoming'
+  );
 
   useEffect(() => {
     loadEvents();

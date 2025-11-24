@@ -79,8 +79,9 @@ export const MemberDashboard = () => {
   };
 
   const formatEventDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const date = new Date(dateStr + 'T00:00:00');
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
@@ -137,7 +138,7 @@ export const MemberDashboard = () => {
           </div>
           <div className="space-y-3">
             {upcomingEvents.map((event) => (
-              <button key={event.id} onClick={() => navigate('/member/calendar')} className="w-full bg-gray-50 rounded-lg p-3 hover:bg-gray-100 transition-colors text-left group">
+              <button key={event.id} onClick={() => navigate(`/member/events/${event.id}`)} className="w-full bg-gray-50 rounded-lg p-3 hover:bg-gray-100 transition-colors text-left group">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-gray-900 text-sm mb-1 group-hover:text-purple-600 transition-colors">{event.title}</h3>
@@ -175,6 +176,7 @@ export const MemberDashboard = () => {
           </button>
         </div>
       </div>
+
     </div>
   );
 };

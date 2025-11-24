@@ -53,6 +53,7 @@ import { AdminSettings } from './pages/admin/Settings';
 import AdminVocalCoach from './pages/admin/VocalCoach';
 import VocalCoachAssignments from './pages/admin/VocalCoachAssignments';
 import SongSubmissions from './pages/admin/SongSubmissions';
+import AttendanceStats from './pages/admin/AttendanceStats';
 import { BulkSongEditor } from './pages/admin/BulkSongEditor';
 import { SongForm } from './pages/admin/SongForm';
 import { MemberForm } from './pages/admin/MemberForm';
@@ -114,6 +115,7 @@ function AppRoutes() {
         <Route path="repertoire" element={<MemberRepertoire />} />
         <Route path="repertoire/:id" element={<SongDetail />} />
         <Route path="calendar" element={<MemberCalendar />} />
+            <Route path="events/:eventId" element={<EventDetail />} />
         <Route path="calendar/:eventId" element={<EventDetail />} />
         <Route path="messages" element={<MemberMessages />} />
         <Route path="practice" element={<MemberPractice />} />
@@ -135,6 +137,7 @@ function AppRoutes() {
         <Route path="repertoire" element={<AdminRepertoire />} />
         <Route path="members" element={<AdminMembers />} />
         <Route path="events" element={<AdminEvents />} />
+        <Route path="attendance" element={<AttendanceStats />} />
         <Route path="messages" element={<AdminMessages />} />
         <Route path="settings" element={<AdminSettings />} />
         <Route path="bulk-edit" element={<BulkSongEditor />} />

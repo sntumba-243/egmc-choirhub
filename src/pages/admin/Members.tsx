@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { Search, Plus, Edit, Trash2 } from 'lucide-react';
+import { User, Search, Plus, Edit, Trash2, Phone, Circle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Member {
@@ -10,7 +10,9 @@ interface Member {
   first_name: string;
   last_name: string;
   email: string;
-  phone?: string;
+  phone_number?: string;
+  avatar_url?: string;
+  last_active?: string;
   voice_part: string;
   role: string;
   status: string;
@@ -19,6 +21,27 @@ interface Member {
 export const AdminMembers = () => {
   const navigate = useNavigate();
   const [members, setMembers] = useState<Member[]>([]);
+
+  const isOnline = (lastActive: string | undefined) => {
+    if (!lastActive) return false;
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    return new Date(lastActive) > fiveMinutesAgo;
+  };
+
+  const getLastActiveText = (lastActive: string | undefined) => {
+    if (!lastActive) return 'Never';
+    const now = new Date();
+    const active = new Date(lastActive);
+    const diffMs = now.getTime() - active.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    
+    if (diffMins < 5) return 'Online now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
+  };
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterVoice, setFilterVoice] = useState('all');
@@ -33,7 +56,7 @@ export const AdminMembers = () => {
     try {
       const { data, error } = await supabase
         .from('members')
-        .select('*')
+        .select('id, first_name, last_name, email, role, voice_part, member_id, phone_number, avatar_url, created_at')
         .order('last_name', { ascending: true });
 
       if (error) throw error;
@@ -210,6 +233,18 @@ export const AdminMembers = () => {
               className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all p-4 cursor-pointer border border-gray-100 active:scale-[0.99]"
             >
               <div className="flex items-start justify-between gap-3">
+                {/* Avatar */}
+                <div className="relative flex-shrink-0">
+                  <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                    {member.avatar_url ? (
+                      <img src={member.avatar_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="w-5 h-5 text-gray-400" />
+                    )}
+                  </div>
+                  <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${isOnline(member.last_active) ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                </div>
+                
                 {/* Member Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -242,6 +277,12 @@ export const AdminMembers = () => {
                   <p className="text-xs sm:text-sm text-gray-600 mb-1 truncate">
                     {member.email}
                   </p>
+                  {member.phone_number && (
+                    <p className="text-xs text-gray-500 flex items-center gap-1">
+                      <Phone className="w-3 h-3" />
+                      {member.phone_number}
+                    </p>
+                  )}
                   
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-medium px-2 py-1 bg-indigo-50 text-indigo-700 rounded">
@@ -249,6 +290,9 @@ export const AdminMembers = () => {
                     </span>
                     <span className="text-xs text-gray-500">
                       ID: {member.member_id}
+                    </span>
+                    <span className={`text-xs ${isOnline(member.last_active) ? 'text-green-600 font-medium' : 'text-gray-400'}`}>
+                      • {getLastActiveText(member.last_active)}
                     </span>
                   </div>
                 </div>

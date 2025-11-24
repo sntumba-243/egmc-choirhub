@@ -1,6 +1,7 @@
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { Home, Music, Calendar, MessageSquare, User, LogOut, Menu, X, Mic } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useActivityTracker } from '../hooks/useActivityTracker';
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 
@@ -8,6 +9,7 @@ export default function MemberLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
+  useActivityTracker();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Close sidebar on route change (mobile)

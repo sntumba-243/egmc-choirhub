@@ -291,10 +291,10 @@ export const AdminDashboard = () => {
                 <div className="flex items-start gap-3 sm:gap-4">
                   <div className="bg-indigo-100 rounded-lg p-2 sm:p-3 text-center flex-shrink-0">
                     <div className="text-lg sm:text-2xl font-bold text-indigo-600">
-                      {new Date(event.date).getDate()}
+                      {new Date(event.date + 'T00:00:00').getDate()}
                     </div>
                     <div className="text-xs text-indigo-600 uppercase">
-                      {formatDate(event.date).split(' ')[0]}
+                      {new Date(event.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' })}
                     </div>
                   </div>
                   <div className="flex-1 min-w-0">
