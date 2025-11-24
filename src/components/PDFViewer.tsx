@@ -165,12 +165,13 @@ export function PDFViewer({ url: googleDriveUrl, title: songTitle, songId, assig
         src={iframeUrl}
         title={songTitle || 'Sheet Music'}
         allow="autoplay"
-        className="w-full h-full border-0"
+        className="w-full border-0 transition-all"
+        style={{ height: showRecorder ? 'calc(100% - 70px)' : '100%' }}
         onLoad={() => console.log('✅ PDF iframe loaded')}
       />
 
-      {/* Tap overlay - captures taps when controls are hidden */}
-      {!controlsVisible && (
+      {/* Tap overlay - captures taps when controls are hidden (not when recording) */}
+      {!controlsVisible && !showRecorder && (
         <div
           onClick={showControls}
           onTouchEnd={showControls}
