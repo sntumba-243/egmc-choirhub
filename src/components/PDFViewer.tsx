@@ -188,14 +188,14 @@ export function PDFViewer({ url: googleDriveUrl, title: songTitle, songId, assig
         </div>
       )}
 
-      {/* Record Button - Always visible at bottom */}
+      {/* Record Button - Small floating icon */}
       {songId && (
         <button
           onClick={() => setShowRecorder(true)}
-          className="fixed bottom-6 right-6 z-[10003] bg-red-600 hover:bg-red-700 text-white p-4 rounded-full shadow-lg flex items-center gap-2 transition-all"
+          className="fixed bottom-4 right-4 z-[10003] bg-red-600 hover:bg-red-700 text-white w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all opacity-80 hover:opacity-100"
+          title="Record your practice"
         >
-          <Mic className="w-6 h-6" />
-          <span className="font-medium">Record</span>
+          <Mic className="w-5 h-5" />
         </button>
       )}
 
