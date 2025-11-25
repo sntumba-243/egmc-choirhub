@@ -41,6 +41,9 @@ export function VocalCoach() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [showRecorder, setShowRecorder] = useState(false);
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [playingFeedback, setPlayingFeedback] = useState<string | null>(null);
+  const feedbackAudioRef = useRef<HTMLAudioElement | null>(null);
   const [selectedSongForRecording, setSelectedSongForRecording] = useState<{
     id: string;
     title: string;
@@ -117,6 +120,15 @@ export function VocalCoach() {
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
+      // Fetch member's submissions with feedback
+      const { data: subsData } = await supabase
+        .from('song_submissions')
+        .select('*, song:songs(title)')
+        .eq('member_id', user.id)
+        .order('created_at', { ascending: false });
+      
+      if (subsData) setSubmissions(subsData);
+      
       setLoading(false);
     }
   };

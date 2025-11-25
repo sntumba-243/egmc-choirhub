@@ -87,10 +87,19 @@ export function SongRecorder({ songId, songTitle, assignmentId, onClose, onSucce
   };
 
   const sendRecording = async () => {
-    if (!audioBlob || !user?.id) return;
+    const userId = user?.id || (user as any)?.user?.id;
+    console.log('Send clicked', { audioBlob: !!audioBlob, userId, songId, user });
+    if (!audioBlob) {
+      toast.error('No recording to send');
+      return;
+    }
+    if (!userId) {
+      toast.error('Please log in to send');
+      return;
+    }
     setSending(true);
     try {
-      const fileName = `${user.id}/${songId}/${Date.now()}.webm`;
+      const fileName = `${userId}/${songId}/${Date.now()}.webm`;
       const { error: uploadError } = await supabase.storage
         .from('recordings')
         .upload(fileName, audioBlob, { contentType: 'audio/webm' });
@@ -99,7 +108,7 @@ export function SongRecorder({ songId, songTitle, assignmentId, onClose, onSucce
       const { data: { publicUrl } } = supabase.storage.from('recordings').getPublicUrl(fileName);
 
       await supabase.from('song_submissions').insert({
-        member_id: user.id,
+        member_id: userId,
         song_id: songId,
         assignment_id: assignmentId || null,
         audio_url: publicUrl,
