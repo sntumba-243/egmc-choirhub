@@ -34,6 +34,7 @@ export const AdminRepertoire = () => {
   const [showEventModal, setShowEventModal] = useState(false);
   const [events, setEvents] = useState<Event[]>([]);
   const [sortBy, setSortBy] = useState<'a-z' | 'z-a' | 'recent' | 'language'>('a-z');
+  const [languageFilter, setLanguageFilter] = useState<'all' | 'english' | 'french' | 'portuguese' | 'lingala' | 'tshiluba' | 'kikongo' | 'swahili'>('all');
 
   useEffect(() => {
     fetchSongs();
@@ -198,7 +199,8 @@ export const AdminRepertoire = () => {
   };
 
   // Filter and sort songs
-  const filteredSongs = songs.filter(song => {
+  const filteredSongs = songs.filter(song =>
+    filterByLanguage(song) && {
     const search = searchTerm.toLowerCase();
     const titleMatch = song.title.toLowerCase().includes(search);
     const composerMatch = song.composer?.toLowerCase().includes(search);
@@ -295,6 +297,29 @@ export const AdminRepertoire = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               )}
+            </div>
+          </div>
+
+          {/* Language Filter Dropdown */}
+          <div className="relative">
+            <select
+              value={languageFilter}
+              onChange={(e) => setLanguageFilter(e.target.value as any)}
+              className="appearance-none pl-4 pr-10 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer font-medium text-gray-700"
+            >
+              <option value="all">All Languages</option>
+              <option value="english">English</option>
+              <option value="french">French</option>
+              <option value="portuguese">Portuguese</option>
+              <option value="lingala">Lingala</option>
+              <option value="tshiluba">Tshiluba</option>
+              <option value="kikongo">Kikongo</option>
+              <option value="swahili">Swahili</option>
+            </select>
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
             </div>
           </div>
 
