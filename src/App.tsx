@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Toaster } from 'react-hot-toast';
@@ -52,7 +53,6 @@ import { AdminMessages } from './pages/admin/Messages';
 import { AdminSettings } from './pages/admin/Settings';
 import AdminVocalCoach from './pages/admin/VocalCoach';
 import VocalCoachAssignments from './pages/admin/VocalCoachAssignments';
-import SongSubmissions from './pages/admin/SongSubmissions';
 import AttendanceStats from './pages/admin/AttendanceStats';
 import { BulkSongEditor } from './pages/admin/BulkSongEditor';
 import { SongForm } from './pages/admin/SongForm';
@@ -63,6 +63,8 @@ import { MessageForm } from './pages/admin/MessageForm';
 
 // Protected Route Component
 import { ProtectedRoute } from './components/ProtectedRoute';
+
+const Submissions = lazy(() => import('./pages/admin/Submissions'));
 
 function App() {
   return (
@@ -138,6 +140,7 @@ function AppRoutes() {
         <Route path="members" element={<AdminMembers />} />
         <Route path="events" element={<AdminEvents />} />
         <Route path="attendance" element={<AttendanceStats />} />
+                <Route path="submissions" element={<Submissions />} />
         <Route path="messages" element={<AdminMessages />} />
         <Route path="settings" element={<AdminSettings />} />
         <Route path="bulk-edit" element={<BulkSongEditor />} />
