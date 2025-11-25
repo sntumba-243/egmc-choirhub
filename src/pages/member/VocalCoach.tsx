@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -10,7 +10,9 @@ import {
   Music,
   CheckCircle,
   Clock,
-  Calendar
+  Calendar,
+  Play,
+  Pause
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { SongRecorder } from '../../components/SongRecorder';
@@ -29,6 +31,7 @@ interface Assignment {
   due_date: string | null;
   notes: string | null;
   completed: boolean;
+  reference_audio_url: string | null;
   exercise: Exercise | null;
   song: { id: string; title: string } | null;
 }
@@ -43,6 +46,8 @@ export function VocalCoach() {
   const [showRecorder, setShowRecorder] = useState(false);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [playingFeedback, setPlayingFeedback] = useState<string | null>(null);
+  const [playingReference, setPlayingReference] = useState<string | null>(null);
+  const referenceAudioRef = useRef<HTMLAudioElement | null>(null);
   const feedbackAudioRef = useRef<HTMLAudioElement | null>(null);
   const [selectedSongForRecording, setSelectedSongForRecording] = useState<{
     id: string;
@@ -76,6 +81,8 @@ export function VocalCoach() {
         .select(`
           id,
           assignment_type,
+          reference_audio_url,
+          reference_audio_url,
           due_date,
           notes,
           completed,
@@ -160,6 +167,19 @@ export function VocalCoach() {
     }
   };
 
+  const toggleReferenceAudio = (url: string, id: string) => {
+    if (playingReference === id) {
+      referenceAudioRef.current?.pause();
+      setPlayingReference(null);
+    } else {
+      if (referenceAudioRef.current) {
+        referenceAudioRef.current.src = url;
+        referenceAudioRef.current.play();
+        setPlayingReference(id);
+      }
+    }
+  };
+
   const handleMarkComplete = async (assignmentId: string) => {
     try {
       const { error } = await supabase
@@ -210,6 +230,8 @@ export function VocalCoach() {
 
   return (
     <div className="p-6 space-y-6">
+      <audio ref={referenceAudioRef} onEnded={() => setPlayingReference(null)} />
+      
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">AI Vocal Coach</h1>
@@ -281,6 +303,27 @@ export function VocalCoach() {
                     </span>
                   )}
                 </div>
+
+                {/* Reference Audio - Compact */}
+                {assignment.reference_audio_url && assignment.assignment_type === 'song' && (
+                  <button
+                    onClick={() => toggleReferenceAudio(assignment.reference_audio_url!, assignment.id)}
+                    className="mb-2 flex items-center gap-2 text-xs text-indigo-600 hover:text-indigo-800"
+                  >
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                      playingReference === assignment.id ? 'bg-indigo-600 animate-pulse' : 'bg-indigo-100'
+                    } ${playingReference === assignment.id ? 'text-white' : 'text-indigo-600'}`}>
+                      {playingReference === assignment.id ? (
+                        <Pause className="w-3 h-3" />
+                      ) : (
+                        <Play className="w-3 h-3" />
+                      )}
+                    </div>
+                    <span className="font-medium">
+                      {playingReference === assignment.id ? 'Playing melody...' : '🎵 Melody reference'}
+                    </span>
+                  </button>
+                )}
 
                 <h3 className="font-semibold text-gray-900 mb-2">
                   {assignment.assignment_type === 'song'

@@ -69,6 +69,11 @@ export default function VocalCoachAssignments() {
   const [selectedMember, setSelectedMember] = useState('');
   const [selectionMode, setSelectionMode] = useState<'single' | 'all' | 'voice'>('single');
   const [selectedVoicePart, setSelectedVoicePart] = useState('');
+  const [referenceAudioBlob, setReferenceAudioBlob] = useState<Blob | null>(null);
+  const [referenceAudioUrl, setReferenceAudioUrl] = useState<string | null>(null);
+  const [isRecordingReference, setIsRecordingReference] = useState(false);
+  const referenceRecorderRef = useRef<MediaRecorder | null>(null);
+  const referenceChunksRef = useRef<Blob[]>([]);
   const [selectedExercise, setSelectedExercise] = useState('');
   const [selectedSong, setSelectedSong] = useState('');
   const [dueDate, setDueDate] = useState('');
@@ -171,6 +176,43 @@ export default function VocalCoachAssignments() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Reference audio recording functions
+  const startReferenceRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      referenceRecorderRef.current = mediaRecorder;
+      referenceChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) referenceChunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(referenceChunksRef.current, { type: 'audio/webm' });
+        setReferenceAudioBlob(blob);
+        setReferenceAudioUrl(URL.createObjectURL(blob));
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecordingReference(true);
+    } catch (error) {
+      toast.error('Could not access microphone');
+    }
+  };
+
+  const stopReferenceRecording = () => {
+    referenceRecorderRef.current?.stop();
+    setIsRecordingReference(false);
+  };
+
+  const clearReferenceAudio = () => {
+    if (referenceAudioUrl) URL.revokeObjectURL(referenceAudioUrl);
+    setReferenceAudioBlob(null);
+    setReferenceAudioUrl(null);
   };
 
   // Audio functions
@@ -305,6 +347,22 @@ export default function VocalCoachAssignments() {
         return;
       }
 
+      // Upload reference audio if provided
+      let referenceUrl = null;
+      if (referenceAudioBlob && assignmentType === 'song') {
+        const fileName = `reference/${selectedSong}/${Date.now()}.webm`;
+        const { error: uploadError } = await supabase.storage
+          .from('recordings')
+          .upload(fileName, referenceAudioBlob, { contentType: 'audio/webm' });
+        
+        if (uploadError) {
+          console.error('Error uploading reference:', uploadError);
+        } else {
+          const { data: { publicUrl } } = supabase.storage.from('recordings').getPublicUrl(fileName);
+          referenceUrl = publicUrl;
+        }
+      }
+
       // Create assignments for all target members
       const assignments = targetMembers.map(memberId => ({
         member_id: memberId,
@@ -313,7 +371,8 @@ export default function VocalCoachAssignments() {
         exercise_id: assignmentType === 'exercise' ? selectedExercise : null,
         song_id: assignmentType === 'song' ? selectedSong : null,
         due_date: dueDate || null,
-        notes: notes || null
+        notes: notes || null,
+        reference_audio_url: referenceUrl
       }));
 
       const { error } = await supabase
@@ -322,7 +381,7 @@ export default function VocalCoachAssignments() {
 
       if (error) throw error;
 
-      toast.success(\`Assigned to \${targetMembers.length} member\${targetMembers.length > 1 ? 's' : ''}!\`);
+      toast.success(`Assigned to ${targetMembers.length} member${targetMembers.length > 1 ? 's' : ''}!`);
       setShowAssignModal(false);
       resetForm();
       loadData();
@@ -360,6 +419,7 @@ export default function VocalCoachAssignments() {
     setAssignmentType('exercise');
     setSelectionMode('single');
     setSelectedVoicePart('');
+    clearReferenceAudio();
   };
 
   const voiceParts = [...new Set(members.map(m => m.voice_part).filter(Boolean))].sort();
@@ -733,33 +793,33 @@ export default function VocalCoachAssignments() {
                   <button
                     type="button"
                     onClick={() => setSelectionMode('single')}
-                    className={\`px-3 py-2 rounded-lg border-2 text-sm font-medium \${
+                    className={`px-3 py-2 rounded-lg border-2 text-sm font-medium ${
                       selectionMode === 'single'
                         ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
                         : 'border-gray-200 hover:border-gray-300'
-                    }\`}
+                    }`}
                   >
                     Single
                   </button>
                   <button
                     type="button"
                     onClick={() => setSelectionMode('voice')}
-                    className={\`px-3 py-2 rounded-lg border-2 text-sm font-medium \${
+                    className={`px-3 py-2 rounded-lg border-2 text-sm font-medium ${
                       selectionMode === 'voice'
                         ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
                         : 'border-gray-200 hover:border-gray-300'
-                    }\`}
+                    }`}
                   >
                     By Voice
                   </button>
                   <button
                     type="button"
                     onClick={() => setSelectionMode('all')}
-                    className={\`px-3 py-2 rounded-lg border-2 text-sm font-medium \${
+                    className={`px-3 py-2 rounded-lg border-2 text-sm font-medium ${
                       selectionMode === 'all'
                         ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
                         : 'border-gray-200 hover:border-gray-300'
-                    }\`}
+                    }`}
                   >
                     All
                   </button>
@@ -820,6 +880,7 @@ export default function VocalCoachAssignments() {
                   </select>
                 </div>
               ) : (
+                <>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Select Song *</label>
                   <select
@@ -835,6 +896,64 @@ export default function VocalCoachAssignments() {
                     ))}
                   </select>
                 </div>
+
+                {/* Reference Audio Recording */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Reference Audio (Optional)
+                  </label>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Record a melody reference to help members learn the song
+                  </p>
+                  
+                  {!referenceAudioUrl ? (
+                    <button
+                      type="button"
+                      onClick={isRecordingReference ? stopReferenceRecording : startReferenceRecording}
+                      className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 ${
+                        isRecordingReference
+                          ? 'border-red-500 bg-red-50 text-red-700'
+                          : 'border-gray-200 hover:border-indigo-300 hover:bg-indigo-50'
+                      }`}
+                    >
+                      {isRecordingReference ? (
+                        <>
+                          <Square className="w-5 h-5" />
+                          <span>Stop Recording</span>
+                        </>
+                      ) : (
+                        <>
+                          <Mic className="w-5 h-5" />
+                          <span>Record Melody</span>
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (audioRef.current) {
+                            audioRef.current.src = referenceAudioUrl;
+                            audioRef.current.play();
+                          }
+                        }}
+                        className="w-10 h-10 rounded-full bg-green-600 text-white flex items-center justify-center"
+                      >
+                        <Play className="w-4 h-4" />
+                      </button>
+                      <span className="text-sm text-green-700 flex-1">Reference recorded</span>
+                      <button
+                        type="button"
+                        onClick={clearReferenceAudio}
+                        className="text-gray-400 hover:text-red-500"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+                </>
               )}
 
               {/* Due Date */}
