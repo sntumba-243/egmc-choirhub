@@ -28,12 +28,23 @@ export const MemberRepertoire = () => {
   const [languageFilter, setLanguageFilter] = useState<'all' | 'english' | 'french' | 'portuguese' | 'lingala' | 'tshiluba' | 'kikongo' | 'swahili'>('all');
 
   // Check if coming from Dashboard with favorites tab request
+  // Check if coming from Dashboard with favorites tab request
   useEffect(() => {
-    if (location.state?.activeTab === 'favorites') {
+    console.log("📍 Full location object:", location);
+    console.log("📍 location.search:", location.search);
+    console.log("📍 location.pathname:", location.pathname);
+    console.log("📍 window.location.search:", window.location.search);
+    
+    const searchParams = new URLSearchParams(location.search);
+    const showFavorites = searchParams.get("tab") === "favorites";
+    
+    console.log("📍 Tab param:", searchParams.get("tab"));
+    
+    if (showFavorites) {
+      console.log("✅ Setting favorites filter to TRUE");
       setShowFavoritesOnly(true);
     }
-  }, [location.state]);
-
+  }, [location]);
   useEffect(() => {
     fetchSongs();
     fetchFavorites();

@@ -113,7 +113,7 @@ export const MemberDashboard = () => {
 
           {/* Favorites Button - goes to repertoire with favorites tab */}
           <button
-            onClick={() => navigate('/member/repertoire', { state: { activeTab: 'favorites' } })}
+            onClick={() => { console.log("🔴 Favorites clicked - navigating to:", '/member/repertoire?tab=favorites'); navigate('/member/repertoire?tab=favorites'); }}
             className="p-4 bg-red-50 rounded-lg hover:bg-red-100 transition-colors active:scale-95"
           >
             <Heart className="w-6 h-6 text-red-600 mb-2" />

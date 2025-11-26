@@ -198,9 +198,23 @@ export const AdminRepertoire = () => {
     }
   };
 
+  // Filter songs by language
+  const filterByLanguage = (song: Song): boolean => {
+    if (languageFilter === 'all') return true;
+    if (languageFilter === 'english') return song.language === 'English';
+    if (languageFilter === 'french') return song.language === 'French';
+    if (languageFilter === 'portuguese') return song.language === 'Portuguese';
+    if (languageFilter === 'lingala') return song.language === 'Lingala';
+    if (languageFilter === 'tshiluba') return song.language === 'Tshiluba';
+    if (languageFilter === 'kikongo') return song.language === 'Kikongo';
+    if (languageFilter === 'swahili') return song.language === 'Swahili';
+    return true;
+  };
+
   // Filter and sort songs
-  const filteredSongs = songs.filter(song =>
-    filterByLanguage(song) && {
+  const filteredSongs = songs.filter(song => {
+    if (!filterByLanguage(song)) return false;
+    
     const search = searchTerm.toLowerCase();
     const titleMatch = song.title.toLowerCase().includes(search);
     const composerMatch = song.composer?.toLowerCase().includes(search);
