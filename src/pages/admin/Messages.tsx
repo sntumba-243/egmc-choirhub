@@ -29,6 +29,7 @@ export const AdminMessages = () => {
       const { data, error } = await supabase
         .from('messages')
         .select('*')
+        .eq('send_to', 'all')
         .order('sent_date', { ascending: false });
 
       if (error) throw error;

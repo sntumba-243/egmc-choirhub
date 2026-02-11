@@ -63,8 +63,17 @@ export const EventForm: React.FC = () => {
         setDescription(data.description || '');
         setType(data.type || '');
         setRequiresRsvp(data.requires_rsvp);
-        setSelectedSongIds(data.setlist || []);
-      }
+       const { data: eventSongs } = await supabase
+  .from('event_songs')
+  .select('song_id')
+  .eq('event_id', eventId);
+
+if (eventSongs && eventSongs.length > 0) {
+  setSelectedSongIds(eventSongs.map(es => es.song_id));
+} else if (data.setlist && data.setlist.length > 0) {
+  // Fallback to setlist column if event_songs is empty
+  setSelectedSongIds(data.setlist);
+}
     } catch (error) {
       console.error('Error:', error);
       toast.error('Failed to load event');
@@ -94,12 +103,37 @@ export const EventForm: React.FC = () => {
           .eq('id', eventId);
         if (error) throw error;
         toast.success('Event updated');
+        try { 
+          await supabase.from('event_songs').delete().eq('event_id', eventId);
+  if (selectedSongIds.length > 0) {
+    const eventSongs = selectedSongIds.map(songId => ({
+      event_id: eventId,
+      song_id: songId
+    }));
+    const { error: syncError } = await supabase.from('event_songs').insert(eventSongs);
+    if (syncError) console.error('Failed to sync songs:', syncError);
+  }
+} catch (err) {
+  console.error('Error syncing to event_songs:', err);
+}
       } else {
         const { error } = await supabase
           .from('events')
           .insert([eventData]);
         if (error) throw error;
         toast.success('Event created');
+        try {
+  if (selectedSongIds.length > 0 && data?.id) {
+    const eventSongs = selectedSongIds.map(songId => ({
+      event_id: data.id,
+      song_id: songId
+    }));
+    const { error: syncError } = await supabase.from('event_songs').insert(eventSongs);
+    if (syncError) console.error('Failed to sync songs on create:', syncError);
+  }
+} catch (err) {
+  console.error('Error syncing to event_songs on create:', err);
+}
       }
 
       navigate('/admin/events');

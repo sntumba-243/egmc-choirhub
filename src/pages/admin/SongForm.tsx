@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Save, Link as LinkIcon } from 'lucide-react';
+import { ArrowLeft, Music } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 
@@ -9,15 +9,13 @@ export const SongForm: React.FC = () => {
   const { id: songId } = useParams();
   const [title, setTitle] = useState('');
   const [composer, setComposer] = useState('');
-  const [arranger, setArranger] = useState('');
   const [language, setLanguage] = useState('');
   const [sheetMusicUrl, setSheetMusicUrl] = useState('');
+  const [learningStatus, setLearningStatus] = useState<'learned' | 'learning' | 'not_yet'>('not_yet');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (songId) {
-      loadSong();
-    }
+    if (songId) loadSong();
   }, [songId]);
 
   const loadSong = async () => {
@@ -32,38 +30,14 @@ export const SongForm: React.FC = () => {
       if (data) {
         setTitle(data.title);
         setComposer(data.composer || '');
-        setArranger(data.arranger || '');
         setLanguage(data.language || '');
         setSheetMusicUrl(data.sheet_music_url || '');
+        setLearningStatus(data.learning_status || 'not_yet');
       }
     } catch (error) {
-      console.error('Error loading song:', error);
+      console.error('Error:', error);
       toast.error('Failed to load song');
     }
-  };
-
-  const convertToEmbedUrl = (url: string): string => {
-    if (!url) return '';
-    
-    // Handle Google Drive URLs
-    if (url.includes('drive.google.com')) {
-      // Extract file ID from various Google Drive URL formats
-      let fileId = '';
-      
-      if (url.includes('/file/d/')) {
-        fileId = url.split('/file/d/')[1]?.split('/')[0];
-      } else if (url.includes('id=')) {
-        fileId = url.split('id=')[1]?.split('&')[0];
-      }
-      
-      if (fileId) {
-        // Return embed URL for Google Drive
-        return `https://drive.google.com/file/d/${fileId}/preview`;
-      }
-    }
-    
-    // Return original URL if not a Google Drive link
-    return url;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -71,16 +45,12 @@ export const SongForm: React.FC = () => {
     setLoading(true);
 
     try {
-      // Convert to embed URL before saving
-      const embedUrl = convertToEmbedUrl(sheetMusicUrl);
-      
       const songData = {
         title,
         composer,
-        arranger,
         language,
-        sheet_music_url: embedUrl,
-        updated_at: new Date().toISOString()
+        sheet_music_url: sheetMusicUrl,
+        learning_status: learningStatus,
       };
 
       if (songId) {
@@ -90,147 +60,202 @@ export const SongForm: React.FC = () => {
           .eq('id', songId);
 
         if (error) throw error;
-        toast.success('Song updated successfully');
+        toast.success('Song updated');
       } else {
         const { error } = await supabase
           .from('songs')
-          .insert([{ ...songData, created_at: new Date().toISOString() }]);
+          .insert([songData]);
 
         if (error) throw error;
-        toast.success('Song added successfully');
+        toast.success('Song created');
       }
 
       navigate('/admin/repertoire');
     } catch (error: any) {
-      console.error('Error saving song:', error);
+      console.error('Error:', error);
       toast.error(error.message || 'Failed to save song');
     } finally {
       setLoading(false);
     }
   };
 
+  const getStatusInfo = (status: string) => {
+    switch (status) {
+      case 'learned':
+        return {
+          label: '✅ Learned',
+          description: 'The choir has mastered this song',
+          color: 'text-green-700 bg-green-50 border-green-200'
+        };
+      case 'learning':
+        return {
+          label: '📚 Learning',
+          description: 'Currently practicing this song',
+          color: 'text-yellow-700 bg-yellow-50 border-yellow-200'
+        };
+      case 'not_yet':
+        return {
+          label: '⏳ Not Yet',
+          description: 'Haven\'t started learning this song',
+          color: 'text-gray-700 bg-gray-50 border-gray-200'
+        };
+      default:
+        return { label: '', description: '', color: '' };
+    }
+  };
+
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center gap-4">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
         <button
           onClick={() => navigate('/admin/repertoire')}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
         >
           <ArrowLeft className="w-5 h-5" />
+          Back to Repertoire
         </button>
         <h1 className="text-3xl font-bold text-gray-900">
           {songId ? 'Edit Song' : 'Add New Song'}
         </h1>
+        <div className="w-32" />
       </div>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-md p-6 space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Title *</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Composer *</label>
-            <input
-              type="text"
-              value={composer}
-              onChange={(e) => setComposer(e.target.value)}
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Language *</label>
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">Select Language</option>
-              <option value="English">English</option>
-              <option value="French">French</option>
-              <option value="Latin">Latin</option>
-              <option value="Swahili">Swahili</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Arranger</label>
-            <input
-              type="text"
-              value={arranger}
-              onChange={(e) => setArranger(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Song Title *
+          </label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+            placeholder="e.g. Amazing Grace"
+            className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+          />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Google Drive Sheet Music Link
+            Composer
           </label>
-          <div className="relative">
-            <LinkIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="url"
-              value={sheetMusicUrl}
-              onChange={(e) => setSheetMusicUrl(e.target.value)}
-              placeholder="https://drive.google.com/file/d/..."
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-          <p className="text-xs text-gray-500 mt-2">
-            📝 How to get the link: Open your file in Google Drive → Click Share → Set to "Anyone with the link" → Copy link
+          <input
+            type="text"
+            value={composer}
+            onChange={(e) => setComposer(e.target.value)}
+            placeholder="e.g. John Newton"
+            className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Language
+          </label>
+          <input
+            type="text"
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            placeholder="e.g. English, French, Latin"
+            className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Sheet Music URL
+          </label>
+          <input
+            type="url"
+            value={sheetMusicUrl}
+            onChange={(e) => setSheetMusicUrl(e.target.value)}
+            placeholder="https://drive.google.com/..."
+            className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+          />
+          <p className="text-sm text-gray-500 mt-1">
+            Link to Google Drive PDF or other sheet music file
           </p>
         </div>
 
-        {sheetMusicUrl && (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-            <p className="text-sm font-medium text-gray-700 mb-2">Preview:</p>
-            <div className="aspect-video bg-white rounded border border-gray-300">
-              <iframe
-                src={convertToEmbedUrl(sheetMusicUrl)}
-                className="w-full h-full rounded"
-                title="Sheet Music Preview"
+        {/* Learning Status */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Learning Status
+          </label>
+          <div className="space-y-3">
+            {/* Learned */}
+            <label className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+              learningStatus === 'learned' 
+                ? 'border-green-500 bg-green-50' 
+                : 'border-gray-200 hover:border-green-300'
+            }`}>
+              <input
+                type="radio"
+                value="learned"
+                checked={learningStatus === 'learned'}
+                onChange={(e) => setLearningStatus(e.target.value as any)}
+                className="w-4 h-4 text-green-600"
               />
-            </div>
+              <div className="flex-1">
+                <div className="font-medium text-gray-900">✅ Learned</div>
+                <div className="text-sm text-gray-600">The choir has mastered this song</div>
+              </div>
+            </label>
+
+            {/* Learning */}
+            <label className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+              learningStatus === 'learning' 
+                ? 'border-yellow-500 bg-yellow-50' 
+                : 'border-gray-200 hover:border-yellow-300'
+            }`}>
+              <input
+                type="radio"
+                value="learning"
+                checked={learningStatus === 'learning'}
+                onChange={(e) => setLearningStatus(e.target.value as any)}
+                className="w-4 h-4 text-yellow-600"
+              />
+              <div className="flex-1">
+                <div className="font-medium text-gray-900">📚 Learning</div>
+                <div className="text-sm text-gray-600">Currently practicing this song</div>
+              </div>
+            </label>
+
+            {/* Not Yet */}
+            <label className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+              learningStatus === 'not_yet' 
+                ? 'border-gray-500 bg-gray-50' 
+                : 'border-gray-200 hover:border-gray-300'
+            }`}>
+              <input
+                type="radio"
+                value="not_yet"
+                checked={learningStatus === 'not_yet'}
+                onChange={(e) => setLearningStatus(e.target.value as any)}
+                className="w-4 h-4 text-gray-600"
+              />
+              <div className="flex-1">
+                <div className="font-medium text-gray-900">⏳ Not Yet</div>
+                <div className="text-sm text-gray-600">Haven't started learning this song</div>
+              </div>
+            </label>
           </div>
-        )}
+        </div>
 
         <div className="flex gap-4 pt-4">
           <button
             type="button"
             onClick={() => navigate('/admin/repertoire')}
-            className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+            className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="flex-1 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:shadow-lg font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
           >
-            {loading ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="w-5 h-5" />
-                {songId ? 'Update Song' : 'Add Song'}
-              </>
-            )}
+            {loading ? 'Saving...' : (songId ? 'Update Song' : 'Create Song')}
           </button>
         </div>
       </form>

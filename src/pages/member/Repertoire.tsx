@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { Music, Search, Eye, Star, ArrowUpAZ, ArrowDownAZ } from 'lucide-react';
+import { Music, Search, Eye, Star, ArrowUpAZ, ArrowDownAZ, SlidersHorizontal } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -12,6 +12,7 @@ interface Song {
   language: string;
   sheet_music_url?: string;
   created_at?: string;
+  learning_status?: 'learned' | 'learning' | 'not_yet';
 }
 
 export const MemberRepertoire = () => {
@@ -23,28 +24,22 @@ export const MemberRepertoire = () => {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [sortBy, setSortBy] = useState<'a-z' | 'z-a' | 'recent'>('a-z');
   const [languageFilter, setLanguageFilter] = useState<'all' | 'english' | 'french' | 'portuguese' | 'lingala' | 'tshiluba' | 'kikongo' | 'swahili'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'learned' | 'learning' | 'not_yet'>('all');
 
-  // Check if coming from Dashboard with favorites tab request
-  // Check if coming from Dashboard with favorites tab request
+  // Check URL params for favorites tab
+  const [searchParams] = useSearchParams();
+  
   useEffect(() => {
-    console.log("📍 Full location object:", location);
-    console.log("📍 location.search:", location.search);
-    console.log("📍 location.pathname:", location.pathname);
-    console.log("📍 window.location.search:", window.location.search);
-    
-    const searchParams = new URLSearchParams(location.search);
-    const showFavorites = searchParams.get("tab") === "favorites";
-    
-    console.log("📍 Tab param:", searchParams.get("tab"));
-    
-    if (showFavorites) {
-      console.log("✅ Setting favorites filter to TRUE");
+    const tab = searchParams.get("tab");
+    if (tab === "favorites") {
       setShowFavoritesOnly(true);
     }
-  }, [location]);
+  }, [searchParams]);
+  
   useEffect(() => {
     fetchSongs();
     fetchFavorites();
@@ -133,6 +128,16 @@ export const MemberRepertoire = () => {
     }
   };
 
+  // Calculate stats
+  const stats = {
+    total: songs.length,
+    learned: songs.filter(s => s.learning_status === 'learned').length,
+    learning: songs.filter(s => s.learning_status === 'learning').length,
+    notYet: songs.filter(s => s.learning_status === 'not_yet' || !s.learning_status).length,
+  };
+
+  const masteryRate = stats.total > 0 ? Math.round((stats.learned / stats.total) * 100) : 0;
+
   // Filter songs by language
   const filterByLanguage = (song: Song): boolean => {
     if (languageFilter === 'all') return true;
@@ -148,6 +153,11 @@ export const MemberRepertoire = () => {
 
   // Filter and sort songs
   const filteredSongs = songs.filter(song => {
+    // Learning status filter
+    if (statusFilter !== 'all' && song.learning_status !== statusFilter) {
+      return false;
+    }
+
     const search = searchTerm.toLowerCase();
     const titleMatch = song.title.toLowerCase().includes(search);
     const composerMatch = song.composer?.toLowerCase().includes(search);
@@ -172,6 +182,19 @@ export const MemberRepertoire = () => {
     }
   });
 
+  const getStatusBadge = (status?: string) => {
+    switch (status) {
+      case 'learned':
+        return <span className="text-xs">✅</span>;
+      case 'learning':
+        return <span className="text-xs">📚</span>;
+      case 'not_yet':
+        return <span className="text-xs">⏳</span>;
+      default:
+        return <span className="text-xs">⏳</span>;
+    }
+  };
+
   const favoriteCount = favorites.size;
 
   if (loading) {
@@ -186,207 +209,224 @@ export const MemberRepertoire = () => {
   }
 
   return (
-    <div className="space-y-4 pb-6">
-      {/* Header - Compact */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Repertoire</h1>
-        <p className="text-sm text-gray-600 mt-0.5">
+    <div className="pb-4">
+      {/* Minimal Header */}
+      <div className="flex items-center justify-between mb-3">
+        <h1 className="text-xl font-bold text-gray-900">Repertoire</h1>
+        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
           {filteredSongs.length} songs
-          {favoriteCount > 0 && <span className="text-yellow-600"> · {favoriteCount} ⭐</span>}
-        </p>
+        </span>
       </div>
 
-      {/* Filters Bar - Compact */}
-      <div className="bg-white rounded-lg shadow-md p-3 space-y-3">
-        {/* Search & Sort - Compact */}
-        <div className="flex items-center gap-2">
-          <div className="flex-1 relative">
-            <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search songs..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
-          </div>
+      {/* Compact Stats Cards */}
+      <div className="grid grid-cols-5 gap-1.5 mb-3">
+        <button
+          onClick={() => setStatusFilter('all')}
+          className={`bg-white rounded-lg shadow-sm p-1.5 text-center transition-all ${
+            statusFilter === 'all' ? 'ring-2 ring-indigo-500' : ''
+          }`}
+        >
+          <div className="text-base font-bold text-gray-900">{stats.total}</div>
+          <div className="text-[10px] text-gray-600">Total</div>
+        </button>
+        <button
+          onClick={() => setStatusFilter('learned')}
+          className={`bg-green-50 border border-green-200 rounded-lg shadow-sm p-1.5 text-center transition-all ${
+            statusFilter === 'learned' ? 'ring-2 ring-green-500' : ''
+          }`}
+        >
+          <div className="text-base font-bold text-green-600">{stats.learned}</div>
+          <div className="text-[10px] text-gray-600">✅</div>
+        </button>
+        <button
+          onClick={() => setStatusFilter('learning')}
+          className={`bg-yellow-50 border border-yellow-200 rounded-lg shadow-sm p-1.5 text-center transition-all ${
+            statusFilter === 'learning' ? 'ring-2 ring-yellow-500' : ''
+          }`}
+        >
+          <div className="text-base font-bold text-yellow-600">{stats.learning}</div>
+          <div className="text-[10px] text-gray-600">📚</div>
+        </button>
+        <button
+          onClick={() => setStatusFilter('not_yet')}
+          className={`bg-gray-50 border border-gray-200 rounded-lg shadow-sm p-1.5 text-center transition-all ${
+            statusFilter === 'not_yet' ? 'ring-2 ring-gray-500' : ''
+          }`}
+        >
+          <div className="text-base font-bold text-gray-600">{stats.notYet}</div>
+          <div className="text-[10px] text-gray-600">⏳</div>
+        </button>
+        <div className="bg-indigo-50 border border-indigo-200 rounded-lg shadow-sm p-1.5 text-center">
+          <div className="text-base font-bold text-indigo-600">{masteryRate}%</div>
+          <div className="text-[10px] text-gray-600">Rate</div>
+        </div>
+      </div>
 
-          {/* Sort Dropdown - Compact */}
-          <div className="relative">
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="appearance-none pl-3 pr-8 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer font-medium text-gray-700"
-            >
-              <option value="a-z">A → Z</option>
-              <option value="z-a">Z → A</option>
-              <option value="recent">Recent</option>
-            </select>
-            <div className="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none">
-              {sortBy === 'a-z' ? (
-                <ArrowUpAZ className="w-3.5 h-3.5 text-gray-500" />
-              ) : sortBy === 'z-a' ? (
-                <ArrowDownAZ className="w-3.5 h-3.5 text-gray-500" />
-              ) : (
-                <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              )}
+      {/* Search + Filter Icons */}
+      <div className="flex gap-2 mb-3">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <input
+            type="text"
+            placeholder="Search..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          />
+        </div>
+        <button
+          onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+          className={`p-2.5 rounded-xl transition-all ${
+            showFavoritesOnly 
+              ? 'bg-yellow-500 text-white shadow-md' 
+              : 'bg-white border border-gray-200 text-gray-600'
+          }`}
+        >
+          <Star className={`w-5 h-5 ${showFavoritesOnly ? 'fill-white' : ''}`} />
+        </button>
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className={`p-2.5 rounded-xl transition-all ${
+            showFilters 
+              ? 'bg-purple-600 text-white' 
+              : 'bg-white border border-gray-200 text-gray-600'
+          }`}
+        >
+          <SlidersHorizontal className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Expandable Filter Panel */}
+      {showFilters && (
+        <div className="bg-white rounded-xl p-3 mb-3 border border-gray-200 space-y-3">
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className="block text-xs font-medium text-gray-500 mb-1">Sort</label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
+              >
+                <option value="a-z">A → Z</option>
+                <option value="z-a">Z → A</option>
+                <option value="recent">Recent</option>
+              </select>
             </div>
-          </div>
-
-          {/* Language Filter Dropdown */}
-          <div className="relative">
-            <select
-              value={languageFilter}
-              onChange={(e) => setLanguageFilter(e.target.value as any)}
-              className="appearance-none pl-3 pr-8 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer font-medium text-gray-700"
-            >
-              <option value="all">All Languages</option>
-              <option value="english">English</option>
-              <option value="french">French</option>
-              <option value="portuguese">Portuguese</option>
-              <option value="lingala">Lingala</option>
-              <option value="tshiluba">Tshiluba</option>
-              <option value="kikongo">Kikongo</option>
-              <option value="swahili">Swahili</option>
-            </select>
-            <div className="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none">
-              <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+            <div className="flex-1">
+              <label className="block text-xs font-medium text-gray-500 mb-1">Language</label>
+              <select
+                value={languageFilter}
+                onChange={(e) => setLanguageFilter(e.target.value as any)}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
+              >
+                <option value="all">All</option>
+                <option value="english">English</option>
+                <option value="french">French</option>
+                <option value="portuguese">Portuguese</option>
+                <option value="lingala">Lingala</option>
+                <option value="tshiluba">Tshiluba</option>
+                <option value="kikongo">Kikongo</option>
+                <option value="swahili">Swahili</option>
+              </select>
             </div>
           </div>
         </div>
+      )}
 
-        {/* Favorites Filter - Compact */}
-        <div className="flex items-center">
-          <button
-            onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-            className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg font-medium transition-all ${
-              showFavoritesOnly
-                ? 'bg-yellow-500 text-white shadow-md'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
+      {/* Active Filter Indicators */}
+      {statusFilter !== 'all' && (
+        <div className="flex items-center justify-between bg-indigo-50 rounded-lg px-3 py-2 mb-3">
+          <span className="text-sm font-medium text-indigo-800">
+            Filtering by: {statusFilter === 'learned' ? '✅ Learned' : statusFilter === 'learning' ? '📚 Learning' : '⏳ Not Yet'}
+          </span>
+          <button 
+            onClick={() => setStatusFilter('all')}
+            className="text-xs text-indigo-600 hover:text-indigo-800"
           >
-            <Star className={`w-3.5 h-3.5 ${showFavoritesOnly ? 'fill-white' : ''}`} />
-            {showFavoritesOnly ? 'Favorites' : 'Show Favorites'}
-            {favoriteCount > 0 && (
-              <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                showFavoritesOnly ? 'bg-yellow-600' : 'bg-gray-200'
-              }`}>
-                {favoriteCount}
-              </span>
-            )}
+            Clear
           </button>
         </div>
-      </div>
+      )}
 
-      {/* Songs List - Compact */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-3 py-2 text-left">
-                <Star className="w-3.5 h-3.5 inline text-gray-400" />
-              </th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                Title
-              </th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                Lang
-              </th>
-              <th className="px-2 py-2">
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {filteredSongs.map((song) => {
-              const isFavorite = favorites.has(song.id);
-              
-              return (
-                <tr
-                  key={song.id}
-                  onClick={() => song.sheet_music_url && handleViewPDF(song)}
-                  className={`hover:bg-gray-50 transition-colors active:bg-gray-100 ${
-                    song.sheet_music_url ? 'cursor-pointer' : ''
-                  }`}
-                >
-                  {/* Star */}
-                  <td className="px-3 py-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleFavorite(song.id, e);
-                      }}
-                      className={`transition-all ${
-                        isFavorite
-                          ? 'text-yellow-500'
-                          : 'text-gray-300'
-                      }`}
-                    >
-                      <Star className={`w-4 h-4 ${isFavorite ? 'fill-yellow-500' : ''}`} />
-                    </button>
-                  </td>
+      {/* Favorites indicator when active */}
+      {showFavoritesOnly && (
+        <div className="flex items-center justify-between bg-yellow-50 rounded-lg px-3 py-2 mb-3">
+          <span className="text-sm font-medium text-yellow-800">
+            ⭐ Showing {favoriteCount} favorites
+          </span>
+          <button 
+            onClick={() => setShowFavoritesOnly(false)}
+            className="text-xs text-yellow-600 hover:text-yellow-800"
+          >
+            Clear
+          </button>
+        </div>
+      )}
 
-                  {/* Title */}
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-1.5">
-                      <Music className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                      <span className="font-medium text-gray-900 text-sm line-clamp-1">{song.title}</span>
-                    </div>
-                  </td>
-
-                  {/* Language */}
-                  <td className="px-3 py-2">
-                    <span className={`inline-block text-xs px-1.5 py-0.5 rounded font-medium ${
-                      song.language === 'English' ? 'bg-blue-100 text-blue-800' :
-                      song.language === 'French' ? 'bg-purple-100 text-purple-800' :
-                      song.language === 'Lingala' ? 'bg-green-100 text-green-800' :
-                      song.language === 'Tshiluba' ? 'bg-yellow-100 text-yellow-800' :
-                      song.language === 'Swahili' ? 'bg-teal-100 text-teal-800' :
-                      song.language === 'Kikongo' ? 'bg-orange-100 text-orange-800' :
-                      song.language === 'Portuguese' ? 'bg-pink-100 text-pink-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {(song.language || "??").slice(0, 2)}
-                    </span>
-                  </td>
-
-                  {/* Actions - Only View PDF */}
-                  <td className="px-2 py-2 text-right">
-                    {song.sheet_music_url && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleViewPDF(song);
-                        }}
-                        className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors"
-                        title="View"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-
-        {/* Empty State - Compact */}
-        {filteredSongs.length === 0 && (
-          <div className="text-center py-8">
+      {/* Ultra Clean Song List */}
+      <div className="bg-white rounded-xl overflow-hidden shadow-sm">
+        {filteredSongs.length === 0 ? (
+          <div className="text-center py-12">
             <Music className="w-12 h-12 text-gray-300 mx-auto mb-3" />
             <h3 className="text-base font-medium text-gray-900 mb-1">
               {showFavoritesOnly ? 'No favorites yet' : 'No songs found'}
             </h3>
             <p className="text-sm text-gray-500">
               {showFavoritesOnly
-                ? 'Star some songs to add them to your favorites!'
-                : 'Try adjusting your filters'}
+                ? 'Tap the star on songs to add favorites!'
+                : 'Try adjusting your search or filters'}
             </p>
           </div>
+        ) : (
+          filteredSongs.map((song, index) => {
+            const isFavorite = favorites.has(song.id);
+            return (
+              <div
+                key={song.id}
+                onClick={() => song.sheet_music_url && handleViewPDF(song)}
+                className={`flex items-center gap-3 px-3 py-3 active:bg-gray-50 ${
+                  index !== filteredSongs.length - 1 ? 'border-b border-gray-100' : ''
+                } ${song.sheet_music_url ? 'cursor-pointer' : ''}`}
+              >
+                {/* Star */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleFavorite(song.id, e);
+                  }}
+                  className="flex-shrink-0"
+                >
+                  <span className={`text-lg ${isFavorite ? 'text-yellow-500' : 'text-gray-300'}`}>
+                    {isFavorite ? '★' : '☆'}
+                  </span>
+                </button>
+
+                {/* Learning Status Badge */}
+                <div className="flex-shrink-0">
+                  {getStatusBadge(song.learning_status || 'not_yet')}
+                </div>
+
+                {/* Title */}
+                <span className="flex-1 text-sm font-medium text-gray-900 truncate">
+                  {song.title}
+                </span>
+
+                {/* Language Badge - Circle */}
+                <span className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-bold text-white flex-shrink-0 ${
+                  song.language === 'English' ? 'bg-blue-500' :
+                  song.language === 'French' ? 'bg-purple-500' :
+                  song.language === 'Lingala' ? 'bg-green-500' :
+                  song.language === 'Tshiluba' ? 'bg-yellow-500' :
+                  song.language === 'Swahili' ? 'bg-teal-500' :
+                  song.language === 'Kikongo' ? 'bg-orange-500' :
+                  song.language === 'Portuguese' ? 'bg-pink-500' :
+                  'bg-gray-400'
+                }`}>
+                  {(song.language || '??').slice(0, 1)}
+                </span>
+              </div>
+            );
+          })
         )}
       </div>
     </div>

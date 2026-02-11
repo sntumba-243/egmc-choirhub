@@ -35,12 +35,25 @@ export const MemberMessages = () => {
         .order('sent_date', { ascending: false });
 
       if (error) throw error;
-      setMessages(data || []);
+      const filtered = (data || []).filter(m => m.send_to === 'all' || m.send_to === user?.id);
+      setMessages(filtered);
     } catch (error) {
       console.error('Error:', error);
       toast.error('Failed to load messages');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const markAsRead = async (messageId: string) => {
+    try {
+      await supabase
+        .from('messages')
+        .update({ is_read: true })
+        .eq('id', messageId);
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, is_read: true } : m));
+    } catch (error) {
+      console.error('Error marking as read:', error);
     }
   };
 
@@ -192,17 +205,17 @@ export const MemberMessages = () => {
       </div>
 
       <div className="space-y-3">
-        {messages.length === 0 ? (
+        {messages.filter(m => filter === 'all' || !m.is_read).length === 0 ? (
           <div className="bg-white rounded-xl p-8 text-center">
             <Mail className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No messages yet</h3>
             <p className="text-gray-600">You'll see messages from your choir here</p>
           </div>
         ) : (
-          messages.map((message) => (
+          messages.filter(m => filter === 'all' || !m.is_read).map((message) => (
             <div
               key={message.id}
-              onClick={() => setSelectedMessage(message)}
+              onClick={() => { setSelectedMessage(message); if (!message.is_read) markAsRead(message.id); }}
               className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all"
             >
               <div className="flex items-start gap-3">

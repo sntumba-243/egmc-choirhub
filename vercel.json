@@ -3,11 +3,5 @@
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
-  ],
-  "crons": [
-    {
-      "path": "/api/notifications/send-event-reminders",
-      "schedule": "0 9 * * *"
-    }
   ]
 }

@@ -29,3 +29,8 @@ dist-ssr
 create-*.js
 reset-*.js
 test-*.js
+src/pages/admin/EventDetail.tsx.songs-debug
+src/pages/admin/EventForm.tsx.before-sync-fix
+src/pages/admin/EventForm.tsx.setlist-backup
+*.backup
+*.backup*
