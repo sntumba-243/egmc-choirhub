@@ -30,7 +30,7 @@ export const MemberCalendar = () => {
   const [rsvps, setRsvps] = useState<Record<string, RSVP>>({});
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('cards');
-  const [timelineFilter, setTimelineFilter] = useState<'all' | 'upcoming' | 'past'>('upcoming');
+  const [timelineFilter, setTimelineFilter] = useState<'all' | 'upcoming' | 'today' | 'past'>('upcoming');
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
@@ -128,6 +128,8 @@ export const MemberCalendar = () => {
     // Apply timeline filter
     if (timelineFilter === 'upcoming') {
       filtered = events.filter(e => !isPast(e.date, e.time));
+    } else if (timelineFilter === 'today') {
+      filtered = events.filter(e => isToday(e.date));
     } else if (timelineFilter === 'past') {
       filtered = events.filter(e => isPast(e.date, e.time));
     }
@@ -237,7 +239,17 @@ export const MemberCalendar = () => {
         >
           Upcoming ({events.filter(e => !isPast(e.date, e.time)).length})
         </button>
-<button
+        <button
+          onClick={() => setTimelineFilter('today')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+            timelineFilter === 'today'
+              ? 'bg-purple-500 text-white shadow-sm'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          Today ({events.filter(e => isToday(e.date)).length})
+        </button>
+        <button
           onClick={() => setTimelineFilter('past')}
           className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
             timelineFilter === 'past'

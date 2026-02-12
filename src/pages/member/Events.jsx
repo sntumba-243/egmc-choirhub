@@ -4,35 +4,14 @@ import { supabase } from '../../lib/supabase';
 import { Calendar, Clock, MapPin, Users, Grid, List, ArrowUpDown, CheckCircle, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-interface Event {
-  id: string;
-  title: string;
-  description?: string;
-  date: string;
-  time: string;
-  location: string;
-  type?: string;
-  requires_rsvp: boolean;
-}
-
-interface RSVP {
-  event_id: string;
-  status: 'yes' | 'no' | 'maybe';
-}
-
-type ViewMode = 'cards' | 'list';
-type SortField = 'date' | 'title' | 'type' | 'time' | 'location';
-type SortDirection = 'asc' | 'desc';
-
-export const MemberCalendar = () => {
+export const MemberEvents = () => {
   const navigate = useNavigate();
-  const [events, setEvents] = useState<Event[]>([]);
-  const [rsvps, setRsvps] = useState<Record<string, RSVP>>({});
+  const [events, setEvents] = useState([]);
+  const [rsvps, setRsvps] = useState({});
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>('cards');
-  const [timelineFilter, setTimelineFilter] = useState<'all' | 'upcoming' | 'past'>('upcoming');
-  const [sortField, setSortField] = useState<SortField>('date');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [viewMode, setViewMode] = useState('cards');
+  const [sortField, setSortField] = useState('date');
+  const [sortDirection, setSortDirection] = useState('asc');
 
   useEffect(() => {
     fetchEvents();
@@ -68,7 +47,7 @@ export const MemberCalendar = () => {
 
       if (error) throw error;
 
-      const rsvpMap: Record<string, RSVP> = {};
+      const rsvpMap = {};
       data?.forEach((rsvp) => {
         rsvpMap[rsvp.event_id] = rsvp;
       });
@@ -78,7 +57,7 @@ export const MemberCalendar = () => {
     }
   };
 
-  const handleRSVP = async (eventId: string, status: 'yes' | 'no' | 'maybe') => {
+  const handleRSVP = async (eventId, status) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -88,16 +67,11 @@ export const MemberCalendar = () => {
 
       const { error } = await supabase
         .from('event_rsvps')
-        .upsert(
-        {
+        .upsert({
           event_id: eventId,
           member_id: user.id,
           status,
-        },
-        {
-          onConflict: 'event_id,member_id'
-        }
-      );
+        });
 
       if (error) throw error;
 
@@ -113,7 +87,7 @@ export const MemberCalendar = () => {
     }
   };
 
-  const handleSort = (field: SortField) => {
+  const handleSort = (field) => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
@@ -123,18 +97,9 @@ export const MemberCalendar = () => {
   };
 
   const getSortedEvents = () => {
-    let filtered = events;
-    
-    // Apply timeline filter
-    if (timelineFilter === 'upcoming') {
-      filtered = events.filter(e => !isPast(e.date, e.time));
-    } else if (timelineFilter === 'past') {
-      filtered = events.filter(e => isPast(e.date, e.time));
-    }
-    
-    return [...filtered].sort((a, b) => {
-      let aVal: any = a[sortField];
-      let bVal: any = b[sortField];
+    return [...events].sort((a, b) => {
+      let aVal = a[sortField];
+      let bVal = b[sortField];
 
       if (sortField === 'date' || sortField === 'time') {
         aVal = new Date(`${a.date} ${a.time}`).getTime();
@@ -147,7 +112,7 @@ export const MemberCalendar = () => {
     });
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
       weekday: 'short',
@@ -157,28 +122,12 @@ export const MemberCalendar = () => {
     });
   };
 
-  const formatTime = (timeString: string) => {
+  const formatTime = (timeString) => {
     const [hours, minutes] = timeString.split(':');
     const hour = parseInt(hours);
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour % 12 || 12;
     return `${displayHour}:${minutes} ${ampm}`;
-  };
-
-  const isToday = (dateString: string) => {
-    const eventDate = new Date(dateString);
-    const today = new Date();
-    return eventDate.toDateString() === today.toDateString();
-  };
-
-  const isPast = (dateString: string, timeString: string) => {
-    const eventDateTime = new Date(`${dateString}T${timeString}`);
-    return eventDateTime < new Date();
-  };
-
-  const isFuture = (dateString: string, timeString: string) => {
-    const eventDateTime = new Date(`${dateString}T${timeString}`);
-    return eventDateTime > new Date() && !isToday(dateString);
   };
 
   const sortedEvents = getSortedEvents();
@@ -197,7 +146,7 @@ export const MemberCalendar = () => {
         </div>
         <div className="flex items-center">
           {/* View Toggle - iOS style */}
-          <div className="hidden sm:flex bg-gray-100 rounded-lg p-1">
+          <div className="flex bg-gray-100 rounded-lg p-1">
             <button
               onClick={() => setViewMode('cards')}
               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md transition-colors ${
@@ -224,41 +173,6 @@ export const MemberCalendar = () => {
         </div>
       </div>
 
-      
-      {/* Timeline Filter Buttons */}
-      <div className="flex gap-1.5 overflow-x-auto pb-2 -mt-1">
-        <button
-          onClick={() => setTimelineFilter('upcoming')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
-            timelineFilter === 'upcoming'
-              ? 'bg-blue-500 text-white shadow-sm'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
-        >
-          Upcoming ({events.filter(e => !isPast(e.date, e.time)).length})
-        </button>
-<button
-          onClick={() => setTimelineFilter('past')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
-            timelineFilter === 'past'
-              ? 'bg-gray-500 text-white shadow-sm'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
-        >
-          Past ({events.filter(e => isPast(e.date, e.time)).length})
-        </button>
-        <button
-          onClick={() => setTimelineFilter('all')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
-            timelineFilter === 'all'
-              ? 'bg-teal-500 text-white shadow-sm'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
-        >
-          All ({events.length})
-        </button>
-      </div>
-
       {/* Cards View - Mobile Responsive */}
       {viewMode === 'cards' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
@@ -271,7 +185,7 @@ export const MemberCalendar = () => {
                 className="group bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 border border-gray-200 hover:border-blue-300 cursor-pointer overflow-hidden"
               >
                 {/* Header with iOS gradient */}
-                <div className="relative p-2.5 pb-1.5 sm:p-2 sm:pb-1.5 bg-gradient-to-br from-blue-50/40 via-cyan-50/30 to-teal-50/30">
+                <div className="relative p-3 pb-2 sm:p-2.5 sm:pb-2 bg-gradient-to-br from-blue-50/40 via-cyan-50/30 to-teal-50/30">
                   <div className="flex items-start justify-between gap-2">
                     <h3 className="text-sm font-bold text-gray-900 line-clamp-2 leading-tight group-hover:text-blue-600 transition-colors">
                       {event.title}
@@ -285,7 +199,7 @@ export const MemberCalendar = () => {
                 </div>
 
                 {/* Content */}
-                <div className="p-2.5 pt-2 sm:p-2 sm:pt-1.5 space-y-0.5">
+                <div className="p-3 pt-2 sm:p-2.5 sm:pt-2 space-y-1">
                   <div className="flex items-center gap-1.5 text-gray-700">
                     <div className="flex-shrink-0 w-5 h-5 rounded-lg bg-blue-500 flex items-center justify-center shadow-sm">
                       <Calendar className="w-3 h-3 text-white" strokeWidth={2.5} />
@@ -309,24 +223,24 @@ export const MemberCalendar = () => {
 
                   {/* RSVP Status */}
                   {event.requires_rsvp && (
-                    <div className="pt-1 min-h-[28px] flex items-center">
+                    <div className="pt-1">
                       {rsvp ? (
                         <div className="flex items-center gap-1.5">
                           {rsvp.status === 'yes' && (
                             <>
-                              <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+                              <CheckCircle className="w-4 h-4 text-green-600" />
                               <span className="text-xs font-semibold text-green-600">You're attending!</span>
                             </>
                           )}
                           {rsvp.status === 'no' && (
                             <>
-                              <XCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                              <XCircle className="w-4 h-4 text-red-600" />
                               <span className="text-xs font-semibold text-red-600">Not attending</span>
                             </>
                           )}
                           {rsvp.status === 'maybe' && (
                             <>
-                              <Users className="w-4 h-4 text-yellow-600 flex-shrink-0" />
+                              <Users className="w-4 h-4 text-yellow-600" />
                               <span className="text-xs font-semibold text-yellow-600">Maybe attending</span>
                             </>
                           )}
@@ -340,7 +254,7 @@ export const MemberCalendar = () => {
 
                 {/* RSVP Buttons */}
                 {event.requires_rsvp && (
-                  <div className="flex gap-1.5 px-2.5 pb-2.5 pt-1.5 sm:px-2 sm:pb-2 sm:pt-1.5">
+                  <div className="flex gap-1.5 px-3 pb-3 pt-2 sm:px-2.5 sm:pb-2.5 sm:pt-2">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -501,19 +415,19 @@ export const MemberCalendar = () => {
                           <div className="flex items-center justify-center gap-1">
                             {rsvp?.status === 'yes' && (
                               <>
-                                <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+                                <CheckCircle className="w-4 h-4 text-green-600" />
                                 <span className="text-xs font-semibold text-green-600">Yes</span>
                               </>
                             )}
                             {rsvp?.status === 'no' && (
                               <>
-                                <XCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                                <XCircle className="w-4 h-4 text-red-600" />
                                 <span className="text-xs font-semibold text-red-600">No</span>
                               </>
                             )}
                             {rsvp?.status === 'maybe' && (
                               <>
-                                <Users className="w-4 h-4 text-yellow-600 flex-shrink-0" />
+                                <Users className="w-4 h-4 text-yellow-600" />
                                 <span className="text-xs font-semibold text-yellow-600">Maybe</span>
                               </>
                             )}

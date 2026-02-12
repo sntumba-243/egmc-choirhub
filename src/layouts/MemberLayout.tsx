@@ -43,7 +43,7 @@ export default function MemberLayout() {
   const navItems = [
     { path: '/member', icon: Home, label: 'Dashboard' },
     { path: '/member/repertoire', icon: Music, label: 'Repertoire' },
-    { path: '/member/calendar', icon: Calendar, label: 'Calendar' },
+    { path: '/member/calendar', icon: Calendar, label: 'Events' },
     { path: '/member/messages', icon: MessageSquare, label: 'Messages' },
     { path: '/member/vocal-coach', icon: Mic, label: 'Vocal Coach' },
     { path: '/member/profile', icon: User, label: 'Profile' },
