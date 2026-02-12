@@ -26,6 +26,7 @@ export const AdminEvents = () => {
   const [loading, setLoading] = useState(true);
   const [rsvpCounts, setRsvpCounts] = useState<Record<string, number>>({});
   const [viewMode, setViewMode] = useState<ViewMode>('cards');
+  const [timelineFilter, setTimelineFilter] = useState<'all' | 'upcoming' | 'past'>('upcoming');
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
@@ -117,6 +118,22 @@ export const AdminEvents = () => {
     return `${displayHour}:${minutes} ${ampm}`;
   };
 
+  const isToday = (dateString: string) => {
+    const eventDate = new Date(dateString);
+    const today = new Date();
+    return eventDate.toDateString() === today.toDateString();
+  };
+
+  const isPast = (dateString: string, timeString: string) => {
+    const eventDateTime = new Date(`${dateString}T${timeString}`);
+    return eventDateTime < new Date();
+  };
+
+  const isFuture = (dateString: string, timeString: string) => {
+    const eventDateTime = new Date(`${dateString}T${timeString}`);
+    return eventDateTime > new Date() && !isToday(dateString);
+  };
+
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -127,7 +144,16 @@ export const AdminEvents = () => {
   };
 
   const getSortedEvents = () => {
-    return [...events].sort((a, b) => {
+    let filtered = events;
+    
+    // Apply timeline filter
+    if (timelineFilter === 'upcoming') {
+      filtered = events.filter(e => !isPast(e.date, e.time));
+    } else if (timelineFilter === 'past') {
+      filtered = events.filter(e => isPast(e.date, e.time));
+    }
+    
+    return [...filtered].sort((a, b) => {
       let aVal: any = a[sortField];
       let bVal: any = b[sortField];
 
@@ -161,7 +187,7 @@ export const AdminEvents = () => {
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           {/* View Toggle - iOS style */}
-          <div className="flex bg-gray-100 rounded-lg p-1">
+          <div className="hidden sm:flex bg-gray-100 rounded-lg p-1">
             <button
               onClick={() => setViewMode('cards')}
               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md transition-colors ${
@@ -194,6 +220,41 @@ export const AdminEvents = () => {
             <span className="text-sm font-medium">Add Event</span>
           </button>
         </div>
+      </div>
+
+      
+      {/* Timeline Filter Buttons */}
+      <div className="flex gap-1.5 overflow-x-auto pb-2 -mt-1">
+        <button
+          onClick={() => setTimelineFilter('upcoming')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+            timelineFilter === 'upcoming'
+              ? 'bg-blue-500 text-white shadow-sm'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          Upcoming ({events.filter(e => !isPast(e.date, e.time)).length})
+        </button>
+        <button
+          onClick={() => setTimelineFilter('past')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+            timelineFilter === 'past'
+              ? 'bg-gray-500 text-white shadow-sm'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          Past ({events.filter(e => isPast(e.date, e.time)).length})
+        </button>
+        <button
+          onClick={() => setTimelineFilter('all')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+            timelineFilter === 'all'
+              ? 'bg-teal-500 text-white shadow-sm'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          All ({events.length})
+        </button>
       </div>
 
       {/* Cards View - Mobile Responsive Grid */}
@@ -279,14 +340,14 @@ export const AdminEvents = () => {
                   className="flex items-center justify-center p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 hover:text-gray-900 transition-colors"
                   title="Edit"
                 >
-                  <Edit className="w-4 h-4" />
+                  <Edit className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={(e) => handleDelete(e, event.id, event.title)}
                   className="flex items-center justify-center p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-red-50 hover:text-red-600 transition-colors"
                   title="Delete"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>

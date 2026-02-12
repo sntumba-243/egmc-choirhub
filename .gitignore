@@ -34,3 +34,4 @@ src/pages/admin/EventForm.tsx.before-sync-fix
 src/pages/admin/EventForm.tsx.setlist-backup
 *.backup
 *.backup*
+.env*.local
