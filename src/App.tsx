@@ -139,8 +139,7 @@ function AppRoutes() {
         <Route path="repertoire" element={<MemberRepertoire />} />
         <Route path="repertoire/:id" element={<SongDetail />} />
         <Route path="events/:eventId" element={<MemberEventDetail />} />
-              <Route path="calendar" element={<MemberCalendar />} />
-            <Route path="events/:eventId" element={<MemberEventDetail />} />
+        <Route path="calendar" element={<MemberCalendar />} />
         <Route path="calendar/:eventId" element={<MemberEventDetail />} />
         <Route path="messages" element={<MemberMessages />} />
         <Route path="messages/compose" element={<MessageCompose />} />
