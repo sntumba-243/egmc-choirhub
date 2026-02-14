@@ -1,22 +1,34 @@
 import { createClient } from '@supabase/supabase-js';
+import { neonClient } from './neonClient';
+import { autoFailover } from './autoFailover';
 
-// Get environment variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Log for debugging
-console.log('🔧 Loading Supabase...');
-console.log('URL exists:', !!supabaseUrl);
-console.log('Key exists:', !!supabaseAnonKey);
+// Manual override from env
+const forceNeon = import.meta.env.VITE_USE_NEON === 'true';
 
-// Check if credentials exist
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('❌ Missing Supabase credentials!');
-  throw new Error('Missing Supabase environment variables');
+console.log('🔧 Database Configuration:');
+
+// Initialize auto-failover (only if not forcing Neon)
+let useNeon = forceNeon;
+
+if (!forceNeon) {
+  // Auto-failover will run asynchronously
+  autoFailover.initialize().then(failedOver => {
+    if (failedOver && !useNeon) {
+      console.log('🔄 Automatic failover to Neon activated');
+      // Trigger a re-render or reload if needed
+      window.dispatchEvent(new Event('database-failover'));
+    }
+  });
 }
 
-// Create the Supabase client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('❌ Missing Supabase credentials!');
+}
+
+const supabaseClient = createClient(supabaseUrl || '', supabaseAnonKey || '', {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
@@ -24,9 +36,26 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
-// Make it globally available for testing
+// Function to get the right client
+export function getDbClient() {
+  const shouldUseNeon = forceNeon || autoFailover.isUsingNeon();
+  return shouldUseNeon ? neonClient : supabaseClient;
+}
+
+// Export current client (may switch after failover check)
+export const supabase = getDbClient();
+
 if (typeof window !== 'undefined') {
   (window as any).supabase = supabase;
-  console.log('✅ Supabase client loaded!');
-  console.log('✅ window.supabase is now available');
+  (window as any).getDbClient = getDbClient;
+  
+  const dbType = forceNeon ? 'Neon (forced)' : 
+                 autoFailover.isUsingNeon() ? 'Neon (auto-failover)' : 
+                 'Supabase';
+  console.log(`✅ Using ${dbType} database`);
+  
+  // Listen for failover events
+  window.addEventListener('database-failover', () => {
+    console.log('🔄 Database failover detected');
+  });
 }

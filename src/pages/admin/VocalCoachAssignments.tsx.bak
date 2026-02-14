@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { analyzeAudio, AnalysisProgress } from '../../services/audioAnalysis';
-import { generateVocalFeedback, saveVocalFeedback, VocalRatings, VocalAnalysisResult } from '../../services/vocalAnalysis';
 
 interface Member {
   id: string;
@@ -35,7 +34,6 @@ interface Submission {
   audio_url: string;
   status: string;
   feedback_audio_url: string | null;
-  ai_feedback: string | null;
   created_at: string;
 }
 
@@ -109,65 +107,10 @@ export default function VocalCoachAssignments() {
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [recordedUrl, setRecordedUrl] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
-  const [evaluatingId, setEvaluatingId] = useState<string | null>(null);
-  const [ratings, setRatings] = useState<VocalRatings>({ key_accuracy: 3, tone_quality: 3, note_accuracy: 3, breathing: 3, rhythm: 3 });
-  const [aiResult, setAiResult] = useState<VocalAnalysisResult | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [showAiDetails, setShowAiDetails] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [analysisProgress, setAnalysisProgress] = useState<AnalysisProgress | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-
-  const handleAutoAnalyze = async (audioUrl: string, referenceUrl?: string | null) => {
-    setAnalyzing(true);
-    setAnalysisProgress({ stage: 'Starting...', percent: 0 });
-    try {
-      const scores = await analyzeAudio(audioUrl, referenceUrl, (p) => setAnalysisProgress(p));
-      setRatings({
-        key_accuracy: scores.pitch_stability,
-        tone_quality: scores.tone_quality,
-        note_accuracy: scores.note_accuracy,
-        breathing: scores.breathing,
-        rhythm: scores.rhythm,
-      });
-      toast.success('Audio analysis complete!');
-    } catch (error) {
-      console.error('Analysis error:', error);
-      toast.error('Analysis failed — rate manually');
-    } finally { setAnalyzing(false); setAnalysisProgress(null); }
-  };
-
-  const startEvaluation = (sid: string) => {
-    setEvaluatingId(sid);
-    setRatings({ key_accuracy: 3, tone_quality: 3, note_accuracy: 3, breathing: 3, rhythm: 3 });
-    setAiResult(null); setShowAiDetails(false);
-  };
-
-  const cancelEvaluation = () => { setEvaluatingId(null); setAiResult(null); setShowAiDetails(false); };
-
-  const handleGenerateFeedback = async (a: any) => {
-    setAiLoading(true);
-    try {
-      const result = await generateVocalFeedback(ratings, {
-        songTitle: a.song?.title, exerciseTitle: a.exercise?.title,
-        voicePart: a.member?.voice_part,
-        memberName: a.member ? `${a.member.first_name} ${a.member.last_name}` : undefined,
-        directorNotes: a.notes || undefined,
-      });
-      console.log("RESULT:", result); setAiResult(result);
-    } catch (err) { console.error("AI ERROR:", err); toast.error('Failed to generate feedback'); }
-    finally { setAiLoading(false); }
-  };
-
-  const handleSaveAiFeedback = async (sid: string) => {
-    if (!aiResult) return;
-    const ok = await saveVocalFeedback(sid, aiResult, ratings);
-    if (ok) { toast.success('AI feedback saved!'); cancelEvaluation(); loadData(); }
-    else toast.error('Failed to save');
-  };
 
   useEffect(() => { loadData(); }, []);
 
@@ -222,7 +165,7 @@ export default function VocalCoachAssignments() {
       rec.onstop = () => { const blob = new Blob(referenceChunksRef.current, { type: 'audio/webm' }); setReferenceAudioBlob(blob); setReferenceAudioUrl(URL.createObjectURL(blob)); stream.getTracks().forEach(t => t.stop()); };
       rec.start();
       setIsRecordingReference(true);
-    } catch (err) { console.error("AI ERROR:", err); toast.error('Could not access microphone'); }
+    } catch { toast.error('Could not access microphone'); }
   };
   const stopReferenceRecording = () => { referenceRecorderRef.current?.stop(); setIsRecordingReference(false); };
   const clearReferenceAudio = () => { if (referenceAudioUrl) URL.revokeObjectURL(referenceAudioUrl); setReferenceAudioBlob(null); setReferenceAudioUrl(null); };
@@ -245,7 +188,7 @@ export default function VocalCoachAssignments() {
       rec.start();
       setIsRecording(true);
       setRecordingFor(submissionId);
-    } catch (err) { console.error("AI ERROR:", err); toast.error('Could not access microphone'); }
+    } catch { toast.error('Could not access microphone'); }
   };
   const stopRecording = () => { mediaRecorderRef.current?.stop(); setIsRecording(false); };
   const cancelRecording = () => { if (recordedUrl) URL.revokeObjectURL(recordedUrl); setRecordedBlob(null); setRecordedUrl(null); setRecordingFor(null); };
@@ -262,11 +205,11 @@ export default function VocalCoachAssignments() {
       toast.success('Feedback sent!');
       cancelRecording();
       loadData();
-    } catch (err) { console.error("AI ERROR:", err); toast.error('Failed to send feedback'); } finally { setSending(false); }
+    } catch { toast.error('Failed to send feedback'); } finally { setSending(false); }
   };
 
   const approveSubmission = async (id: string) => {
-    try { await supabase.from('song_submissions').update({ status: 'approved' }).eq('id', id); toast.success('Approved!'); loadData(); } catch (err) { console.error("AI ERROR:", err); toast.error('Failed'); }
+    try { await supabase.from('song_submissions').update({ status: 'approved' }).eq('id', id); toast.success('Approved!'); loadData(); } catch { toast.error('Failed'); }
   };
 
   const handleAssign = async () => {
@@ -304,12 +247,12 @@ export default function VocalCoachAssignments() {
       setShowAssignModal(false);
       resetForm();
       loadData();
-    } catch (err) { console.error("AI ERROR:", err); toast.error('Failed to assign'); }
+    } catch { toast.error('Failed to assign'); }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this assignment?')) return;
-    try { await supabase.from('exercise_assignments').delete().eq('id', id); toast.success('Deleted'); loadData(); } catch (err) { console.error("AI ERROR:", err); toast.error('Failed'); }
+    try { await supabase.from('exercise_assignments').delete().eq('id', id); toast.success('Deleted'); loadData(); } catch { toast.error('Failed'); }
   };
 
   const resetForm = () => { setSelectedMember(''); setSelectedExercise(''); setSelectedSong(''); setDueDate(''); setNotes(''); setAssignmentType('song'); setSelectionMode('single'); setSelectedVoicePart(''); clearReferenceAudio(); };
@@ -330,21 +273,6 @@ export default function VocalCoachAssignments() {
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-  const RatingBar = ({ label, emoji, value, field }: { label: string; emoji: string; value: number; field: keyof VocalRatings }) => (
-    <div className="flex items-center gap-2">
-      <span className="text-[11px] w-20 text-gray-600">{emoji} {label}</span>
-      <div className="flex gap-1 flex-1">
-        {[1, 2, 3, 4, 5].map(n => (
-          <button key={n} onClick={() => setRatings(prev => ({ ...prev, [field]: n }))}
-            className={`flex-1 h-7 rounded-md text-[10px] font-bold transition-all ${
-              n <= value ? n >= 4 ? 'bg-green-500 text-white' : n >= 3 ? 'bg-yellow-500 text-white' : 'bg-red-500 text-white' : 'bg-gray-100 text-gray-400'
-            }`}>{n}</button>
-        ))}
-      </div>
-      <span className="text-[10px] text-gray-400 w-16">{['','Poor','Needs work','OK','Good','Great'][value]}</span>
-    </div>
-  );
-
   if (loading) return (
     <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent" /></div>
   );
@@ -359,7 +287,7 @@ export default function VocalCoachAssignments() {
           <h1 className="text-xl font-bold text-gray-900">Vocal Coach</h1>
           <p className="text-[11px] text-gray-500">Assign songs & exercises · Review submissions</p>
         </div>
-        <button onClick={() => setShowAssignModal(true)} className="flex items-center justify-center gap-1 px-4 py-2 bg-blue-500 text-white rounded-xl text-[12px] font-semibold hover:bg-blue-600 shadow-sm transition-all active:scale-[0.98] whitespace-nowrap">
+        <button onClick={() => setShowAssignModal(true)} className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-500 text-white rounded-xl text-[13px] font-semibold hover:bg-blue-600 shadow-sm transition-all active:scale-[0.98]">
           <Plus className="w-4 h-4" />
           Assign
         </button>
@@ -510,15 +438,10 @@ export default function VocalCoachAssignments() {
                             )}
                           </div>
                         ) : (
-                          <>
                           <div className="flex gap-2">
                             <button onClick={() => setRecordingFor(a.submission!.id)}
                               className="flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 bg-red-50 text-red-600 rounded-lg text-[11px] font-semibold hover:bg-red-100">
-                              🎤 Feedback
-                            </button>
-                            <button onClick={() => startEvaluation(a.submission!.id)}
-                              className="flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 bg-purple-50 text-purple-600 rounded-lg text-[11px] font-semibold hover:bg-purple-100">
-                              🤖 AI Evaluate
+                              🎤 Record Feedback
                             </button>
                             {a.submission.status !== 'approved' && (
                               <button onClick={() => approveSubmission(a.submission!.id)}
@@ -527,111 +450,6 @@ export default function VocalCoachAssignments() {
                               </button>
                             )}
                           </div>
-
-                          {/* AI Evaluation Panel */}
-                          {evaluatingId === a.submission!.id && (
-                            <div className="mt-2 bg-purple-50/50 rounded-xl border border-purple-200/60 p-3 space-y-3">
-                              {!aiResult ? (
-                                <>
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[12px] font-bold text-purple-800">🤖 AI Vocal Analysis</span>
-                                    <button onClick={cancelEvaluation} className="text-[11px] text-gray-500">Cancel</button>
-                                  </div>
-
-                                  {/* Auto-Analyze Button */}
-                                  {!analyzing ? (
-                                    <button onClick={() => handleAutoAnalyze(a.submission!.audio_url, (a as any).reference_audio_url || null)}
-                                      className="w-full py-2.5 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-lg text-[12px] font-semibold hover:from-purple-600 hover:to-blue-600 flex items-center justify-center gap-2">
-                                      🔊 Auto-Analyze Recording
-                                    </button>
-                                  ) : (
-                                    <div className="w-full py-2 bg-purple-100 rounded-lg text-center">
-                                      <p className="text-[11px] font-semibold text-purple-700">{analysisProgress?.stage || 'Analyzing...'}</p>
-                                      <div className="mx-4 mt-1.5 h-1.5 bg-purple-200 rounded-full overflow-hidden">
-                                        <div className="h-full bg-purple-600 rounded-full transition-all duration-300" style={{ width: (analysisProgress?.percent || 0) + '%' }} />
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  <div className="flex items-center gap-2 my-1">
-                                    <div className="flex-1 h-px bg-gray-200" />
-                                    <span className="text-[9px] text-gray-400">or adjust manually</span>
-                                    <div className="flex-1 h-px bg-gray-200" />
-                                  </div>
-
-                                  <div className="space-y-1.5">
-                                    <RatingBar label="Key" emoji="🎹" value={ratings.key_accuracy} field="key_accuracy" />
-                                    <RatingBar label="Tone" emoji="🎵" value={ratings.tone_quality} field="tone_quality" />
-                                    <RatingBar label="Notes" emoji="🎼" value={ratings.note_accuracy} field="note_accuracy" />
-                                    <RatingBar label="Breathing" emoji="💨" value={ratings.breathing} field="breathing" />
-                                    <RatingBar label="Rhythm" emoji="🥁" value={ratings.rhythm} field="rhythm" />
-                                  </div>
-
-                                  <button onClick={() => handleGenerateFeedback(a)} disabled={aiLoading}
-                                    className="w-full py-2 bg-purple-600 text-white rounded-lg text-[12px] font-semibold hover:bg-purple-700 disabled:opacity-50">
-                                    {aiLoading ? '⏳ Generating...' : '🤖 Generate Coaching Feedback'}
-                                  </button>
-                                </>
-                              ) : (
-                                <>
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[12px] font-bold text-purple-800">🤖 AI Analysis Results</span>
-                                    <div className="flex gap-2">
-                                      <button onClick={() => setAiResult(null)} className="text-[11px] text-purple-500">Re-rate</button>
-                                      <button onClick={cancelEvaluation} className="text-[11px] text-gray-500">Close</button>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-3">
-                                    <div className={`w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold text-white flex-shrink-0 ${
-                                      aiResult.overall_score >= 80 ? 'bg-green-500' : aiResult.overall_score >= 60 ? 'bg-yellow-500' : 'bg-red-500'}`}>
-                                      {aiResult.overall_score}
-                                    </div>
-                                    <p className="text-[12px] font-semibold text-gray-900">{aiResult.summary}</p>
-                                  </div>
-                                  <div className="grid grid-cols-5 gap-1.5">
-                                    {[
-                                      { l: '🎹 Key', v: ratings.key_accuracy },
-                                      { l: '🎵 Tone', v: ratings.tone_quality },
-                                      { l: '🎼 Notes', v: ratings.note_accuracy },
-                                      { l: '💨 Breath', v: ratings.breathing },
-                                      { l: '🥁 Rhythm', v: ratings.rhythm },
-                                    ].map(({ l, v }) => (
-                                      <div key={l} className="text-center">
-                                        <div className={`text-[14px] font-bold ${v >= 4 ? 'text-green-600' : v >= 3 ? 'text-yellow-600' : 'text-red-500'}`}>{v}/5</div>
-                                        <div className="text-[9px] text-gray-500">{l}</div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                  <button onClick={() => setShowAiDetails(!showAiDetails)}
-                                    className="w-full text-left text-[11px] text-purple-600 font-medium">
-                                    {showAiDetails ? '▼ Hide details' : '▶ Show detailed feedback'}
-                                  </button>
-                                  {showAiDetails && (
-                                    <div className="space-y-2 text-[11px]">
-                                      {Object.entries(aiResult.details).map(([area, text]) => (
-                                        <div key={area} className="bg-white rounded-lg p-2">
-                                          <span className="font-bold text-gray-700 capitalize">{area}:</span>
-                                          <p className="text-gray-600 mt-0.5">{text as string}</p>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                  {aiResult.suggestions.length > 0 && (
-                                    <div className="bg-blue-50 rounded-lg p-2">
-                                      <span className="text-[10px] font-bold text-blue-700">💡 Suggestions:</span>
-                                      {aiResult.suggestions.map((s: string, i: number) => <p key={i} className="text-[11px] text-blue-600 mt-0.5">• {s}</p>)}
-                                    </div>
-                                  )}
-                                  <p className="text-[11px] text-gray-500 italic">{aiResult.encouragement}</p>
-                                  <button onClick={() => handleSaveAiFeedback(a.submission!.id)}
-                                    className="w-full py-2 bg-green-600 text-white rounded-lg text-[12px] font-semibold hover:bg-green-700">
-                                    💾 Save & Send to Member
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          )}
-                          </>
                         )}
                       </div>
                     ) : !a.completed && (

@@ -30,7 +30,8 @@ import AdminLayout from './layouts/AdminLayout';
 import { MemberDashboard } from './pages/member/Dashboard-MOBILE';
 import { MemberRepertoire } from './pages/member/Repertoire';
 import { MemberCalendar } from './pages/member/Calendar';
-import { EventDetail } from './pages/member/EventDetail';
+import { EventDetail as MemberEventDetail } from './pages/member/EventDetail';
+import { MessageCompose } from './pages/member/MessageCompose';
 import { MemberMessages } from './pages/member/Messages-MOBILE';
 import { MemberPractice } from './pages/member/Practice';
 import { MemberProfile } from './pages/member/Profile';
@@ -70,7 +71,28 @@ function App() {
   return (
     <AuthProvider>
       <AppRoutes />
-      <Toaster position="top-right" />
+      <Toaster 
+        position="top-center"
+        toastOptions={{
+          duration: 2500,
+          style: {
+            background: '#1a1a1a',
+            color: '#fff',
+            fontSize: '13px',
+            fontWeight: '500',
+            padding: '10px 16px',
+            borderRadius: '12px',
+            maxWidth: '320px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+          },
+          success: {
+            iconTheme: { primary: '#22c55e', secondary: '#fff' },
+          },
+          error: {
+            iconTheme: { primary: '#ef4444', secondary: '#fff' },
+          },
+        }}
+      />
       <PWAInstallPrompt />
       <IOSInstallPrompt />
       <PWAUpdateNotification />
@@ -116,10 +138,12 @@ function AppRoutes() {
         <Route index element={<MemberDashboard />} />
         <Route path="repertoire" element={<MemberRepertoire />} />
         <Route path="repertoire/:id" element={<SongDetail />} />
-        <Route path="calendar" element={<MemberCalendar />} />
-            <Route path="events/:eventId" element={<EventDetail />} />
-        <Route path="calendar/:eventId" element={<EventDetail />} />
+        <Route path="events/:eventId" element={<MemberEventDetail />} />
+              <Route path="calendar" element={<MemberCalendar />} />
+            <Route path="events/:eventId" element={<MemberEventDetail />} />
+        <Route path="calendar/:eventId" element={<MemberEventDetail />} />
         <Route path="messages" element={<MemberMessages />} />
+        <Route path="messages/compose" element={<MessageCompose />} />
         <Route path="practice" element={<MemberPractice />} />
         <Route path="profile" element={<MemberProfile />} />
         

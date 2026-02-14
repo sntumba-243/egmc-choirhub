@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { Calendar, Clock, MapPin, ArrowLeft, Edit, Users, Music, Eye, Trash2, Plus } from 'lucide-react';
+import { Calendar, Clock, MapPin, Music, Eye, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Event {
@@ -50,7 +50,6 @@ export const AdminEventDetail = () => {
   }, [id]);
 
   const fetchEventAndRsvps = async () => {
-    console.log('Fetching RSVPs for event:', id);
     try {
       const [eventRes, rsvpsRes] = await Promise.all([
         supabase.from('events').select('*').eq('id', id).single(),
@@ -62,7 +61,6 @@ export const AdminEventDetail = () => {
 
       if (eventRes.error) throw eventRes.error;
       setEvent(eventRes.data);
-      console.log('RSVPs response:', rsvpsRes);
       setRsvps(rsvpsRes.data || []);
     } catch (error) {
       console.error('Error:', error);
@@ -72,9 +70,7 @@ export const AdminEventDetail = () => {
     }
   };
 
-
   const fetchEventSongs = async () => {
-    console.log('🎵 Starting fetchEventSongs for event:', id);
     try {
       const { data, error } = await supabase
         .from('event_songs')
@@ -92,20 +88,15 @@ export const AdminEventDetail = () => {
         .eq('event_id', id)
         .order('created_at', { ascending: true });
 
-      if (error) {
-        console.error('❌ Supabase error:', error);
-        throw error;
-      }
-      
-      console.log('✅ Event songs loaded:', data?.length, 'songs');
-      console.log('📦 Full data:', data);
+      if (error) throw error;
       setEventSongs(data || []);
     } catch (error) {
-      console.error('💥 Error loading event songs:', error);
+      console.error('Error loading event songs:', error);
     }
   };
+
   const removeSongFromEvent = async (eventSongId: string, songTitle: string) => {
-    if (!confirm(`Remove "${songTitle}" from this event?`)) return;
+    if (!confirm(`Remove "${songTitle}"?`)) return;
 
     try {
       const { error } = await supabase
@@ -116,7 +107,7 @@ export const AdminEventDetail = () => {
       if (error) throw error;
 
       setEventSongs(eventSongs.filter(es => es.id !== eventSongId));
-      toast.success('Song removed from event');
+      toast.success('Song removed');
     } catch (error) {
       console.error('Error removing song:', error);
       toast.error('Failed to remove song');
@@ -125,21 +116,16 @@ export const AdminEventDetail = () => {
 
   const viewPDF = (song: any) => {
     if (song.sheet_music_url) {
-      navigate('/pdf-viewer', {
-        state: {
-          url: song.sheet_music_url,
-          title: song.title,
-        },
-      });
+      navigate('/pdf-viewer', { state: { url: song.sheet_music_url, title: song.title } });
     } else {
-      toast.error('No PDF available for this song');
+      toast.error('No PDF available');
     }
   };
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
+      weekday: 'short',
+      month: 'short',
       day: 'numeric',
       year: 'numeric'
     });
@@ -148,10 +134,7 @@ export const AdminEventDetail = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading event details...</p>
-        </div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
       </div>
     );
   }
@@ -160,11 +143,8 @@ export const AdminEventDetail = () => {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Event not found</h2>
-          <button
-            onClick={() => navigate('/admin/events')}
-            className="text-indigo-600 hover:text-indigo-700"
-          >
+          <h2 className="text-lg font-bold text-gray-900 mb-2">Event not found</h2>
+          <button onClick={() => navigate('/admin/events')} className="text-sm text-indigo-600">
             Back to Events
           </button>
         </div>
@@ -179,149 +159,130 @@ export const AdminEventDetail = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="max-w-5xl mx-auto space-y-4 p-4">
+      {/* Minimal Header */}
       <div className="flex items-center justify-between">
         <button
           onClick={() => navigate('/admin/events')}
-          className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700"
+          className="text-sm text-gray-700 hover:text-gray-900 font-medium"
         >
-          <ArrowLeft className="w-5 h-5" />
-          Back to Events
+          ← Back
         </button>
         <button
           onClick={() => navigate(`/admin/events/${id}/edit`)}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+          className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
         >
-          <Edit className="w-4 h-4" />
-          Edit Event
+          Edit
         </button>
       </div>
 
-      {/* Event Details */}
-      <div className="bg-white rounded-xl shadow-md p-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-6">{event.title}</h1>
+      {/* Event Details - Vibrant */}
+      <div className="bg-white rounded-lg shadow-sm border p-4">
+        <h1 className="text-xl font-bold text-gray-900 mb-3">{event.title}</h1>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          <div className="flex items-center gap-3">
-            <div className="bg-indigo-100 p-3 rounded-lg">
-              <Calendar className="w-6 h-6 text-indigo-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Date</p>
-              <p className="font-semibold">{formatDate(event.date)}</p>
+        <div className="grid grid-cols-3 gap-3 mb-3">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-indigo-600" />
+            <div className="min-w-0">
+              <p className="text-xs text-gray-600">Date</p>
+              <p className="text-sm font-semibold text-gray-900 truncate">{formatDate(event.date)}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="bg-purple-100 p-3 rounded-lg">
-              <Clock className="w-6 h-6 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Time</p>
-              <p className="font-semibold">{event.time}</p>
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-purple-600" />
+            <div className="min-w-0">
+              <p className="text-xs text-gray-600">Time</p>
+              <p className="text-sm font-semibold text-gray-900">{event.time}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="bg-green-100 p-3 rounded-lg">
-              <MapPin className="w-6 h-6 text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Location</p>
-              <p className="font-semibold">{event.location}</p>
+          <div className="flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-green-600" />
+            <div className="min-w-0">
+              <p className="text-xs text-gray-600">Location</p>
+              <p className="text-sm font-semibold text-gray-900 truncate">{event.location}</p>
             </div>
           </div>
         </div>
 
         {event.description && (
-          <div className="border-t pt-6">
-            <h3 className="font-semibold mb-2">Description</h3>
-            <p className="text-gray-700 whitespace-pre-wrap">{event.description}</p>
+          <div className="border-t pt-3">
+            <p className="text-sm text-gray-700">{event.description}</p>
           </div>
         )}
       </div>
 
-      {/* Songs Section */}
-      <div className="bg-white rounded-xl shadow-md p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="bg-purple-100 p-3 rounded-lg">
-              <Music className="w-6 h-6 text-purple-600" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">Songs for This Event</h2>
-              <p className="text-sm text-gray-600">{eventSongs.length} song{eventSongs.length !== 1 ? 's' : ''} assigned</p>
-            </div>
-          </div>
+      {/* Songs Section - Vibrant */}
+      <div className="bg-white rounded-lg shadow-sm border p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-bold text-gray-900">
+            Setlist ({eventSongs.length})
+          </h2>
 
           <button
             onClick={() => navigate('/admin/repertoire', { state: { addToEvent: id } })}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:shadow-lg transition-all"
+            className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold"
           >
-            <Plus className="w-4 h-4" />
-            Add Songs
+            + Add
           </button>
         </div>
 
         {eventSongs.length === 0 ? (
-          <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-lg">
-            <Music className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No songs yet</h3>
-            <p className="text-gray-600 mb-6">Add songs from your repertoire to this event</p>
+          <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
+            <Music className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+            <p className="text-xs text-gray-600 mb-3">No songs added</p>
             <button
               onClick={() => navigate('/admin/repertoire', { state: { addToEvent: id } })}
-              className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold"
             >
               Browse Repertoire
             </button>
           </div>
         ) : (
-          <div className="space-y-3">
-            {eventSongs.map((eventSong) => {
+          <div className="space-y-2">
+            {eventSongs.map((eventSong, index) => {
               const song = eventSong.songs;
               if (!song) return null;
 
               return (
                 <div
                   key={eventSong.id}
-                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  className="flex items-center justify-between p-2 bg-indigo-50 rounded hover:bg-indigo-100 border border-indigo-100"
                 >
-                  <div className="flex items-center gap-3 flex-1">
-                    <Music className="w-5 h-5 text-gray-400" />
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-gray-900">{song.title}</h4>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          song.language === 'English' ? 'bg-blue-100 text-blue-800' :
-                          song.language === 'French' ? 'bg-purple-100 text-purple-800' :
-                          song.language === 'Lingala' ? 'bg-green-100 text-green-800' :
-                          song.language === 'Tshiluba' ? 'bg-yellow-100 text-yellow-800' :
-                          song.language === 'Swahili' ? 'bg-teal-100 text-teal-800' :
-                          song.language === 'Kikongo' ? 'bg-orange-100 text-orange-800' :
-                          song.language === 'Portuguese' ? 'bg-pink-100 text-pink-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {song.language}
-                        </span>
-                      </div>
+                  <div 
+                    className={`flex items-center gap-2 flex-1 min-w-0 ${song.sheet_music_url ? 'cursor-pointer' : ''}`}
+                    onClick={() => song.sheet_music_url && viewPDF(song)}
+                  >
+                    <span className="text-xs font-bold text-indigo-700">#{index + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <h4 className={`text-sm font-semibold text-gray-900 truncate ${song.sheet_music_url ? 'hover:text-indigo-700' : ''}`}>
+                        {song.title}
+                      </h4>
+                      <p className="text-xs text-gray-700 truncate">{song.composer}</p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
                     {song.sheet_music_url && (
                       <button
-                        onClick={() => viewPDF(song)}
-                        className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          viewPDF(song);
+                        }}
+                        className="p-1 text-green-600 hover:bg-green-100 rounded"
+                        title="View PDF"
                       >
                         <Eye className="w-4 h-4" />
-                        View PDF
                       </button>
                     )}
                     <button
-                      onClick={() => removeSongFromEvent(eventSong.id, song.title)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Remove from event"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeSongFromEvent(eventSong.id, song.title);
+                      }}
+                      className="p-1 text-red-600 hover:bg-red-100 rounded"
+                      title="Remove"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -333,59 +294,45 @@ export const AdminEventDetail = () => {
         )}
       </div>
 
-      {/* RSVPs Section */}
-      <div className="bg-white rounded-xl shadow-md p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="bg-blue-100 p-3 rounded-lg">
-            <Users className="w-6 h-6 text-blue-600" />
+      {/* RSVPs Section - Vibrant */}
+      <div className="bg-white rounded-lg shadow-sm border p-4">
+        <h2 className="text-sm font-bold text-gray-900 mb-3">
+          RSVPs ({rsvps.length})
+        </h2>
+
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          <div className="text-center p-3 bg-green-100 rounded-lg border border-green-200">
+            <div className="text-2xl font-bold text-green-700">{rsvpCounts.yes}</div>
+            <div className="text-xs font-medium text-green-700">Yes</div>
           </div>
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">RSVPs</h2>
-            <p className="text-sm text-gray-600">{rsvps.length} total response{rsvps.length !== 1 ? 's' : ''}</p>
+          <div className="text-center p-3 bg-yellow-100 rounded-lg border border-yellow-200">
+            <div className="text-2xl font-bold text-yellow-700">{rsvpCounts.maybe}</div>
+            <div className="text-xs font-medium text-yellow-700">Maybe</div>
+          </div>
+          <div className="text-center p-3 bg-red-100 rounded-lg border border-red-200">
+            <div className="text-2xl font-bold text-red-700">{rsvpCounts.no}</div>
+            <div className="text-xs font-medium text-red-700">No</div>
           </div>
         </div>
 
-        {/* RSVP Summary */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="text-center p-4 bg-green-50 rounded-lg">
-            <div className="text-3xl font-bold text-green-600">{rsvpCounts.yes}</div>
-            <div className="text-sm text-gray-600 mt-1">Attending</div>
-          </div>
-          <div className="text-center p-4 bg-yellow-50 rounded-lg">
-            <div className="text-3xl font-bold text-yellow-600">{rsvpCounts.maybe}</div>
-            <div className="text-sm text-gray-600 mt-1">Maybe</div>
-          </div>
-          <div className="text-center p-4 bg-red-50 rounded-lg">
-            <div className="text-3xl font-bold text-red-600">{rsvpCounts.no}</div>
-            <div className="text-sm text-gray-600 mt-1">Not Attending</div>
-          </div>
-        </div>
-
-        {/* RSVP Details */}
         {['yes', 'maybe', 'no'].map(status => {
           const statusRsvps = rsvps.filter(r => r.status === status);
           if (statusRsvps.length === 0) return null;
 
-          const statusConfig = {
-            yes: { label: 'Attending', color: 'green' },
-            maybe: { label: 'Maybe', color: 'yellow' },
-            no: { label: 'Not Attending', color: 'red' }
-          };
-
-          const config = statusConfig[status as keyof typeof statusConfig];
+          const labels = { yes: 'Yes', maybe: 'Maybe', no: 'No' };
 
           return (
-            <div key={status} className="mb-6 last:mb-0">
-              <h3 className={`font-semibold text-${config.color}-600 mb-3`}>
-                {config.label} ({statusRsvps.length})
+            <div key={status} className="mb-3 last:mb-0">
+              <h3 className="text-xs font-bold text-gray-700 mb-2">
+                {labels[status as keyof typeof labels]} ({statusRsvps.length})
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-2">
                 {statusRsvps.map(rsvp => (
-                  <div key={rsvp.id} className="p-3 bg-gray-50 rounded-lg">
-                    <div className="font-medium">
+                  <div key={rsvp.id} className="p-2 bg-gray-100 rounded border border-gray-200 text-xs">
+                    <div className="font-semibold text-gray-900 truncate">
                       {rsvp.members.first_name} {rsvp.members.last_name}
                     </div>
-                    <div className="text-sm text-gray-600">{rsvp.members.voice_part}</div>
+                    <div className="text-gray-700">{rsvp.members.voice_part}</div>
                   </div>
                 ))}
               </div>
@@ -394,7 +341,7 @@ export const AdminEventDetail = () => {
         })}
 
         {rsvps.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
+          <div className="text-center py-4 text-xs text-gray-600">
             No RSVPs yet
           </div>
         )}

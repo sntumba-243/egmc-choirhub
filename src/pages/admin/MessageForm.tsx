@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Send } from 'lucide-react';
+import { ArrowLeft, Send } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 
@@ -10,6 +10,7 @@ export const MessageForm: React.FC = () => {
   const [content, setContent] = useState('');
   const [recipientType, setRecipientType] = useState('all');
   const [loading, setLoading] = useState(false);
+  const [isImportant, setIsImportant] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,7 +24,10 @@ export const MessageForm: React.FC = () => {
           body: content,
           send_to: recipientType,
           recipients: recipientType,
-          created_at: new Date().toISOString()
+          is_important: isImportant,
+          is_read: false,
+          created_at: new Date().toISOString(),
+          sent_date: new Date().toISOString()
         }]);
 
       if (error) throw error;
@@ -38,80 +42,99 @@ export const MessageForm: React.FC = () => {
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center gap-4">
+    <div className="max-w-2xl mx-auto space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <button
           onClick={() => navigate('/admin/messages')}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          className="flex items-center gap-1 text-blue-500 text-[15px] font-medium"
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft className="w-5 h-5" strokeWidth={2.5} />
+          Messages
         </button>
-        <h1 className="text-3xl font-bold text-gray-900">Send Message</h1>
+        <h1 className="text-[17px] font-bold text-gray-900">New Message</h1>
+        <div className="w-20" />
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-md p-6 space-y-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Recipients *</label>
-          <select
-            value={recipientType}
-            onChange={(e) => setRecipientType(e.target.value)}
-            required
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="all">All Members</option>
-            <option value="soprano">Soprano Section</option>
-            <option value="alto">Alto Section</option>
-            <option value="tenor">Tenor Section</option>
-            <option value="bass">Bass Section</option>
-          </select>
+      {/* Form Card */}
+      <form onSubmit={handleSubmit}>
+        <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-gray-200/60 shadow-sm overflow-hidden">
+          {/* Recipients */}
+          <div className="px-4 py-3 border-b border-gray-100">
+            <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">To *</label>
+            <select
+              value={recipientType}
+              onChange={(e) => setRecipientType(e.target.value)}
+              required
+              className="w-full mt-1 text-[15px] text-gray-900 bg-transparent border-0 p-0 focus:ring-0 cursor-pointer"
+            >
+              <option value="all">All Members</option>
+              <option value="soprano">Soprano Section</option>
+              <option value="alto">Alto Section</option>
+              <option value="tenor">Tenor Section</option>
+              <option value="bass">Bass Section</option>
+            </select>
+          </div>
+
+          {/* Subject */}
+          <div className="px-4 py-3 border-b border-gray-100">
+            <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Subject *</label>
+            <input
+              type="text"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              required
+              placeholder="What is this about?"
+              className="w-full mt-1 text-[15px] text-gray-900 font-medium bg-transparent border-0 p-0 focus:ring-0 placeholder-gray-300"
+            />
+          </div>
+
+          {/* Message body */}
+          <div className="px-4 py-3">
+            <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Message *</label>
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              required
+              rows={6}
+              placeholder="Type your message..."
+              className="w-full mt-1 text-[15px] text-gray-900 bg-transparent border-0 p-0 focus:ring-0 placeholder-gray-300 resize-none"
+            />
+          </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Subject *</label>
-          <input
-            type="text"
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-            required
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-            placeholder="Enter message subject"
-          />
+        {/* Important toggle */}
+        <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-gray-200/60 shadow-sm overflow-hidden mt-3">
+          <label className="flex items-center justify-between px-4 py-3 cursor-pointer">
+            <div>
+              <span className="text-[14px] font-semibold text-gray-900">Mark as Important</span>
+              <p className="text-[11px] text-gray-400">Shows a red badge to recipients</p>
+            </div>
+            <div className={`relative w-12 h-7 rounded-full transition-colors ${isImportant ? 'bg-red-500' : 'bg-gray-300'}`}>
+              <div className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${isImportant ? 'translate-x-5' : ''}`} />
+              <input type="checkbox" checked={isImportant} onChange={(e) => setIsImportant(e.target.checked)} className="sr-only" />
+            </div>
+          </label>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Message *</label>
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            required
-            rows={8}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-            placeholder="Type your message here..."
-          />
-        </div>
-
-        <div className="flex gap-4 pt-4">
+        {/* Buttons */}
+        <div className="flex gap-3 mt-5">
           <button
             type="button"
             onClick={() => navigate('/admin/messages')}
-            className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+            className="flex-1 py-3 bg-white/80 backdrop-blur-xl text-gray-600 rounded-2xl text-[15px] font-medium border border-gray-200/60 hover:bg-gray-50 transition-all active:scale-[0.98]"
           >
             Cancel
           </button>
           <button
             type="submit"
-            disabled={loading}
-            className="flex-1 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:shadow-lg font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+            disabled={loading || !subject || !content}
+            className="flex-1 py-3 bg-blue-500 text-white rounded-2xl text-[15px] font-semibold hover:bg-blue-600 shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {loading ? (
+            {loading ? 'Sending...' : (
               <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                Sending...
-              </>
-            ) : (
-              <>
-                <Send className="w-5 h-5" />
-                Send Message
+                <Send className="w-4 h-4" />
+                Send
               </>
             )}
           </button>

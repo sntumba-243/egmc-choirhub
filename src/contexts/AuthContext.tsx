@@ -1,81 +1,66 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-
-interface User {
-  id: string;
-  email: string;
-  role: 'admin' | 'member' | 'guest';
-  force_password_change?: boolean;
-}
+import { getDbClient } from '../lib/supabase';
+import { neonAuth, NeonUser } from '../lib/neonAuth';
+import { autoFailover } from '../lib/autoFailover';
+import toast from 'react-hot-toast';
 
 interface AuthContextType {
-  user: User | null;
+  user: NeonUser | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
-  signOut: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [user, setUser] = useState<NeonUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  
+  const useNeon = import.meta.env.VITE_USE_NEON === 'true' || autoFailover.isUsingNeon();
 
   useEffect(() => {
     checkUser();
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        fetchUserProfile(session.user.id);
-      } else {
-        setUser(null);
-      }
-    });
-
-    return () => {
-      authListener?.subscription.unsubscribe();
+    
+    // Listen for failover events
+    const handleFailover = () => {
+      console.log('Failover detected, rechecking user...');
+      checkUser();
     };
+    
+    window.addEventListener('database-failover', handleFailover);
+    return () => window.removeEventListener('database-failover', handleFailover);
   }, []);
-
-  const fetchUserProfile = async (userId: string) => {
-    try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('role, force_password_change, email')
-        .eq('id', userId)
-        .single();
-
-      if (error) throw error;
-
-      if (profile) {
-        setUser({
-          id: userId,
-          email: profile.email || '',
-          role: (profile.role || 'member') as 'admin' | 'member' | 'guest',
-          force_password_change: profile.force_password_change || false
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-    }
-  };
 
   const checkUser = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      toast.success('Password changed successfully! Please login with your new password.');
+      console.log('Checking user... Using Neon:', useNeon);
       
-      // Sign out and redirect to login
-      setTimeout(async () => {
-        await logout();
-        navigate('/login');
-      }, 1500);
-      if (session?.user) {
-        await fetchUserProfile(session.user.id);
+      if (useNeon) {
+        const { user } = neonAuth.getSession();
+        setUser(user);
+      } else {
+        const supabase = getDbClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          const { data: memberData } = await supabase
+            .from('members')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+          
+          if (memberData) {
+            setUser({
+              id: memberData.id,
+              email: memberData.email,
+              name: memberData.name,
+              role: memberData.role,
+              voice_part: memberData.voice_part
+            });
+          }
+        }
       }
     } catch (error) {
       console.error('Error checking user:', error);
@@ -85,69 +70,74 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const login = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    
-    if (data.user) {
-      // Fetch profile to get role and force_password_change
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role, force_password_change, email')
-        .eq('id', data.user.id)
-        .single();
-
-      if (profile) {
-        setUser({
-          id: data.user.id,
-          email: profile.email || data.user.email || '',
-          role: (profile.role || 'member') as 'admin' | 'member' | 'guest',
-          force_password_change: profile.force_password_change || false
-        });
-
-        // Check if password change is required
-        if (profile.force_password_change) {
-          // Don't throw error, just let the redirect happen
-          // The useEffect will catch this and redirect
-          return;
+    try {
+      if (useNeon) {
+        const { user, error } = await neonAuth.login(email, password);
+        
+        if (error) throw new Error(error);
+        
+        if (user) {
+          setUser(user);
+          toast.success('Login successful!');
+          navigate(user.role === 'admin' ? '/admin' : '/member');
         }
       } else {
-        setUser({
-          id: data.user.id,
-          email: data.user.email || '',
-          role: 'member',
-          force_password_change: false
+        const supabase = getDbClient();
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
         });
+
+        if (error) throw error;
+
+        if (data.user) {
+          const { data: memberData } = await supabase
+            .from('members')
+            .select('*')
+            .eq('id', data.user.id)
+            .single();
+
+          if (memberData) {
+            setUser({
+              id: memberData.id,
+              email: memberData.email,
+              name: memberData.name,
+              role: memberData.role,
+              voice_part: memberData.voice_part
+            });
+            
+            toast.success('Login successful!');
+            navigate(memberData.role === 'admin' ? '/admin' : '/member');
+          }
+        }
       }
+    } catch (error: any) {
+      console.error('Login error:', error);
+      toast.error(error.message || 'Login failed');
+      throw error;
     }
   };
 
-  const register = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { role: 'member' }
-      }
-    });
-    if (error) throw error;
-  };
-
   const logout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
+    try {
+      if (useNeon) {
+        neonAuth.logout();
+      } else {
+        const supabase = getDbClient();
+        await supabase.auth.signOut();
+      }
+      
+      setUser(null);
+      toast.success('Logged out successfully');
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast.error('Logout failed');
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      loading, 
-      signIn: login,
-      signUp: register,
-      signOut: logout,
-      login, 
-      register, 
-      logout 
-    }}>
+    <AuthContext.Provider value={{ user, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
@@ -155,8 +145,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
   }
   return context;
 };

@@ -8,11 +8,12 @@ import toast from 'react-hot-toast';
 interface Message {
   id: string;
   subject: string;
-  message: string;
+  body: string;
   admin_id: string;
   send_to: string;
   created_at: string;
   is_read: boolean;
+  is_important?: boolean;
   admin_name?: string;
 }
 
@@ -27,7 +28,7 @@ export const MemberMessages = () => {
 
   useEffect(() => {
     fetchMessages();
-    const interval = setInterval(fetchMessages, 5000);
+    const interval = setInterval(fetchMessages, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -40,11 +41,12 @@ export const MemberMessages = () => {
         .select(`
           id,
           subject,
-          message,
+          body,
           admin_id,
           send_to,
           created_at,
           is_read,
+          is_important,
           members (name)
         `)
         .order('created_at', { ascending: false });
@@ -53,8 +55,6 @@ export const MemberMessages = () => {
         console.error('Error fetching messages:', error);
         return;
       }
-
-      console.log("User ID:", user?.id);
       console.log("All messages send_to:", data?.map(m => m.send_to));
       const filteredData = data?.filter(msg => msg.send_to === 'all' || msg.send_to === user?.id) || [];
 
@@ -76,10 +76,10 @@ export const MemberMessages = () => {
 
   const markAsRead = async (messageId: string) => {
     try {
+      if (!user?.id) return;
       const { error } = await supabase
-        .from('messages')
-        .update({ is_read: true })
-        .eq('id', messageId);
+        .from('message_reads')
+        .upsert({ message_id: messageId, user_id: user.id }, { onConflict: 'message_id,user_id' });
 
       if (error) throw error;
 
@@ -146,9 +146,14 @@ export const MemberMessages = () => {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 space-y-4">
           {/* Subject */}
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
-              {selectedMessage.subject}
-            </h1>
+            <div className="flex items-center gap-2 mb-2">
+              <h1 className="text-xl font-bold text-gray-900">
+                {selectedMessage.subject}
+              </h1>
+              {selectedMessage.is_important && (
+                <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-[10px] font-semibold rounded-md">Important</span>
+              )}
+            </div>
             <div className="flex items-center justify-between">
               <p className="text-sm text-gray-600">From: {selectedMessage.admin_name}</p>
               <p className="text-xs text-gray-500">{formatDate(selectedMessage.created_at)}</p>
@@ -161,7 +166,7 @@ export const MemberMessages = () => {
           {/* Message Body */}
           <div className="bg-gray-50 rounded-lg p-4">
             <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-wrap">
-              {selectedMessage.message}
+              {selectedMessage.body}
             </p>
           </div>
 
@@ -246,7 +251,7 @@ export const MemberMessages = () => {
               className={`w-full text-left rounded-lg border transition-all ${
                 message.is_read
                   ? 'bg-white border-gray-200 hover:border-gray-300'
-                  : 'bg-blue-50 border-blue-200 hover:border-blue-300'
+                  : 'bg-blue-50/60 border-blue-200 border-l-4 border-l-blue-500 hover:border-blue-300'
               }`}
             >
               <div className="p-3 sm:p-4">
@@ -259,11 +264,14 @@ export const MemberMessages = () => {
                   <div className="flex-1 min-w-0">
                     {/* Subject and Meta */}
                     <div className="flex items-start justify-between gap-2 mb-1">
-                      <h3 className={`text-sm font-semibold truncate ${
-                        message.is_read ? 'text-gray-900' : 'text-blue-900'
+                      <h3 className={`text-sm truncate ${
+                        message.is_read ? 'font-medium text-gray-600' : 'font-bold text-gray-900'
                       }`}>
                         {message.subject}
                       </h3>
+                      {message.is_important && (
+                        <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-[9px] font-semibold rounded-md flex-shrink-0">!</span>
+                      )}
                       <span className="text-xs text-gray-500 flex-shrink-0 whitespace-nowrap">
                         {formatDate(message.created_at)}
                       </span>
@@ -274,7 +282,7 @@ export const MemberMessages = () => {
                     <p className={`text-xs line-clamp-2 ${
                       message.is_read ? 'text-gray-600' : 'text-gray-700 font-medium'
                     }`}>
-                      {message.message}
+                      {message.body}
                     </p>
                   </div>
 

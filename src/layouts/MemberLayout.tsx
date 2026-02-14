@@ -8,7 +8,7 @@ import toast from 'react-hot-toast';
 export default function MemberLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { signOut, user } = useAuth();
+  const { logout, user } = useAuth();
   useActivityTracker();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -31,7 +31,7 @@ export default function MemberLayout() {
   const handleLogout = async () => {
     try {
       setSidebarOpen(false);
-      await signOut();
+      await logout();
       navigate('/login', { replace: true });
       toast.success('Logged out successfully');
     } catch (error: any) {

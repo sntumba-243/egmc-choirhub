@@ -81,11 +81,30 @@ export const AdminEvents = () => {
   };
 
   const handleResetRsvps = async (eventId: string, title: string) => {
-    if (window.confirm(`Reset all RSVPs for "${title}"?`)) {
+    if (window.confirm(`Reset all RSVPs for "${title}"? (Data will be archived for attendance tracking)`)) {
       try {
+        // Get event date for archive
+        const { data: event } = await supabase.from('events').select('date').eq('id', eventId).single();
+        
+        // Get current RSVPs before deleting
+        const { data: currentRsvps } = await supabase.from('rsvps').select('member_id, status').eq('event_id', eventId);
+        
+        // Archive RSVPs to attendance_history
+        if (currentRsvps && currentRsvps.length > 0 && event) {
+          const archiveData = currentRsvps.map(r => ({
+            event_id: eventId,
+            member_id: r.member_id,
+            event_title: title,
+            event_date: event.date,
+            status: r.status || 'attending',
+          }));
+          await supabase.from('attendance_history').upsert(archiveData, { onConflict: 'event_id,member_id,event_date' });
+        }
+        
+        // Now safe to delete
         const { error } = await supabase.from('rsvps').delete().eq('event_id', eventId);
         if (error) throw error;
-        toast.success('RSVPs reset');
+        toast.success('RSVPs archived & reset');
         fetchEvents();
       } catch (error) {
         console.error('Error resetting RSVPs:', error);

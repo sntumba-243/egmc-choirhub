@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { signOut, user } = useAuth();
+  const { logout, user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Close sidebar on route change (mobile)
@@ -32,7 +32,7 @@ export default function AdminLayout() {
       setSidebarOpen(false);
       
       // Sign out
-      await signOut();
+      await logout();
       
       // Navigate to login
       navigate('/login', { replace: true });

@@ -88,9 +88,9 @@ export function PDFViewer({ url: googleDriveUrl, title: songTitle, songId, assig
   // Show loading state
   if (isLoading) {
     return (
-      <div className="fixed inset-0 bg-black z-[9999] flex items-center justify-center">
-        <div className="text-center text-white">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-white border-t-transparent mx-auto mb-4"></div>
+      <div className="fixed inset-0 bg-white z-[9999] flex items-center justify-center">
+        <div className="text-center text-gray-600">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-400 border-t-transparent mx-auto mb-4"></div>
           <div className="text-sm opacity-75">Loading PDF...</div>
         </div>
       </div>
@@ -121,72 +121,43 @@ export function PDFViewer({ url: googleDriveUrl, title: songTitle, songId, assig
   // Main viewer with minimal UI
   return (
     <div
-      className="fixed inset-0 bg-black z-[9999]"
+      className="fixed inset-0 bg-white z-[9999]"
       style={{
         paddingTop: 'env(safe-area-inset-top)',
         paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
-      {/* Header controls - auto-hide */}
-      {controlsVisible && (
-        <div className="fixed inset-0 z-[10001] pointer-events-none">
-          <div 
-            className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 to-transparent pb-6"
-            style={{
-              paddingTop: 'max(env(safe-area-inset-top), 0.5rem)',
-            }}
-          >
-            <div className="flex items-center justify-between px-3 pt-2">
-              {/* Back button */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  goBack();
-                }}
-                className="pointer-events-auto flex items-center gap-1 px-3 py-1.5 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-all"
-              >
-                <ArrowLeft className="w-4 h-4 text-white" strokeWidth={2.5} />
-                <span className="text-white text-sm font-medium">Back</span>
-              </button>
-
-              {/* Title */}
-              {songTitle && (
-                <div className="text-white text-sm font-medium truncate max-w-[50%]">
-                  {songTitle}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Always-visible minimal back button */}
+      <button
+        onClick={goBack}
+        className="fixed top-3 left-3 z-[10003] w-9 h-9 bg-gray-200/60 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-gray-300/70 transition-all"
+        style={{ marginTop: 'env(safe-area-inset-top)' }}
+      >
+        <ArrowLeft className="w-4 h-4 text-gray-600" strokeWidth={2.5} />
+      </button>
 
       {/* Google Drive iframe */}
       <iframe
         src={iframeUrl}
         title={songTitle || 'Sheet Music'}
         allow="autoplay"
-        className="w-full border-0 transition-all"
-        style={{ height: showRecorder ? 'calc(100% - 70px)' : '100%' }}
+        className="border-0 transition-all origin-top-left"
+        style={{
+          width: '110%',
+          height: showRecorder ? 'calc(110% - 70px)' : '110%',
+          transform: 'scale(0.909)',
+          transformOrigin: 'top left',
+        }}
         onLoad={() => console.log('✅ PDF iframe loaded')}
       />
 
-      {/* Tap overlay - captures taps when controls are hidden (not when recording) */}
+      {/* Thin top-edge tap zone to show controls - invisible, doesn't block PDF scrolling */}
       {!controlsVisible && !showRecorder && (
         <div
           onClick={showControls}
-          onTouchEnd={showControls}
-          className="absolute inset-0 z-[10000] cursor-pointer"
-          style={{ touchAction: 'manipulation' }}
+          className="absolute top-0 left-0 right-0 h-4 z-[10000]"
+          style={{ paddingTop: 'env(safe-area-inset-top)' }}
         />
-      )}
-
-      {/* Tap hint */}
-      {controlsVisible && (
-        <div className="absolute bottom-8 left-0 right-0 text-center pointer-events-none z-[10002]">
-          <div className="inline-block bg-black/80 text-white text-xs px-4 py-2 rounded-full opacity-75">
-            Tap to show/hide controls
-          </div>
-        </div>
       )}
 
       {/* Record Button - Small floating icon */}

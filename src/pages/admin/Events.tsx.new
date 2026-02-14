@@ -1,0 +1,67 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
+import { Calendar, Clock, MapPin, Users, Grid, List, ArrowUpDown, Plus, Edit, Trash2 } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+interface Event {
+  id: string;
+  title: string;
+  description?: string;
+  date: string;
+  time: string;
+  location: string;
+  type?: string;
+  requires_rsvp: boolean;
+}
+
+type ViewMode = 'cards' | 'list';
+type SortField = 'date' | 'title' | 'type' | 'time' | 'location';
+type SortDirection = 'asc' | 'desc';
+
+export const AdminEvents = () => {
+  const navigate = useNavigate();
+  const [events, setEvents] = useState<Event[]>([]);
+  const [rsvpCounts, setRsvpCounts] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<ViewMode>('cards');
+  const [sortField, setSortField] = useState<SortField>('date');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [timelineFilter, setTimelineFilter] = useState<'all' | 'upcoming' | 'past'>('upcoming');
+
+  useEffect(() => {
+    fetchEvents();
+  }, []);
+
+  const fetchEvents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .order('date', { ascending: true });
+
+      if (error) throw error;
+      setEvents(data || []);
+
+      // Fetch RSVP counts
+      if (data) {
+        const counts: Record<string, number> = {};
+        for (const event of data) {
+          if (event.requires_rsvp) {
+            const { count } = await supabase
+              .from('rsvps')
+              .select('*', { count: 'exact', head: true })
+              .eq('event_id', event.id)
+              .eq('status', 'yes');
+            counts[event.id] = count || 0;
+          }
+        }
+        setRsvpCounts(counts);
+      }
+    } catch (error) {
+      console.error('Error fetching events:', error);
+      toast.error('Failed to load events');
+    } finally {
+      setLoading(false);
+    }
+  };

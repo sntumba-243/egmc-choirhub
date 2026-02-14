@@ -135,7 +135,7 @@ export const AdminMembers = () => {
         </div>
         <button
           onClick={() => navigate('/admin/members/new')}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:shadow-lg transition-all flex-shrink-0 text-sm"
+          className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-500 text-white rounded-xl text-[13px] font-semibold hover:bg-blue-600 shadow-sm transition-all flex-shrink-0"
         >
           <Plus className="w-4 h-4" />
           <span>Add New</span>

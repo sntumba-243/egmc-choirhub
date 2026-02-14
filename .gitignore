@@ -35,3 +35,8 @@ src/pages/admin/EventForm.tsx.setlist-backup
 *.backup
 *.backup*
 .env*.local
+
+# Neon backup database
+neon-server.js
+export_supabase_to_neon.js
+backups/

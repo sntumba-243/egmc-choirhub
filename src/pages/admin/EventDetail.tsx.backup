@@ -72,14 +72,16 @@ export const AdminEventDetail = () => {
     }
   };
 
+
   const fetchEventSongs = async () => {
+    console.log('🎵 Starting fetchEventSongs for event:', id);
     try {
       const { data, error } = await supabase
         .from('event_songs')
         .select(`
           id,
           song_id,
-          songs (
+          songs:song_id (
             id,
             title,
             composer,
@@ -90,14 +92,18 @@ export const AdminEventDetail = () => {
         .eq('event_id', id)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
-      console.log('Event songs loaded:', data?.length);
+      if (error) {
+        console.error('❌ Supabase error:', error);
+        throw error;
+      }
+      
+      console.log('✅ Event songs loaded:', data?.length, 'songs');
+      console.log('📦 Full data:', data);
       setEventSongs(data || []);
     } catch (error) {
-      console.error('Error loading event songs:', error);
+      console.error('💥 Error loading event songs:', error);
     }
   };
-
   const removeSongFromEvent = async (eventSongId: string, songTitle: string) => {
     if (!confirm(`Remove "${songTitle}" from this event?`)) return;
 

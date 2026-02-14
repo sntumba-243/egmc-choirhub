@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Calendar, Clock, MapPin, Music, X, Eye, Users, UserCheck } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, MapPin, Music, X, Eye, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 
@@ -30,6 +30,11 @@ export const EventForm: React.FC = () => {
   const [type, setType] = useState('');
   const [requiresRsvp, setRequiresRsvp] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [originalDate, setOriginalDate] = useState('');
+  
+  // Collapsible sections
+  const [showVisibility, setShowVisibility] = useState(false);
+  const [showSetlist, setShowSetlist] = useState(false);
   
   // Visibility controls
   const [visibility, setVisibility] = useState<'all' | 'voice_part' | 'role' | 'specific_users'>('all');
@@ -42,7 +47,7 @@ export const EventForm: React.FC = () => {
   const [selectedSongIds, setSelectedSongIds] = useState<string[]>([]);
   const [searchSong, setSearchSong] = useState('');
   
-  // Members for specific user selection
+  // Members
   const [allMembers, setAllMembers] = useState<Member[]>([]);
   const [searchMember, setSearchMember] = useState('');
 
@@ -95,6 +100,7 @@ export const EventForm: React.FC = () => {
       if (data) {
         setTitle(data.title);
         setDate(data.date);
+        setOriginalDate(data.date);
         setTime(data.time);
         setLocation(data.location);
         setDescription(data.description || '');
@@ -104,7 +110,6 @@ export const EventForm: React.FC = () => {
         setAllowedVoiceParts(data.allowed_voice_parts || []);
         setAllowedRoles(data.allowed_roles || []);
 
-        // Load songs from event_songs table
         const { data: eventSongs } = await supabase
           .from('event_songs')
           .select('song_id')
@@ -116,7 +121,6 @@ export const EventForm: React.FC = () => {
           setSelectedSongIds(data.setlist);
         }
 
-        // Load specific users if applicable
         if (data.visibility === 'specific_users') {
           const { data: userAccess } = await supabase
             .from('event_user_access')
@@ -154,7 +158,25 @@ export const EventForm: React.FC = () => {
       };
 
       if (eventId) {
-        // UPDATE existing event
+        // If date changed, archive existing RSVPs before updating
+        if (originalDate && date !== originalDate) {
+          const { data: currentRsvps } = await supabase
+            .from('rsvps')
+            .select('member_id, status')
+            .eq('event_id', eventId);
+          
+          if (currentRsvps && currentRsvps.length > 0) {
+            const archiveData = currentRsvps.map(r => ({
+              event_id: eventId,
+              member_id: r.member_id,
+              event_title: title,
+              event_date: originalDate,
+              status: r.status || 'attending',
+            }));
+            await supabase.from('attendance_history').upsert(archiveData, { onConflict: 'event_id,member_id,event_date' });
+          }
+        }
+        
         const { error } = await supabase
           .from('events')
           .update(eventData)
@@ -162,7 +184,6 @@ export const EventForm: React.FC = () => {
         
         if (error) throw error;
 
-        // Sync event_songs
         await supabase.from('event_songs').delete().eq('event_id', eventId);
         if (selectedSongIds.length > 0) {
           const eventSongs = selectedSongIds.map(songId => ({
@@ -172,7 +193,6 @@ export const EventForm: React.FC = () => {
           await supabase.from('event_songs').insert(eventSongs);
         }
 
-        // Sync event_user_access for specific users
         if (visibility === 'specific_users') {
           await supabase.from('event_user_access').delete().eq('event_id', eventId);
           if (selectedMemberIds.length > 0) {
@@ -183,13 +203,11 @@ export const EventForm: React.FC = () => {
             await supabase.from('event_user_access').insert(userAccess);
           }
         } else {
-          // Clear user access if not specific_users
           await supabase.from('event_user_access').delete().eq('event_id', eventId);
         }
         
         toast.success('Event updated');
       } else {
-        // CREATE new event
         const { data, error } = await supabase
           .from('events')
           .insert([eventData])
@@ -198,7 +216,6 @@ export const EventForm: React.FC = () => {
         
         if (error) throw error;
         
-        // Sync event_songs
         if (selectedSongIds.length > 0 && data?.id) {
           const eventSongs = selectedSongIds.map(songId => ({
             event_id: data.id,
@@ -207,7 +224,6 @@ export const EventForm: React.FC = () => {
           await supabase.from('event_songs').insert(eventSongs);
         }
 
-        // Sync event_user_access for specific users
         if (visibility === 'specific_users' && selectedMemberIds.length > 0 && data?.id) {
           const userAccess = selectedMemberIds.map(memberId => ({
             event_id: data.id,
@@ -280,231 +296,284 @@ export const EventForm: React.FC = () => {
   const selectedMembers = allMembers.filter(m => selectedMemberIds.includes(m.id));
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-4xl mx-auto space-y-4 pb-6">
+      {/* Compact Header */}
       <div className="flex items-center justify-between">
         <button
           onClick={() => navigate('/admin/events')}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+          className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900"
         >
-          <ArrowLeft className="w-5 h-5" />
-          Back to Events
+          <ArrowLeft className="w-4 h-4" />
+          Back
         </button>
-        <h1 className="text-3xl font-bold text-gray-900">
-          {eventId ? 'Edit Event' : 'Create Event'}
+        <h1 className="text-xl font-bold text-gray-900">
+          {eventId ? 'Edit Event' : 'New Event'}
         </h1>
-        <div className="w-32" />
+        <div className="w-16" />
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-md p-6 space-y-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Event Title *</label>
+      <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm border p-4 space-y-4">
+        {/* Basic Info - Compact */}
+        <div className="space-y-3">
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
-            placeholder="e.g. Thanksgiving Services"
-            className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+            placeholder="Event Title *"
+            className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500"
           />
-        </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Date *</label>
+          <div className="grid grid-cols-3 gap-3">
             <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Calendar className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 required
-                className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                className="w-full pl-8 pr-2 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500"
               />
             </div>
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Time *</label>
             <div className="relative">
-              <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Clock className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="time"
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
                 required
-                className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                className="w-full pl-8 pr-2 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500"
               />
             </div>
-          </div>
-        </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Location *</label>
+            <select
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+              className="w-full px-2 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="">Type</option>
+              <option value="Service">Service</option>
+              <option value="Practice">Practice</option>
+              <option value="Performance">Performance</option>
+              <option value="Meeting">Meeting</option>
+              <option value="Social">Social</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
           <div className="relative">
-            <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <MapPin className="absolute left-2.5 top-2.5 text-gray-400 w-4 h-4" />
             <input
               type="text"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               required
-              placeholder="e.g. Church Main Hall"
-              className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+              placeholder="Location *"
+              className="w-full pl-8 pr-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500"
             />
           </div>
-        </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Event Type</label>
-          <select
-            value={type}
-            onChange={(e) => setType(e.target.value)}
-            className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="">Select Type</option>
-            <option value="Service">Service</option>
-            <option value="Practice">Practice</option>
-            <option value="Performance">Performance</option>
-            <option value="Meeting">Meeting</option>
-            <option value="Social">Social Event</option>
-            <option value="Other">Other</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            rows={4}
-            placeholder="Add event details..."
-            className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 resize-none"
+            rows={2}
+            placeholder="Description (optional)"
+            className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500 resize-none"
           />
         </div>
 
-        {/* Visibility Controls */}
-        <div className="border-t pt-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Eye className="w-5 h-5 text-indigo-600" />
-            <label className="text-sm font-medium text-gray-700">Who can see this event?</label>
-          </div>
+        {/* RSVP Checkbox */}
+        <label className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+          <input
+            type="checkbox"
+            checked={requiresRsvp}
+            onChange={(e) => setRequiresRsvp(e.target.checked)}
+            className="w-4 h-4 text-indigo-600 rounded"
+          />
+          <span className="text-sm font-medium text-gray-700">Require RSVP</span>
+        </label>
 
-          <div className="space-y-3 mb-4">
-            <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
-              <input
-                type="radio"
-                value="all"
-                checked={visibility === 'all'}
-                onChange={(e) => setVisibility(e.target.value as any)}
-                className="w-4 h-4 text-indigo-600"
-              />
-              <div>
-                <div className="font-medium">All Members</div>
-                <div className="text-sm text-gray-600">Everyone can see this event</div>
-              </div>
-            </label>
+        {/* Collapsible Visibility */}
+        <div className="border rounded-lg">
+          <button
+            type="button"
+            onClick={() => setShowVisibility(!showVisibility)}
+            className="w-full flex items-center justify-between p-3 text-left hover:bg-gray-50"
+          >
+            <div className="flex items-center gap-2">
+              <Eye className="w-4 h-4 text-indigo-600" />
+              <span className="text-sm font-medium">Visibility</span>
+              <span className="text-xs text-gray-500">
+                {visibility === 'all' ? 'All Members' :
+                 visibility === 'voice_part' ? `${allowedVoiceParts.length} Voice Parts` :
+                 visibility === 'role' ? `${allowedRoles.length} Roles` :
+                 `${selectedMemberIds.length} Users`}
+              </span>
+            </div>
+            {showVisibility ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
 
-            <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
-              <input
-                type="radio"
-                value="voice_part"
-                checked={visibility === 'voice_part'}
-                onChange={(e) => setVisibility(e.target.value as any)}
-                className="w-4 h-4 text-indigo-600"
-              />
-              <div>
-                <div className="font-medium">By Voice Part</div>
-                <div className="text-sm text-gray-600">Only specific voice parts</div>
-              </div>
-            </label>
+          {showVisibility && (
+            <div className="p-3 border-t space-y-2">
+              <label className="flex items-center gap-2 p-2 border rounded cursor-pointer hover:bg-gray-50">
+                <input
+                  type="radio"
+                  value="all"
+                  checked={visibility === 'all'}
+                  onChange={(e) => setVisibility(e.target.value as any)}
+                  className="w-3.5 h-3.5"
+                />
+                <span className="text-sm">All Members</span>
+              </label>
 
-            <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
-              <input
-                type="radio"
-                value="role"
-                checked={visibility === 'role'}
-                onChange={(e) => setVisibility(e.target.value as any)}
-                className="w-4 h-4 text-indigo-600"
-              />
-              <div>
-                <div className="font-medium">By Role</div>
-                <div className="text-sm text-gray-600">Only specific roles (Admin, Member, Guest)</div>
-              </div>
-            </label>
+              <label className="flex items-center gap-2 p-2 border rounded cursor-pointer hover:bg-gray-50">
+                <input
+                  type="radio"
+                  value="voice_part"
+                  checked={visibility === 'voice_part'}
+                  onChange={(e) => setVisibility(e.target.value as any)}
+                  className="w-3.5 h-3.5"
+                />
+                <span className="text-sm">By Voice Part</span>
+              </label>
 
-            <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
-              <input
-                type="radio"
-                value="specific_users"
-                checked={visibility === 'specific_users'}
-                onChange={(e) => setVisibility(e.target.value as any)}
-                className="w-4 h-4 text-indigo-600"
-              />
-              <div>
-                <div className="font-medium">Specific Users</div>
-                <div className="text-sm text-gray-600">Hand-pick individuals</div>
-              </div>
-            </label>
-          </div>
+              {visibility === 'voice_part' && (
+                <div className="ml-6 flex flex-wrap gap-1.5">
+                  {voiceParts.map(vp => (
+                    <label key={vp} className="flex items-center gap-1.5 px-2 py-1 bg-white border rounded text-xs cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="checkbox"
+                        checked={allowedVoiceParts.includes(vp)}
+                        onChange={() => toggleVoicePart(vp)}
+                        className="w-3 h-3"
+                      />
+                      {vp}
+                    </label>
+                  ))}
+                </div>
+              )}
 
-          {/* Voice Part Selection */}
-          {visibility === 'voice_part' && (
-            <div className="p-4 bg-indigo-50 rounded-lg">
-              <p className="text-sm font-medium text-gray-700 mb-3">Select Voice Parts:</p>
-              <div className="flex flex-wrap gap-2">
-                {voiceParts.map(vp => (
-                  <label key={vp} className="flex items-center gap-2 px-3 py-2 bg-white border rounded-lg cursor-pointer hover:bg-gray-50">
-                    <input
-                      type="checkbox"
-                      checked={allowedVoiceParts.includes(vp)}
-                      onChange={() => toggleVoicePart(vp)}
-                      className="w-4 h-4 text-indigo-600"
-                    />
-                    <span className="text-sm">{vp}</span>
-                  </label>
-                ))}
-              </div>
+              <label className="flex items-center gap-2 p-2 border rounded cursor-pointer hover:bg-gray-50">
+                <input
+                  type="radio"
+                  value="role"
+                  checked={visibility === 'role'}
+                  onChange={(e) => setVisibility(e.target.value as any)}
+                  className="w-3.5 h-3.5"
+                />
+                <span className="text-sm">By Role</span>
+              </label>
+
+              {visibility === 'role' && (
+                <div className="ml-6 flex flex-wrap gap-1.5">
+                  {roles.map(role => (
+                    <label key={role} className="flex items-center gap-1.5 px-2 py-1 bg-white border rounded text-xs cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="checkbox"
+                        checked={allowedRoles.includes(role)}
+                        onChange={() => toggleRole(role)}
+                        className="w-3 h-3"
+                      />
+                      {role}
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              <label className="flex items-center gap-2 p-2 border rounded cursor-pointer hover:bg-gray-50">
+                <input
+                  type="radio"
+                  value="specific_users"
+                  checked={visibility === 'specific_users'}
+                  onChange={(e) => setVisibility(e.target.value as any)}
+                  className="w-3.5 h-3.5"
+                />
+                <span className="text-sm">Specific Users</span>
+              </label>
+
+              {visibility === 'specific_users' && (
+                <div className="ml-6 space-y-2">
+                  {selectedMembers.length > 0 && (
+                    <div className="space-y-1">
+                      {selectedMembers.map(member => (
+                        <div key={member.id} className="flex items-center justify-between p-1.5 bg-white rounded text-xs">
+                          <span>{member.first_name} {member.last_name}</span>
+                          <button
+                            type="button"
+                            onClick={() => toggleMember(member.id)}
+                            className="p-0.5 text-red-600 hover:bg-red-50 rounded"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <input
+                    type="text"
+                    value={searchMember}
+                    onChange={(e) => setSearchMember(e.target.value)}
+                    placeholder="Search members..."
+                    className="w-full px-2 py-1.5 text-xs border rounded"
+                  />
+                  
+                  {searchMember && (
+                    <div className="max-h-32 overflow-y-auto border rounded text-xs">
+                      {filteredMembers.map(member => (
+                        <button
+                          key={member.id}
+                          type="button"
+                          onClick={() => toggleMember(member.id)}
+                          disabled={selectedMemberIds.includes(member.id)}
+                          className="w-full text-left p-2 hover:bg-gray-50 border-b last:border-b-0 disabled:opacity-50"
+                        >
+                          {member.first_name} {member.last_name} • {member.voice_part}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
+        </div>
 
-          {/* Role Selection */}
-          {visibility === 'role' && (
-            <div className="p-4 bg-indigo-50 rounded-lg">
-              <p className="text-sm font-medium text-gray-700 mb-3">Select Roles:</p>
-              <div className="flex flex-wrap gap-2">
-                {roles.map(role => (
-                  <label key={role} className="flex items-center gap-2 px-3 py-2 bg-white border rounded-lg cursor-pointer hover:bg-gray-50">
-                    <input
-                      type="checkbox"
-                      checked={allowedRoles.includes(role)}
-                      onChange={() => toggleRole(role)}
-                      className="w-4 h-4 text-indigo-600"
-                    />
-                    <span className="text-sm capitalize">{role}</span>
-                  </label>
-                ))}
-              </div>
+        {/* Collapsible Setlist */}
+        <div className="border rounded-lg">
+          <button
+            type="button"
+            onClick={() => setShowSetlist(!showSetlist)}
+            className="w-full flex items-center justify-between p-3 text-left hover:bg-gray-50"
+          >
+            <div className="flex items-center gap-2">
+              <Music className="w-4 h-4 text-indigo-600" />
+              <span className="text-sm font-medium">Setlist</span>
+              <span className="text-xs text-gray-500">{selectedSongs.length} songs</span>
             </div>
-          )}
+            {showSetlist ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
 
-          {/* Specific Users Selection */}
-          {visibility === 'specific_users' && (
-            <div className="p-4 bg-indigo-50 rounded-lg space-y-3">
-              <p className="text-sm font-medium text-gray-700">Select Members ({selectedMembers.length} selected):</p>
-              
-              {selectedMembers.length > 0 && (
-                <div className="space-y-2 mb-3">
-                  {selectedMembers.map(member => (
-                    <div key={member.id} className="flex items-center justify-between p-2 bg-white rounded-lg">
-                      <div>
-                        <div className="font-medium text-sm">{member.first_name} {member.last_name}</div>
-                        <div className="text-xs text-gray-600">{member.email} • {member.voice_part}</div>
+          {showSetlist && (
+            <div className="p-3 border-t space-y-2">
+              {selectedSongs.length > 0 && (
+                <div className="space-y-1">
+                  {selectedSongs.map((song, index) => (
+                    <div key={song.id} className="flex items-center justify-between p-2 bg-indigo-50 rounded">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-xs font-medium text-indigo-600">#{index + 1}</span>
+                        <div className="text-xs truncate">
+                          <div className="font-medium">{song.title}</div>
+                          <div className="text-gray-600">{song.composer}</div>
+                        </div>
                       </div>
                       <button
                         type="button"
-                        onClick={() => toggleMember(member.id)}
-                        className="p-1 text-red-600 hover:bg-red-50 rounded"
+                        onClick={() => removeSong(song.id)}
+                        className="p-1 text-red-600 hover:bg-red-100 rounded"
                       >
-                        <X className="w-4 h-4" />
+                        <X className="w-3 h-3" />
                       </button>
                     </div>
                   ))}
@@ -513,28 +582,27 @@ export const EventForm: React.FC = () => {
 
               <input
                 type="text"
-                value={searchMember}
-                onChange={(e) => setSearchMember(e.target.value)}
-                placeholder="Search members to add..."
-                className="w-full px-4 py-2 border rounded-lg"
+                value={searchSong}
+                onChange={(e) => setSearchSong(e.target.value)}
+                placeholder="Search songs to add..."
+                className="w-full px-3 py-2 text-sm border rounded-lg"
               />
               
-              {searchMember && (
-                <div className="max-h-48 overflow-y-auto border rounded-lg bg-white">
-                  {filteredMembers.map(member => (
+              {searchSong && (
+                <div className="max-h-40 overflow-y-auto border rounded">
+                  {filteredAvailableSongs.map((song) => (
                     <button
-                      key={member.id}
+                      key={song.id}
                       type="button"
-                      onClick={() => toggleMember(member.id)}
-                      disabled={selectedMemberIds.includes(member.id)}
-                      className="w-full text-left p-3 hover:bg-gray-50 border-b last:border-b-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => addSong(song.id)}
+                      className="w-full text-left p-2 hover:bg-gray-50 border-b last:border-b-0 text-xs"
                     >
-                      <div className="font-medium text-sm">{member.first_name} {member.last_name}</div>
-                      <div className="text-xs text-gray-600">{member.email} • {member.voice_part} • {member.role}</div>
+                      <div className="font-medium">{song.title}</div>
+                      <div className="text-gray-600">{song.composer}</div>
                     </button>
                   ))}
-                  {filteredMembers.length === 0 && (
-                    <div className="p-4 text-center text-gray-500 text-sm">No members found</div>
+                  {filteredAvailableSongs.length === 0 && (
+                    <div className="p-3 text-center text-gray-500 text-xs">No songs found</div>
                   )}
                 </div>
               )}
@@ -542,92 +610,21 @@ export const EventForm: React.FC = () => {
           )}
         </div>
 
-        {/* Setlist Section */}
-        <div className="border-t pt-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Music className="w-5 h-5 text-indigo-600" />
-            <label className="text-sm font-medium text-gray-700">Setlist ({selectedSongs.length} songs)</label>
-          </div>
-
-          {selectedSongs.length > 0 && (
-            <div className="space-y-2 mb-4">
-              {selectedSongs.map((song, index) => (
-                <div key={song.id} className="flex items-center justify-between p-3 bg-indigo-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-indigo-600">#{index + 1}</span>
-                    <div>
-                      <div className="font-medium">{song.title}</div>
-                      <div className="text-sm text-gray-600">{song.composer}</div>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeSong(song.id)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <input
-              type="text"
-              value={searchSong}
-              onChange={(e) => setSearchSong(e.target.value)}
-              placeholder="Search songs to add..."
-              className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500"
-            />
-            {searchSong && (
-              <div className="max-h-48 overflow-y-auto border rounded-lg">
-                {filteredAvailableSongs.map((song) => (
-                  <button
-                    key={song.id}
-                    type="button"
-                    onClick={() => addSong(song.id)}
-                    className="w-full text-left p-3 hover:bg-gray-50 transition-colors border-b last:border-b-0"
-                  >
-                    <div className="font-medium">{song.title}</div>
-                    <div className="text-sm text-gray-600">{song.composer}</div>
-                  </button>
-                ))}
-                {filteredAvailableSongs.length === 0 && (
-                  <div className="p-4 text-center text-gray-500">No songs found</div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <input
-            type="checkbox"
-            id="requiresRsvp"
-            checked={requiresRsvp}
-            onChange={(e) => setRequiresRsvp(e.target.checked)}
-            className="w-5 h-5 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-500"
-          />
-          <label htmlFor="requiresRsvp" className="text-sm font-medium text-gray-700">
-            Require RSVP for this event
-          </label>
-        </div>
-
-        <div className="flex gap-4">
+        {/* Compact Action Buttons */}
+        <div className="flex gap-3 pt-2">
           <button
             type="button"
             onClick={() => navigate('/admin/events')}
-            className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+            className="flex-1 px-4 py-2 text-sm border text-gray-700 rounded-lg hover:bg-gray-50"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-lg disabled:opacity-50"
+            className="flex-1 px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg disabled:opacity-50 hover:bg-indigo-700"
           >
-            {loading ? 'Saving...' : (eventId ? 'Update Event' : 'Create Event')}
+            {loading ? 'Saving...' : (eventId ? 'Update' : 'Create')}
           </button>
         </div>
       </form>

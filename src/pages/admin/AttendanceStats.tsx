@@ -14,6 +14,23 @@ interface MemberAttendance {
 }
 
 type TimePeriod = 'week' | 'month' | 'year' | 'all';
+type StatusFilter = 'all' | 'regulars' | 'followup';
+
+const voicePartColors: Record<string, string> = {
+  Soprano: 'text-pink-600 bg-pink-50',
+  Alto: 'text-purple-600 bg-purple-50',
+  Tenor: 'text-blue-600 bg-blue-50',
+  Bass: 'text-green-600 bg-green-50',
+  Instrumentalist: 'text-orange-600 bg-orange-50',
+};
+
+const getStatus = (rate: number, attended: number) => {
+  if (attended === 0) return { emoji: '❌', label: 'Never', color: 'bg-red-50 text-red-600', barColor: 'bg-gray-300', rowBg: 'bg-red-50/20' };
+  if (rate >= 75) return { emoji: '💪', label: 'Always', color: 'bg-green-50 text-green-700', barColor: 'bg-green-500', rowBg: '' };
+  if (rate >= 50) return { emoji: '👍', label: 'Often', color: 'bg-green-50 text-green-700', barColor: 'bg-green-500', rowBg: '' };
+  if (rate >= 25) return { emoji: '🤷', label: 'Sometimes', color: 'bg-yellow-50 text-yellow-700', barColor: 'bg-yellow-500', rowBg: '' };
+  return { emoji: '⚠️', label: 'Rarely', color: 'bg-red-50 text-red-600', barColor: 'bg-red-500', rowBg: 'bg-red-50/20' };
+};
 
 export default function AttendanceStats() {
   const [memberStats, setMemberStats] = useState<MemberAttendance[]>([]);
@@ -21,306 +38,242 @@ export default function AttendanceStats() {
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('month');
   const [sortBy, setSortBy] = useState<'name' | 'rate'>('rate');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [voiceFilter, setVoiceFilter] = useState('all');
 
-  useEffect(() => {
-    loadStats();
-  }, [timePeriod]);
+  useEffect(() => { loadStats(); }, [timePeriod]);
 
   const getDateRange = () => {
     const now = new Date();
-    let startDate: Date;
-
     switch (timePeriod) {
-      case 'week':
-        // Start of this week (Sunday)
-        startDate = new Date(now);
-        startDate.setDate(now.getDate() - now.getDay());
-        break;
-      case 'month':
-        // Start of this month (1st day of current month)
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        break;
-      case 'year':
-        // Start of this year (January 1st)
-        startDate = new Date(now.getFullYear(), 0, 1);
-        break;
-      case 'all':
-        startDate = new Date('2000-01-01');
-        break;
+      case 'week': { const d = new Date(now); d.setDate(now.getDate() - now.getDay()); return d.toISOString().split('T')[0]; }
+      case 'month': return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      case 'year': return new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
+      case 'all': return '2000-01-01';
     }
-
-    return startDate.toISOString().split('T')[0];
   };
 
   const loadStats = async () => {
     try {
       setLoading(true);
-
-      // Get all active members (exclude inactive)
       const { data: members } = await supabase
-        .from('members')
-        .select('id, first_name, last_name, email, voice_part, role')
-        .neq('role', 'inactive')
-        .order('first_name', { ascending: true });
+        .from('members').select('id, first_name, last_name, email, voice_part, role')
+        .neq('role', 'inactive').order('first_name', { ascending: true });
 
       const startDate = getDateRange();
-
-      // Get events in the selected time period
       const { data: events } = await supabase
-        .from('events')
-        .select('id')
-        .gte('date', startDate)
-        .lte('date', new Date().toISOString().split('T')[0]);
+        .from('events').select('id')
+        .gte('date', startDate).lte('date', new Date().toISOString().split('T')[0]);
 
       const eventIds = events?.map(e => e.id) || [];
       const totalEvents = eventIds.length;
 
       if (totalEvents === 0) {
-        // No events in this period
-        const emptyStats: MemberAttendance[] = (members || []).map(member => ({
-          ...member,
-          attended: 0,
-          total_events: 0,
-          attendance_rate: 0
-        }));
-        setMemberStats(emptyStats);
+        setMemberStats((members || []).map(m => ({ ...m, attended: 0, total_events: 0, attendance_rate: 0 })));
         setLoading(false);
         return;
       }
 
-      // Get all RSVPs for events in this period
-      const { data: rsvps } = await supabase
-        .from('event_rsvps')
-        .select('member_id, event_id, status')
-        .in('event_id', eventIds);
+      const { data: currentRsvps } = await supabase
+        .from('rsvps').select('member_id, event_id, status').in('event_id', eventIds);
 
-      // Calculate attendance for each member
-      const memberAttendance: MemberAttendance[] = (members || []).map(member => {
-        const memberRsvps = rsvps?.filter(r => r.member_id === member.id) || [];
-        const attended = memberRsvps.filter(r => r.status === 'attending').length;
-        const rate = totalEvents > 0 ? Math.round((attended / totalEvents) * 100) : 0;
+      const { data: archivedRsvps } = await supabase
+        .from('attendance_history').select('member_id, event_id, event_date, status')
+        .gte('event_date', startDate).lte('event_date', new Date().toISOString().split('T')[0]);
 
-        return {
-          ...member,
-          attended,
-          total_events: totalEvents,
-          attendance_rate: rate
-        };
+      const attendanceMap = new Map<string, Set<string>>();
+      (currentRsvps || []).forEach(r => {
+        if (r.status === 'attending') {
+          if (!attendanceMap.has(r.member_id)) attendanceMap.set(r.member_id, new Set());
+          attendanceMap.get(r.member_id)!.add(r.event_id);
+        }
+      });
+      (archivedRsvps || []).forEach(r => {
+        if (r.status === 'attending') {
+          if (!attendanceMap.has(r.member_id)) attendanceMap.set(r.member_id, new Set());
+          attendanceMap.get(r.member_id)!.add(r.event_id + '_' + r.event_date);
+        }
       });
 
-      setMemberStats(memberAttendance);
+      const seenArchive = new Set<string>();
+      let extraArchived = 0;
+      (archivedRsvps || []).forEach(r => {
+        const k = r.event_id + '_' + r.event_date;
+        if (!seenArchive.has(k)) { seenArchive.add(k); if (!eventIds.includes(r.event_id)) extraArchived++; }
+      });
+      const combinedTotal = totalEvents + extraArchived;
+
+      setMemberStats((members || []).map(m => {
+        const att = attendanceMap.get(m.id)?.size || 0;
+        return { ...m, attended: att, total_events: combinedTotal, attendance_rate: combinedTotal > 0 ? Math.round((att / combinedTotal) * 100) : 0 };
+      }));
     } catch (error) {
-      console.error('Error loading stats:', error);
+      console.error('Error:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const sortedMembers = [...memberStats].sort((a, b) => {
+  const toggleSort = (field: 'name' | 'rate') => {
+    if (sortBy === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortBy(field); setSortDir(field === 'name' ? 'asc' : 'desc'); }
+  };
+
+  const filtered = memberStats
+    .filter(m => {
+      if (statusFilter === 'regulars') return m.attendance_rate >= 50;
+      if (statusFilter === 'followup') return m.attendance_rate < 50;
+      return true;
+    })
+    .filter(m => voiceFilter === 'all' || m.voice_part === voiceFilter);
+
+  const sorted = [...filtered].sort((a, b) => {
     if (sortBy === 'name') {
-      const nameA = `${a.first_name} ${a.last_name}`.toLowerCase();
-      const nameB = `${b.first_name} ${b.last_name}`.toLowerCase();
-      return sortDir === 'asc' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+      const cmp = `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
+      return sortDir === 'asc' ? cmp : -cmp;
     }
-    // Sort by rate
     return sortDir === 'asc' ? a.attendance_rate - b.attendance_rate : b.attendance_rate - a.attendance_rate;
   });
 
-  const toggleSort = (field: 'name' | 'rate') => {
-    if (sortBy === field) {
-      // Toggle direction if clicking same field
-      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
-    } else {
-      // Switch to new field with default direction
-      setSortBy(field);
-      setSortDir(field === 'name' ? 'asc' : 'desc');
-    }
-  };
-
-  const getStatusEmoji = (rate: number) => {
-    if (rate >= 75) return '🟢';
-    if (rate >= 50) return '🟡';
-    return '🔴';
-  };
-
-  const getStatusText = (rate: number) => {
-    if (rate >= 75) return 'Excellent';
-    if (rate >= 50) return 'Follow-up';
-    return 'Rarely Attends';
-  };
-
-  const getStatusColor = (rate: number) => {
-    if (rate >= 75) return 'text-green-600 bg-green-50';
-    if (rate >= 50) return 'text-yellow-600 bg-yellow-50';
-    return 'text-red-600 bg-red-50';
-  };
-
-  const averageAttendance = memberStats.length > 0
-    ? Math.round(memberStats.reduce((sum, m) => sum + m.attendance_rate, 0) / memberStats.length)
-    : 0;
-
-  const excellentCount = memberStats.filter(m => m.attendance_rate >= 75).length;
-  const needsFollowup = memberStats.filter(m => m.attendance_rate < 50 && m.attendance_rate > 0).length;
-
-  const timePeriodLabels: Record<TimePeriod, string> = {
-    week: 'This Week',
-    month: 'This Month',
-    year: 'This Year',
-    all: 'All Time'
-  };
-
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <div className="animate-pulse space-y-4">
-          <div className="h-6 bg-gray-200 rounded w-1/4"></div>
-          <div className="grid grid-cols-4 gap-2">
-            {[1, 2, 3, 4].map(i => <div key={i} className="h-16 bg-gray-200 rounded"></div>)}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const totalEvents = memberStats[0]?.total_events || 0;
+  const regularsCount = memberStats.filter(m => m.attendance_rate >= 50).length;
+  const followupCount = memberStats.filter(m => m.attendance_rate < 50).length;
+  const timePeriodLabels: Record<TimePeriod, string> = { week: 'Week', month: 'Month', year: 'Year', all: 'All' };
+  const voiceParts = [...new Set(memberStats.map(m => m.voice_part).filter(Boolean))];
+
+  if (loading) return (
+    <div className="flex justify-center p-12">
+      <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent" />
+    </div>
+  );
 
   return (
-    <div className="space-y-4 pb-8">
-      {/* Compact Header */}
+    <div className="space-y-3 pb-8">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Attendance</h1>
-          <p className="text-sm text-gray-600">Based on RSVPs • {totalEvents} events in period</p>
+          <h1 className="text-xl font-bold text-gray-900">Attendance</h1>
+          <p className="text-[11px] text-gray-500">Based on RSVPs · {totalEvents} events in period</p>
         </div>
-        
-        {/* Time Period Filter */}
-        <div className="flex gap-1 bg-white rounded-lg shadow-sm p-1">
-          {(['week', 'month', 'year', 'all'] as TimePeriod[]).map(period => (
-            <button
-              key={period}
-              onClick={() => setTimePeriod(period)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                timePeriod === period
-                  ? 'bg-indigo-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              {timePeriodLabels[period]}
+        <div className="flex bg-gray-100/80 rounded-xl p-0.5">
+          {(['week', 'month', 'year', 'all'] as TimePeriod[]).map(p => (
+            <button key={p} onClick={() => setTimePeriod(p)}
+              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all ${timePeriod === p ? 'bg-blue-500 text-white shadow-sm font-semibold' : 'text-gray-500'}`}>
+              {timePeriodLabels[p]}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Compact Stats Cards */}
+      {/* Stats */}
       <div className="grid grid-cols-4 gap-2">
-        <div className="bg-white rounded-lg shadow-sm p-3 border-l-2 border-purple-500">
-          <div className="text-xs text-gray-600">Members</div>
-          <div className="text-2xl font-bold text-gray-900">{memberStats.length}</div>
+        <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-2.5">
+          <div className="text-[10px] text-gray-400">Members</div>
+          <div className="text-xl font-bold text-gray-900">{memberStats.length}</div>
         </div>
-
-        <div className="bg-white rounded-lg shadow-sm p-3 border-l-2 border-blue-500">
-          <div className="text-xs text-gray-600">Events</div>
-          <div className="text-2xl font-bold text-gray-900">{totalEvents}</div>
+        <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-2.5">
+          <div className="text-[10px] text-gray-400">Events</div>
+          <div className="text-xl font-bold text-gray-900">{totalEvents}</div>
         </div>
-
-        <div className="bg-white rounded-lg shadow-sm p-3 border-l-2 border-green-500">
-          <div className="text-xs text-gray-600">Avg Rate</div>
-          <div className="text-2xl font-bold text-gray-900">{averageAttendance}%</div>
+        <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-2.5">
+          <div className="text-[10px] text-gray-400">Regulars 💪</div>
+          <div className="text-xl font-bold text-green-600">{regularsCount}</div>
         </div>
-
-        <div className="bg-white rounded-lg shadow-sm p-3 border-l-2 border-yellow-500">
-          <div className="text-xs text-gray-600">🟢 Excellent</div>
-          <div className="text-2xl font-bold text-gray-900">{excellentCount}</div>
+        <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-2.5">
+          <div className="text-[10px] text-gray-400">Follow-up ⚠️</div>
+          <div className="text-xl font-bold text-red-500">{followupCount}</div>
         </div>
       </div>
 
-      {/* Sort Toggle - Compact */}
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-medium text-gray-600">Sort:</span>
-        <button
-          onClick={() => toggleSort('name')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-            sortBy === 'name'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-white text-gray-600 hover:bg-gray-100 shadow-sm'
-          }`}
-        >
-          Name {sortBy === 'name' && (sortDir === 'asc' ? '↑' : '↓')}
-        </button>
-        <button
-          onClick={() => toggleSort('rate')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-            sortBy === 'rate'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-white text-gray-600 hover:bg-gray-100 shadow-sm'
-          }`}
-        >
-          Attendance {sortBy === 'rate' && (sortDir === 'asc' ? '↑' : '↓')}
-        </button>
+      {/* Sort + Filter */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-medium text-gray-400">Sort:</span>
+          <div className="flex bg-gray-100/80 rounded-lg p-0.5">
+            <button onClick={() => toggleSort('name')}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${sortBy === 'name' ? 'bg-white shadow-sm text-gray-900 font-semibold' : 'text-gray-500'}`}>
+              Name {sortBy === 'name' && (sortDir === 'asc' ? '↑' : '↓')}
+            </button>
+            <button onClick={() => toggleSort('rate')}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${sortBy === 'rate' ? 'bg-white shadow-sm text-gray-900 font-semibold' : 'text-gray-500'}`}>
+              Attendance {sortBy === 'rate' && (sortDir === 'asc' ? '↑' : '↓')}
+            </button>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex bg-gray-100/80 rounded-lg p-0.5">
+            {([['all', 'All'], ['regulars', '💪 Regulars'], ['followup', '⚠️ Follow-up']] as const).map(([key, label]) => (
+              <button key={key} onClick={() => setStatusFilter(key as StatusFilter)}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${statusFilter === key ? 'bg-white shadow-sm text-gray-900 font-semibold' : 'text-gray-500'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <select value={voiceFilter} onChange={e => setVoiceFilter(e.target.value)}
+            className="px-2 py-1 text-[11px] font-medium text-gray-600 bg-white rounded-lg border border-gray-200/60 shadow-sm">
+            <option value="all">All Voices</option>
+            {voiceParts.map(vp => <option key={vp} value={vp}>{vp}</option>)}
+          </select>
+        </div>
       </div>
 
-      {/* Compact Table */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      {/* Table */}
+      <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm overflow-hidden">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Member</th>
-              <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Voice Part</th>
-              <th className="px-4 py-2 text-center text-xs font-semibold text-gray-700">Attendance</th>
-              <th className="px-4 py-2 text-center text-xs font-semibold text-gray-700">Status</th>
+          <thead>
+            <tr className="border-b border-gray-100">
+              <th className="px-4 py-2 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Member</th>
+              <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Voice</th>
+              <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Attendance</th>
+              <th className="px-3 py-2 text-center text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Status</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
-            {sortedMembers.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-500">
-                  No events in this time period
-                </td>
-              </tr>
-            ) : (
-              sortedMembers.map((member) => (
-                <tr key={member.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3">
-                    <div className="text-sm font-semibold text-gray-900">
-                      {member.first_name} {member.last_name}
-                    </div>
-                    <div className="text-xs text-gray-500">{member.email}</div>
+          <tbody>
+            {sorted.length === 0 ? (
+              <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-400">No members match this filter</td></tr>
+            ) : sorted.map(m => {
+              const s = getStatus(m.attendance_rate, m.attended);
+              return (
+                <tr key={m.id} className={`border-b border-gray-50 hover:bg-gray-50/50 ${s.rowBg}`}>
+                  <td className="px-4 py-2.5">
+                    <div className="text-[13px] font-semibold text-gray-900">{m.first_name} {m.last_name}</div>
+                    <div className="text-[10px] text-gray-400">{m.email}</div>
                   </td>
-                  <td className="px-4 py-3">
-                    <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
-                      {member.voice_part || 'Not Set'}
+                  <td className="px-3 py-2.5">
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${voicePartColors[m.voice_part] || 'text-gray-600 bg-gray-50'}`}>
+                      {m.voice_part || '—'}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-center">
-                    <div className="text-base font-bold text-gray-900">
-                      {member.attended}/{member.total_events}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      ({member.attendance_rate}%)
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-center gap-1.5">
-                      <span className="text-lg">{getStatusEmoji(member.attendance_rate)}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${getStatusColor(member.attendance_rate)}`}>
-                        {getStatusText(member.attendance_rate)}
+                  <td className="px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden max-w-[100px]">
+                        <div className={`h-full rounded-full ${s.barColor}`} style={{ width: `${m.attendance_rate}%` }} />
+                      </div>
+                      <span className={`text-[12px] font-bold whitespace-nowrap ${m.attended === 0 ? 'text-gray-400' : m.attendance_rate >= 50 ? 'text-green-600' : m.attendance_rate >= 25 ? 'text-yellow-600' : 'text-red-500'}`}>
+                        {m.attended} / {m.total_events}
                       </span>
                     </div>
                   </td>
+                  <td className="px-3 py-2.5 text-center">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${s.color}`}>
+                      {s.emoji} {s.label}
+                    </span>
+                  </td>
                 </tr>
-              ))
-            )}
+              );
+            })}
           </tbody>
         </table>
       </div>
 
-      {/* Compact Legend */}
-      <div className="bg-gray-50 rounded-lg p-3">
-        <div className="flex items-center gap-4 text-xs text-gray-700">
-          <span className="font-semibold">Status:</span>
-          <span className="flex items-center gap-1">🟢 Excellent (75%+)</span>
-          <span className="flex items-center gap-1">🟡 Follow-up (50-74%)</span>
-          <span className="flex items-center gap-1">🔴 Rarely (below 50%)</span>
+      {/* Legend */}
+      <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm px-4 py-2">
+        <div className="flex items-center gap-3 text-[10px] text-gray-400 flex-wrap">
+          <span><span className="font-semibold text-green-600">💪 Always</span> 75%+</span>
+          <span><span className="font-semibold text-green-600">👍 Often</span> 50-74%</span>
+          <span><span className="font-semibold text-yellow-600">🤷 Sometimes</span> 25-49%</span>
+          <span><span className="font-semibold text-red-500">⚠️ Rarely</span> 1-24%</span>
+          <span><span className="font-semibold text-red-500">❌ Never</span> 0%</span>
         </div>
       </div>
     </div>

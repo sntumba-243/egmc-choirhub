@@ -2,17 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { 
-  Brain, 
-  TrendingUp, 
-  Dumbbell, 
-  Plus,
-  Music,
-  CheckCircle,
-  Clock,
-  Calendar,
-  Play,
-  Pause
+import {
+  ChevronDown, ChevronRight, Play, Pause, CheckCircle, Clock,
+  Music, Dumbbell, Calendar, Brain
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { SongRecorder } from '../../components/SongRecorder';
@@ -23,6 +15,7 @@ interface Exercise {
   description: string;
   exercise_type: string;
   difficulty: string;
+  instructions?: string;
 }
 
 interface Assignment {
@@ -33,474 +26,440 @@ interface Assignment {
   completed: boolean;
   reference_audio_url: string | null;
   exercise: Exercise | null;
-  song: { id: string; title: string } | null;
+  song: { id: string; title: string; sheet_music_url?: string } | null;
 }
+
+interface Submission {
+  id: string;
+  assignment_id: string;
+  audio_url: string;
+  status: string;
+  feedback_audio_url: string | null;
+  ai_feedback: string | null;
+  created_at: string;
+  song: { title: string } | null;
+}
+
+const typeColors: Record<string, string> = {
+  breathing: 'text-teal-600 bg-teal-50',
+  rhythm: 'text-orange-600 bg-orange-50',
+  tone: 'text-pink-600 bg-pink-50',
+  range: 'text-blue-600 bg-blue-50',
+};
+
+const diffColors: Record<string, string> = {
+  beginner: 'text-green-600 bg-green-50',
+  intermediate: 'text-yellow-600 bg-yellow-50',
+  advanced: 'text-red-600 bg-red-50',
+};
+
+const typeEmojis: Record<string, string> = {
+  breathing: '💨',
+  rhythm: '🥁',
+  tone: '🎵',
+  range: '🎤',
+};
 
 export function VocalCoach() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [exercises, setExercises] = useState<Exercise[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedExercise, setExpandedExercise] = useState<string | null>(null);
+  const [playingId, setPlayingId] = useState<string | null>(null);
   const [showRecorder, setShowRecorder] = useState(false);
-  const [submissions, setSubmissions] = useState<any[]>([]);
-  const [playingFeedback, setPlayingFeedback] = useState<string | null>(null);
-  const [playingReference, setPlayingReference] = useState<string | null>(null);
-  const referenceAudioRef = useRef<HTMLAudioElement | null>(null);
-  const feedbackAudioRef = useRef<HTMLAudioElement | null>(null);
-  const [selectedSongForRecording, setSelectedSongForRecording] = useState<{
-    id: string;
-    title: string;
-    assignmentId?: string;
-  } | null>(null);
+  const [selectedSong, setSelectedSong] = useState<{ id: string; title: string; assignmentId?: string } | null>(null);
+  const [exerciseTab, setExerciseTab] = useState<'all' | 'breathing' | 'tone' | 'rhythm' | 'range'>('all');
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, [user]);
+  useEffect(() => { if (user) loadData(); }, [user]);
 
   const loadData = async () => {
     if (!user) return;
-
     try {
       setLoading(true);
 
-      // Load member's own generated exercises
-      const { data: exercisesData } = await supabase
-        .from('smart_coach_exercises')
-        .select('*')
-        .eq('member_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      setExercises(exercisesData || []);
-
-      // Load assignments from admin
-      const { data: assignmentsData } = await supabase
+      // Load assignments
+      const { data: assignData } = await supabase
         .from('exercise_assignments')
-        .select(`
-          id,
-          assignment_type,
-          reference_audio_url,
-          reference_audio_url,
-          due_date,
-          notes,
-          completed,
-          exercise_id,
-          song_id
-        `)
+        .select('id, assignment_type, reference_audio_url, due_date, notes, completed, exercise_id, song_id')
         .eq('member_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (assignmentsData) {
-        // Fetch exercise and song details
-        const enrichedAssignments = await Promise.all(
-          assignmentsData.map(async (assignment) => {
-            let exercise = null;
-            let song = null;
-
-            if (assignment.exercise_id) {
-              const { data } = await supabase
-                .from('smart_coach_exercises')
-                .select('id, title, description, exercise_type, difficulty')
-                .eq('id', assignment.exercise_id)
-                .single();
-              exercise = data;
-            }
-
-            if (assignment.song_id) {
-              const { data } = await supabase
-                .from('songs')
-                .select('id, title')
-                .eq('id', assignment.song_id)
-                .single();
-              song = data;
-            }
-
-            return { ...assignment, exercise, song };
-          })
-        );
-
-        setAssignments(enrichedAssignments);
+      if (assignData) {
+        const enriched = await Promise.all(assignData.map(async (a) => {
+          let exercise = null, song = null;
+          if (a.exercise_id) {
+            const { data } = await supabase.from('smart_coach_exercises')
+              .select('id, title, description, exercise_type, difficulty, instructions')
+              .eq('id', a.exercise_id).single();
+            exercise = data;
+          }
+          if (a.song_id) {
+            const { data } = await supabase.from('songs')
+              .select('id, title, sheet_music_url').eq('id', a.song_id).single();
+            song = data;
+          }
+          return { ...a, exercise, song };
+        }));
+        setAssignments(enriched);
       }
 
-    } catch (error) {
-      console.error('Error loading data:', error);
-    } finally {
-      // Fetch member's submissions with feedback
-      const { data: subsData } = await supabase
+      // Load all global exercises (for practice library)
+      const { data: exData } = await supabase
+        .from('smart_coach_exercises')
+        .select('id, title, description, exercise_type, difficulty, instructions')
+        .is('member_id', null)
+        .order('difficulty', { ascending: true });
+      setExercises(exData || []);
+
+      // Load submissions
+      const { data: subData } = await supabase
         .from('song_submissions')
         .select('*, song:songs(title)')
         .eq('member_id', user.id)
         .order('created_at', { ascending: false });
-      
-      if (subsData) setSubmissions(subsData);
-      
-      setLoading(false);
-    }
-  };
+      setSubmissions(subData || []);
 
-  const handleGenerateExercises = async () => {
-    if (!user) return;
-
-    // Check if user already has exercises
-    if (exercises.length > 0) {
-      const confirm = window.confirm(
-        `You already have ${exercises.length} personalized exercises. Generate new ones? (This won't delete existing ones)`
-      );
-      if (!confirm) return;
-    }
-
-    try {
-      setGenerating(true);
-      const { smartCoachService } = await import('../../services/smartCoach');
-      
-      await smartCoachService.generateSmartCoachExercises(user.id);
-      
-      toast.success('New exercises generated!');
-      loadData();
     } catch (error) {
-      console.error('Error generating exercises:', error);
-      toast.error('Failed to generate exercises');
-    } finally {
-      setGenerating(false);
-    }
+      console.error('Error:', error);
+    } finally { setLoading(false); }
   };
 
-  const toggleReferenceAudio = (url: string, id: string) => {
-    if (playingReference === id) {
-      referenceAudioRef.current?.pause();
-      setPlayingReference(null);
-    } else {
-      if (referenceAudioRef.current) {
-        referenceAudioRef.current.src = url;
-        referenceAudioRef.current.play();
-        setPlayingReference(id);
-      }
-    }
+  const playAudio = (url: string, id: string) => {
+    if (playingId === id) { audioRef.current?.pause(); setPlayingId(null); }
+    else if (audioRef.current) { audioRef.current.src = url; audioRef.current.play(); setPlayingId(id); }
   };
 
-  const handleMarkComplete = async (assignmentId: string) => {
+  const handleMarkComplete = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('exercise_assignments')
-        .update({ 
-          completed: true,
-          completed_at: new Date().toISOString()
-        })
-        .eq('id', assignmentId);
-
-      if (error) throw error;
-
-      toast.success('Assignment marked complete!');
+      await supabase.from('exercise_assignments').update({ completed: true, completed_at: new Date().toISOString() }).eq('id', id);
+      toast.success('Marked complete! ✅');
       loadData();
-    } catch (error) {
-      console.error('Error marking complete:', error);
-      toast.error('Failed to update');
-    }
+    } catch { toast.error('Failed to update'); }
   };
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty?.toLowerCase()) {
-      case 'beginner':
-        return 'bg-green-100 text-green-700';
-      case 'intermediate':
-        return 'bg-yellow-100 text-yellow-700';
-      case 'advanced':
-        return 'bg-red-100 text-red-700';
-      default:
-        return 'bg-gray-100 text-gray-700';
-    }
-  };
+  const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-  if (loading) {
-    return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-          <div className="h-32 bg-gray-200 rounded"></div>
-          <div className="h-32 bg-gray-200 rounded"></div>
-        </div>
-      </div>
-    );
-  }
+  const pending = assignments.filter(a => !a.completed);
+  const completed = assignments.filter(a => a.completed);
+  const filteredExercises = exerciseTab === 'all' ? exercises : exercises.filter(e => e.exercise_type === exerciseTab);
 
-  const pendingAssignments = assignments.filter(a => !a.completed);
-  const completedAssignments = assignments.filter(a => a.completed);
+  if (loading) return (
+    <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent" /></div>
+  );
 
   return (
-    <div className="p-6 space-y-6">
-      <audio ref={referenceAudioRef} onEnded={() => setPlayingReference(null)} />
-      
+    <div className="space-y-4 pb-8">
+      <audio ref={audioRef} onEnded={() => setPlayingId(null)} />
+
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">AI Vocal Coach</h1>
-        <p className="text-gray-600 mt-1">Personalized practice and progress tracking</p>
+        <h1 className="text-xl font-bold text-gray-900">Vocal Coach</h1>
+        <p className="text-[11px] text-gray-500">Practice assignments & vocal exercises</p>
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <button
-          onClick={() => navigate('/member/vocal-coach/progress')}
-          className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-6 rounded-lg hover:from-indigo-600 hover:to-purple-700 transition-all"
-        >
-          <div className="flex items-center justify-between">
-            <div className="text-left">
-              <h3 className="text-lg font-semibold">View Progress</h3>
-              <p className="text-sm text-indigo-100 mt-1">Track your improvement</p>
-            </div>
-            <TrendingUp className="w-8 h-8" />
-          </div>
-        </button>
+      {/* ==================== ASSIGNMENTS FROM DIRECTOR ==================== */}
+      {pending.length > 0 && (
+        <div>
+          <h2 className="text-[13px] font-bold text-gray-900 mb-2 flex items-center gap-1.5">
+            <Calendar className="w-4 h-4 text-orange-500" />
+            Assignments ({pending.length})
+          </h2>
 
-        <button
-          onClick={handleGenerateExercises}
-          disabled={generating}
-          className="bg-gradient-to-r from-green-500 to-teal-600 text-white p-6 rounded-lg hover:from-green-600 hover:to-teal-700 transition-all disabled:opacity-50"
-        >
-          <div className="flex items-center justify-between">
-            <div className="text-left">
-              <h3 className="text-lg font-semibold">
-                {generating ? 'Generating...' : 'Generate Exercises'}
-              </h3>
-              <p className="text-sm text-green-100 mt-1">AI-powered recommendations</p>
-            </div>
-            <Brain className="w-8 h-8" />
-          </div>
-        </button>
-      </div>
+          <div className="space-y-2">
+            {pending.map(a => {
+              const isExpanded = expandedId === a.id;
+              const isSong = a.assignment_type === 'song';
+              const title = isSong ? a.song?.title : a.exercise?.title;
+              const sub = submissions.find(s => s.assignment_id === a.id);
 
-      {/* Assigned by Director */}
-      {pendingAssignments.length > 0 && (
-        <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900 flex items-center">
-              <Calendar className="w-6 h-6 mr-2 text-yellow-600" />
-              Assignments from Director ({pendingAssignments.length})
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {pendingAssignments.map((assignment) => (
-              <div
-                key={assignment.id}
-                className="bg-white border border-yellow-300 rounded-lg p-4 hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center space-x-2">
-                    {assignment.assignment_type === 'song' ? (
-                      <Music className="w-5 h-5 text-purple-600" />
-                    ) : (
-                      <Dumbbell className="w-5 h-5 text-blue-600" />
-                    )}
-                    <span className="text-xs font-medium text-gray-500 uppercase">
-                      {assignment.assignment_type}
-                    </span>
-                  </div>
-                  {assignment.due_date && (
-                    <span className="text-xs text-gray-500">
-                      Due: {new Date(assignment.due_date).toLocaleDateString()}
-                    </span>
-                  )}
-                </div>
-
-                {/* Reference Audio - Compact */}
-                {assignment.reference_audio_url && assignment.assignment_type === 'song' && (
-                  <button
-                    onClick={() => toggleReferenceAudio(assignment.reference_audio_url!, assignment.id)}
-                    className="mb-2 flex items-center gap-2 text-xs text-indigo-600 hover:text-indigo-800"
-                  >
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                      playingReference === assignment.id ? 'bg-indigo-600 animate-pulse' : 'bg-indigo-100'
-                    } ${playingReference === assignment.id ? 'text-white' : 'text-indigo-600'}`}>
-                      {playingReference === assignment.id ? (
-                        <Pause className="w-3 h-3" />
-                      ) : (
-                        <Play className="w-3 h-3" />
-                      )}
+              return (
+                <div key={a.id} className="bg-white rounded-2xl border border-gray-200/60 shadow-sm overflow-hidden">
+                  {/* Header row */}
+                  <button onClick={() => setExpandedId(isExpanded ? null : a.id)}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${isSong ? 'bg-purple-50' : 'bg-blue-50'}`}>
+                      {isSong ? <Music className="w-4 h-4 text-purple-500" /> : <Dumbbell className="w-4 h-4 text-blue-500" />}
                     </div>
-                    <span className="font-medium">
-                      {playingReference === assignment.id ? 'Playing melody...' : '🎵 Melody reference'}
-                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[13px] font-semibold text-gray-900 truncate">{title || 'Assignment'}</span>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${isSong ? 'text-purple-600 bg-purple-50' : 'text-blue-600 bg-blue-50'}`}>
+                          {isSong ? 'Song' : 'Exercise'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px] text-gray-400">
+                        {a.due_date && <span>Due {formatDate(a.due_date)}</span>}
+                        {sub && <span className={`font-medium ${sub.status === 'approved' ? 'text-green-600' : sub.status === 'reviewed' ? 'text-blue-600' : 'text-orange-500'}`}>
+                          {sub.status === 'approved' ? '✅ Approved' : sub.status === 'reviewed' ? '💬 Reviewed' : '⏳ Submitted'}
+                        </span>}
+                      </div>
+                    </div>
+                    {isExpanded ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
                   </button>
-                )}
 
-                <h3 className="font-semibold text-gray-900 mb-2">
-                  {assignment.assignment_type === 'song'
-                    ? assignment.song?.title
-                    : assignment.exercise?.title}
-                </h3>
+                  {/* Expanded content */}
+                  {isExpanded && (
+                    <div className="px-4 pb-4 space-y-3 border-t border-gray-100 pt-3">
+                      {/* Director's notes */}
+                      {a.notes && (
+                        <div className="bg-yellow-50 rounded-xl p-3">
+                          <span className="text-[10px] font-bold text-yellow-700">📝 Director's notes:</span>
+                          <p className="text-[12px] text-yellow-800 mt-0.5">{a.notes}</p>
+                        </div>
+                      )}
 
-                {assignment.notes && (
-                  <p className="text-sm text-gray-600 mb-3">{assignment.notes}</p>
-                )}
+                      {/* Reference audio */}
+                      {a.reference_audio_url && (
+                        <button onClick={() => playAudio(a.reference_audio_url!, `ref-${a.id}`)}
+                          className={`w-full flex items-center gap-2.5 p-2.5 rounded-xl transition-all ${
+                            playingId === `ref-${a.id}` ? 'bg-indigo-100 border border-indigo-300' : 'bg-indigo-50 border border-indigo-200'
+                          }`}>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                            playingId === `ref-${a.id}` ? 'bg-indigo-600 animate-pulse' : 'bg-indigo-500'
+                          } text-white`}>
+                            {playingId === `ref-${a.id}` ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                          </div>
+                          <span className="text-[12px] font-medium text-indigo-700">
+                            {playingId === `ref-${a.id}` ? '🎵 Playing melody reference...' : '🎵 Listen to melody reference'}
+                          </span>
+                        </button>
+                      )}
 
-                <div className="flex space-x-2">
-                  {assignment.assignment_type === 'song' ? (
-                    <>
-                      <button
-                        onClick={async () => {
-                          const { data: song } = await supabase
-                            .from('songs')
-                            .select('sheet_music_url')
-                            .eq('id', assignment.song?.id)
-                            .single();
-                          if (song?.sheet_music_url) {
-                            navigate('/pdf-viewer', {
-                              state: {
-                                url: song.sheet_music_url,
-                                title: assignment.song?.title,
-                                songId: assignment.song?.id,
-                                assignmentId: assignment.id
-                              }
-                            });
-                          } else {
-                            navigate(`/member/repertoire/${assignment.song?.id}`);
-                          }
-                        }}
-                        className="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm"
-                      >
-                        View & Record
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleMarkComplete(assignment.id);
-                        }}
-                        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm"
-                      >
-                        <CheckCircle className="w-4 h-4" />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => navigate(`/member/vocal-coach/practice/${assignment.exercise?.id}`)}
-                        className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm"
-                      >
-                        Practice
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleMarkComplete(assignment.id);
-                        }}
-                        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm"
-                      >
-                        <CheckCircle className="w-4 h-4" />
-                      </button>
-                    </>
+                      {/* Exercise instructions */}
+                      {!isSong && a.exercise?.instructions && (
+                        <div className="bg-gray-50 rounded-xl p-3">
+                          <span className="text-[10px] font-bold text-gray-500">📋 How to do this exercise:</span>
+                          <div className="mt-1.5 text-[12px] text-gray-700 whitespace-pre-line leading-relaxed">
+                            {a.exercise.instructions}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Feedback from director */}
+                      {sub?.feedback_audio_url && (
+                        <button onClick={() => playAudio(sub.feedback_audio_url!, `fb-${sub.id}`)}
+                          className={`w-full flex items-center gap-2.5 p-2.5 rounded-xl ${
+                            playingId === `fb-${sub.id}` ? 'bg-green-100 border border-green-300' : 'bg-green-50 border border-green-200'
+                          }`}>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                            playingId === `fb-${sub.id}` ? 'bg-green-600 animate-pulse' : 'bg-green-500'
+                          } text-white`}>
+                            {playingId === `fb-${sub.id}` ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                          </div>
+                          <span className="text-[12px] font-medium text-green-700">
+                            {playingId === `fb-${sub.id}` ? '🎧 Playing feedback...' : '🎧 Director feedback'}
+                          </span>
+                        </button>
+                      )}
+
+                      {/* AI Feedback */}
+                      {sub?.ai_feedback && (() => {
+                        try {
+                          const saved = JSON.parse(sub.ai_feedback);
+                          const a = saved.analysis;
+                          return (
+                            <div className="bg-purple-50 rounded-xl p-3 space-y-2">
+                              <div className="flex items-center gap-2">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white ${
+                                  a.overall_score >= 80 ? 'bg-green-500' : a.overall_score >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                                }`}>{a.overall_score}</div>
+                                <div className="flex-1">
+                                  <span className="text-[10px] font-bold text-purple-600">🤖 AI Evaluation</span>
+                                  <p className="text-[11px] text-gray-700 mt-0.5">{a.summary}</p>
+                                </div>
+                              </div>
+                              {a.suggestions?.length > 0 && (
+                                <div className="bg-white/60 rounded-lg p-2">
+                                  <span className="text-[10px] font-bold text-blue-600">💡 Tips:</span>
+                                  {a.suggestions.map((s: string, i: number) => (
+                                    <p key={i} className="text-[11px] text-gray-600 mt-0.5">• {s}</p>
+                                  ))}
+                                </div>
+                              )}
+                              <p className="text-[10px] text-gray-500 italic">{a.encouragement}</p>
+                            </div>
+                          );
+                        } catch { return null; }
+                      })()}
+
+                      {/* Actions */}
+                      <div className="flex gap-2">
+                        {isSong ? (
+                          <button onClick={async () => {
+                            if (a.song?.sheet_music_url) {
+                              navigate('/pdf-viewer', { state: { url: a.song.sheet_music_url, title: a.song.title, songId: a.song.id, assignmentId: a.id } });
+                            } else {
+                              setSelectedSong({ id: a.song!.id, title: a.song!.title, assignmentId: a.id });
+                              setShowRecorder(true);
+                            }
+                          }}
+                            className="flex-1 py-2.5 bg-purple-500 text-white rounded-xl text-[13px] font-semibold text-center hover:bg-purple-600 transition-all active:scale-[0.98]">
+                            {a.song?.sheet_music_url ? '📄 View & Record' : '🎤 Record'}
+                          </button>
+                        ) : (
+                          <div className="flex-1 py-2.5 bg-blue-50 text-blue-600 rounded-xl text-[13px] font-semibold text-center">
+                            Follow the steps above ☝️
+                          </div>
+                        )}
+                        <button onClick={() => handleMarkComplete(a.id)}
+                          className="px-4 py-2.5 bg-green-500 text-white rounded-xl text-[13px] font-semibold hover:bg-green-600 transition-all active:scale-[0.98]">
+                          ✅ Done
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* AI Personalized Exercises */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-gray-900">
-              AI Personalized Exercises ({exercises.length})
-            </h2>
-            {exercises.length > 0 && (
-              <button
-                onClick={handleGenerateExercises}
-                disabled={generating}
-                className="text-sm text-indigo-600 hover:text-indigo-800 flex items-center"
-              >
-                <Plus className="w-4 h-4 mr-1" />
-                Generate More
-              </button>
-            )}
-          </div>
+      {/* ==================== EXERCISE LIBRARY ==================== */}
+      <div>
+        <h2 className="text-[13px] font-bold text-gray-900 mb-2 flex items-center gap-1.5">
+          <Brain className="w-4 h-4 text-purple-500" />
+          Exercise Library ({exercises.length})
+        </h2>
+
+        {/* Filter tabs */}
+        <div className="flex bg-gray-100/80 rounded-xl p-0.5 mb-3">
+          {([['all', 'All'], ['breathing', '💨 Breathing'], ['tone', '🎵 Tone'], ['rhythm', '🥁 Rhythm'], ['range', '🎤 Range']] as const).map(([key, label]) => (
+            <button key={key} onClick={() => setExerciseTab(key)}
+              className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
+                exerciseTab === key ? 'bg-white shadow-sm text-gray-900 font-semibold' : 'text-gray-500'
+              }`}>
+              {label}
+            </button>
+          ))}
         </div>
 
-        {exercises.length === 0 ? (
-          <div className="p-12 text-center">
-            <Brain className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600">No exercises yet. Practice some songs to get personalized recommendations!</p>
-            <button
-              onClick={handleGenerateExercises}
-              disabled={generating}
-              className="mt-4 bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {generating ? 'Generating...' : 'Generate Exercises'}
-            </button>
-          </div>
-        ) : (
-          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {exercises.map((exercise) => (
-              <div
-                key={exercise.id}
-                onClick={() => navigate(`/member/vocal-coach/practice/${exercise.id}`)}
-                className="border border-gray-200 rounded-lg p-4 hover:border-indigo-500 hover:shadow-md cursor-pointer transition-all"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <h3 className="font-semibold text-gray-900 flex-1">{exercise.title}</h3>
-                </div>
+        {/* Exercise list */}
+        <div className="space-y-2">
+          {filteredExercises.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-6 text-center">
+              <Dumbbell className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+              <p className="text-[13px] text-gray-400">No exercises in this category</p>
+            </div>
+          ) : filteredExercises.map(ex => {
+            const isExpanded = expandedExercise === ex.id;
+            return (
+              <div key={ex.id} className="bg-white rounded-2xl border border-gray-200/60 shadow-sm overflow-hidden">
+                <button onClick={() => setExpandedExercise(isExpanded ? null : ex.id)}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left">
+                  <span className="text-lg">{typeEmojis[ex.exercise_type] || '🎵'}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[13px] font-semibold text-gray-900 truncate">{ex.title}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${typeColors[ex.exercise_type] || 'text-gray-600 bg-gray-50'}`}>
+                        {ex.exercise_type}
+                      </span>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${diffColors[ex.difficulty] || 'text-gray-600 bg-gray-50'}`}>
+                        {ex.difficulty}
+                      </span>
+                    </div>
+                  </div>
+                  {isExpanded ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
+                </button>
 
-                <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-                  {exercise.description}
-                </p>
-
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs bg-gray-100 px-2 py-1 rounded">
-                    {exercise.exercise_type}
-                  </span>
-                  <span className={`text-xs px-2 py-1 rounded ${getDifficultyColor(exercise.difficulty)}`}>
-                    {exercise.difficulty}
-                  </span>
-                </div>
+                {isExpanded && (
+                  <div className="px-4 pb-4 border-t border-gray-100 pt-3 space-y-2">
+                    <p className="text-[12px] text-gray-600">{ex.description}</p>
+                    {ex.instructions && (
+                      <div className="bg-gray-50 rounded-xl p-3">
+                        <span className="text-[10px] font-bold text-gray-500">📋 Instructions:</span>
+                        <div className="mt-1.5 text-[12px] text-gray-700 whitespace-pre-line leading-relaxed">
+                          {ex.instructions}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
-        )}
+            );
+          })}
+        </div>
       </div>
 
-      {/* Completed Assignments */}
-      {completedAssignments.length > 0 && (
-        <details className="bg-white rounded-lg shadow">
-          <summary className="p-6 cursor-pointer hover:bg-gray-50">
-            <span className="text-lg font-semibold text-gray-900">
-              Completed Assignments ({completedAssignments.length})
-            </span>
+      {/* ==================== COMPLETED ==================== */}
+      {completed.length > 0 && (
+        <details className="bg-white rounded-2xl border border-gray-200/60 shadow-sm">
+          <summary className="px-4 py-3 cursor-pointer text-[13px] font-semibold text-gray-900 flex items-center gap-1.5">
+            <CheckCircle className="w-4 h-4 text-green-500" />
+            Completed ({completed.length})
           </summary>
-          <div className="p-6 pt-0 grid grid-cols-1 md:grid-cols-2 gap-4">
-            {completedAssignments.map((assignment) => (
-              <div
-                key={assignment.id}
-                className="border border-gray-200 rounded-lg p-4 bg-gray-50"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-green-600 flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-1" />
-                    Completed
-                  </span>
+          <div className="px-4 pb-3 space-y-2 border-t border-gray-100 pt-3">
+            {completed.map(a => {
+              const sub = submissions.find(s => s.assignment_id === a.id);
+              return (
+                <div key={a.id} className="space-y-2 py-2">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${a.assignment_type === 'song' ? 'bg-purple-50' : 'bg-blue-50'}`}>
+                      {a.assignment_type === 'song' ? <Music className="w-3.5 h-3.5 text-purple-400" /> : <Dumbbell className="w-3.5 h-3.5 text-blue-400" />}
+                    </div>
+                    <span className="text-[12px] text-gray-500 flex-1">
+                      {a.assignment_type === 'song' ? a.song?.title : a.exercise?.title}
+                    </span>
+                    <CheckCircle className="w-4 h-4 text-green-400" />
+                  </div>
+                  {sub?.ai_feedback && (() => {
+                    try {
+                      const saved = JSON.parse(sub.ai_feedback);
+                      const r = saved.analysis;
+                      return (
+                        <div className="bg-purple-50 rounded-xl p-3 space-y-2 ml-11">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${
+                              r.overall_score >= 80 ? 'bg-green-500' : r.overall_score >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                            }`}>{r.overall_score}</div>
+                            <div className="flex-1">
+                              <span className="text-[10px] font-bold text-purple-600">🤖 AI Evaluation</span>
+                              <p className="text-[11px] text-gray-700 mt-0.5">{r.summary}</p>
+                            </div>
+                          </div>
+                          {r.suggestions?.length > 0 && (
+                            <div className="bg-white/60 rounded-lg p-2">
+                              <span className="text-[10px] font-bold text-blue-600">💡 Tips:</span>
+                              {r.suggestions.map((s: string, i: number) => (
+                                <p key={i} className="text-[11px] text-gray-600 mt-0.5">• {s}</p>
+                              ))}
+                            </div>
+                          )}
+                          <p className="text-[10px] text-gray-500 italic">{r.encouragement}</p>
+                        </div>
+                      );
+                    } catch { return null; }
+                  })()}
                 </div>
-                <h3 className="font-semibold text-gray-700">
-                  {assignment.assignment_type === 'song'
-                    ? assignment.song?.title
-                    : assignment.exercise?.title}
-                </h3>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </details>
       )}
+
+      {/* ==================== NO CONTENT ==================== */}
+      {pending.length === 0 && exercises.length === 0 && (
+        <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-8 text-center">
+          <Brain className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+          <p className="text-[13px] text-gray-500">No assignments or exercises yet</p>
+          <p className="text-[11px] text-gray-400 mt-1">Your director will assign songs and exercises for you to practice</p>
+        </div>
+      )}
+
       {/* Song Recorder Modal */}
-      {showRecorder && selectedSongForRecording && (
+      {showRecorder && selectedSong && (
         <SongRecorder
-          songId={selectedSongForRecording.id}
-          songTitle={selectedSongForRecording.title}
-          assignmentId={selectedSongForRecording.assignmentId}
-          onClose={() => {
-            setShowRecorder(false);
-            setSelectedSongForRecording(null);
-            loadData();
-          }}
+          songId={selectedSong.id}
+          songTitle={selectedSong.title}
+          assignmentId={selectedSong.assignmentId}
+          onClose={() => { setShowRecorder(false); setSelectedSong(null); loadData(); }}
         />
       )}
     </div>

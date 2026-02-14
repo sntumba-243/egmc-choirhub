@@ -240,6 +240,8 @@ export const AdminDashboard = () => {
   };
 
   const sendEventReminders = async () => {
+    if (!confirm('Send RSVP reminders to members who haven\'t responded?')) return;
+    
     try {
       const sevenDaysFromNow = new Date();
       sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
@@ -255,31 +257,49 @@ export const AdminDashboard = () => {
         return;
       }
       
+      // Only get non-admin active members
       const { data: members } = await supabase
         .from("members")
-        .select("id, first_name, last_name, email")
-        .neq("role", "inactive");
+        .select("id, first_name, last_name, email, role")
+        .neq("role", "inactive")
+        .neq("role", "admin");
       
       if (!members) return;
+      
+      // Check for already-sent reminders today to prevent duplicates
+      const today = new Date().toISOString().split("T")[0];
+      const { data: existingReminders } = await supabase
+        .from("messages")
+        .select("send_to, subject")
+        .like("subject", "RSVP Reminder:%")
+        .gte("created_at", today + "T00:00:00");
+      
+      const alreadySent = new Set(
+        existingReminders?.map(r => r.send_to + "|" + r.subject) || []
+      );
       
       let remindersSent = 0;
       
       for (const event of events) {
         const { data: rsvps } = await supabase
-          .from("event_rsvps")
+          .from("rsvps")
           .select("member_id")
           .eq("event_id", event.id);
         
         const rsvpMemberIds = new Set(rsvps?.map(r => r.member_id) || []);
+        const reminderSubject = "RSVP Reminder: " + event.title;
         
         for (const member of members) {
-          if (!rsvpMemberIds.has(member.id)) {
+          const dupeKey = member.id + "|" + reminderSubject;
+          if (!rsvpMemberIds.has(member.id) && !alreadySent.has(dupeKey)) {
             const memberName = `${member.first_name} ${member.last_name}`;
             await supabase.from("messages").insert({
               send_to: member.id,
-              subject: "RSVP Reminder: " + event.title,
+              subject: reminderSubject,
               body: `Hi ${member.first_name}, please RSVP for ${event.title} on ${new Date(event.date + 'T00:00:00').toLocaleDateString()}. Your response helps us plan better!`,
               is_important: false,
+              is_read: false,
+              created_at: new Date().toISOString(),
               sent_date: new Date().toISOString(),
               recipients: memberName
             });
@@ -288,9 +308,12 @@ export const AdminDashboard = () => {
         }
       }
       
-      toast.success(`Sent ${remindersSent} reminders for ${events.length} event(s)`);
+      if (remindersSent === 0) {
+        toast.success("All members have already been reminded or RSVP'd!");
+      } else {
+        toast.success(`Sent ${remindersSent} reminders for ${events.length} event(s)`);
+      }
       
-      // Refresh alerts after sending reminders
       fetchAlerts();
     } catch (error) {
       console.error("Error sending reminders:", error);
