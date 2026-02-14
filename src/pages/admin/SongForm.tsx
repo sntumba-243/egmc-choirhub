@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Music } from 'lucide-react';
+import { ArrowLeft, Music, Eye, FileText } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 
@@ -175,6 +175,34 @@ export const SongForm: React.FC = () => {
           <p className="text-sm text-gray-500 mt-1">
             Link to Google Drive PDF or other sheet music file
           </p>
+
+          {/* PDF Preview */}
+          {sheetMusicUrl && (
+            <div className="mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  PDF Preview
+                </span>
+                <a
+                  href={sheetMusicUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                >
+                  <Eye className="w-4 h-4" />
+                  Open in new tab
+                </a>
+              </div>
+              <iframe
+                src={sheetMusicUrl.includes("drive.google.com") 
+                  ? sheetMusicUrl.replace("/view", "/preview").replace("?usp=sharing", "") 
+                  : sheetMusicUrl}
+                className="w-full h-64 rounded-lg border border-gray-300"
+                title="Sheet Music Preview"
+              />
+            </div>
+          )}
         </div>
 
         {/* Learning Status */}
