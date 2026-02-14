@@ -166,7 +166,7 @@ export const MemberEvents = () => {
         </div>
         <div className="flex items-center">
           {/* View Toggle - iOS style */}
-          <div className="flex bg-gray-100 rounded-lg p-1">
+          <div className="hidden sm:flex bg-gray-100 rounded-lg p-1">
             <button
               onClick={() => setViewMode('cards')}
               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md transition-colors ${
