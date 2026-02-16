@@ -3,20 +3,18 @@
 > vite build
 
 vite v7.2.4 building client environment for production...
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
 transforming...
-✓ 1678 modules transformed.
+✓ 1684 modules transformed.
 rendering chunks...
-[plugin vite:reporter] 
-(!) /Users/sethntumba/egmc-choirhub/src/services/smartCoach.ts is dynamically imported by /Users/sethntumba/egmc-choirhub/src/pages/member/VocalCoach.tsx but also statically imported by /Users/sethntumba/egmc-choirhub/src/components/VocalCoach/PracticeSession.tsx, /Users/sethntumba/egmc-choirhub/src/components/VocalCoach/VocalCoach.tsx, dynamic import will not move module into another chunk.
-
 computing gzip size...
-dist/index.html                        1.50 kB │ gzip:   0.66 kB
-dist/assets/index-MANIJuX7.css        58.30 kB │ gzip:   9.42 kB
-dist/assets/Submissions-Bv55w5RS.js    7.85 kB │ gzip:   2.49 kB
-dist/assets/index-BStaVdTm.js        764.51 kB │ gzip: 204.71 kB
+dist/index.html                        1.50 kB │ gzip:   0.67 kB
+dist/assets/index-CO_Y74q9.css        64.33 kB │ gzip:  10.48 kB
+dist/assets/Submissions-DEA4s9BD.js    7.85 kB │ gzip:   2.49 kB
+dist/assets/index-B_Vt4Rg6.js        821.57 kB │ gzip: 221.57 kB
 
 (!) Some chunks are larger than 500 kB after minification. Consider:
 - Using dynamic import() to code-split the application
 - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 5.58s
+✓ built in 7.04s
