@@ -3,10 +3,11 @@ import { useAuth } from '../contexts/AuthContext';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  requiredRole?: 'member' | 'admin' | 'super_admin';
   requireAdmin?: boolean;
 }
 
-export const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRouteProps) => {
+export const ProtectedRoute = ({ children, requiredRole, requireAdmin = false }: ProtectedRouteProps) => {
   const { user, loading } = useAuth();
   const location = useLocation();
 
@@ -22,15 +23,25 @@ export const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRout
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // If user needs to change password, redirect to change-password page
-  // BUT allow access to /change-password itself
   if (user.force_password_change && location.pathname !== '/change-password') {
     return <Navigate to="/change-password" replace />;
   }
 
-  // Check admin requirement (admin and guest can access member pages, but member cannot access admin pages)
-  if (requireAdmin && user.role !== 'admin') {
-    return <Navigate to="/member" replace />;
+  if (requiredRole === 'super_admin') {
+    if (!user.is_super_admin) {
+      if (user.role === 'admin') return <Navigate to="/admin" replace />;
+      return <Navigate to="/member" replace />;
+    }
+  }
+
+  if (requiredRole === 'admin' || requireAdmin) {
+    if (user.role !== 'admin' && !user.is_super_admin) {
+      return <Navigate to="/member" replace />;
+    }
+  }
+
+  if (requiredRole === 'member') {
+    // All roles can access member pages
   }
 
   return <>{children}</>;

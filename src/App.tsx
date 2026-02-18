@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ChurchProvider } from './contexts/ChurchContext';
 import { Toaster } from 'react-hot-toast';
 import toast from 'react-hot-toast';
 
@@ -70,6 +71,7 @@ const Submissions = lazy(() => import('./pages/admin/Submissions'));
 function App() {
   return (
     <AuthProvider>
+      <ChurchProvider>
       <AppRoutes />
       <Toaster 
         position="top-center"
@@ -97,6 +99,7 @@ function App() {
       <IOSInstallPrompt />
       <PWAUpdateNotification />
       <EnhancedOfflineIndicator />
+    </ChurchProvider>
     </AuthProvider>
   );
 }
@@ -122,8 +125,8 @@ function AppRoutes() {
   return (
     <Routes>
       {/* Public Routes */}
-      <Route path="/login" element={!user ? <Login /> : <Navigate to={user.role === 'admin' ? '/admin' : '/member'} />} />
-      <Route path="/register" element={!user ? <Register /> : <Navigate to={user.role === 'admin' ? '/admin' : '/member'} />} />
+      <Route path="/login" element={!user ? <Login /> : <Navigate to={user.is_super_admin ? '/super-admin' : user.role === 'admin' ? '/admin' : '/member'} />} />
+      <Route path="/register" element={!user ? <Register /> : <Navigate to={user.is_super_admin ? '/super-admin' : user.role === 'admin' ? '/admin' : '/member'} />} />
       <Route path="/change-password" element={<ChangePassword />} />
 
       {/* PDF Viewer */}
@@ -180,7 +183,7 @@ function AppRoutes() {
       {/* Root redirect */}
       <Route path="/" element={
         user ? (
-          <Navigate to={user.role === 'admin' ? '/admin' : '/member'} />
+          <Navigate to={user.is_super_admin ? '/super-admin' : user.role === 'admin' ? '/admin' : '/member'} />
         ) : (
           <Navigate to="/login" />
         )

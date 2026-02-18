@@ -18,26 +18,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<NeonUser | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  
+
   const useNeon = import.meta.env.VITE_USE_NEON === 'true' || autoFailover.isUsingNeon();
 
   useEffect(() => {
     checkUser();
-    
-    // Listen for failover events
+
     const handleFailover = () => {
       console.log('Failover detected, rechecking user...');
       checkUser();
     };
-    
+
     window.addEventListener('database-failover', handleFailover);
     return () => window.removeEventListener('database-failover', handleFailover);
   }, []);
 
   const checkUser = async () => {
     try {
-      console.log('Checking user... Using Neon:', useNeon);
-      
       if (useNeon) {
         const { user } = neonAuth.getSession();
         setUser(user);
@@ -50,14 +47,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             .select('*')
             .eq('id', session.user.id)
             .single();
-          
+
           if (memberData) {
+            const { data: userData } = await supabase
+              .from('users')
+              .select('is_super_admin')
+              .eq('id', session.user.id)
+              .single();
+
             setUser({
               id: memberData.id,
               email: memberData.email,
-              name: memberData.name,
+              name: memberData.first_name ? `${memberData.first_name} ${memberData.last_name || ''}`.trim() : memberData.email,
               role: memberData.role,
-              voice_part: memberData.voice_part
+              voice_part: memberData.voice_part,
+              church_id: memberData.church_id,
+              is_super_admin: userData?.is_super_admin || false,
+              force_password_change: memberData.must_change_password || false,
             });
           }
         }
@@ -69,17 +75,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const getRedirectPath = (user: NeonUser): string => {
+    if (user.is_super_admin) return '/super-admin';
+    if (user.role === 'admin') return '/admin';
+    return '/member';
+  };
+
   const login = async (email: string, password: string) => {
     try {
       if (useNeon) {
         const { user, error } = await neonAuth.login(email, password);
-        
         if (error) throw new Error(error);
-        
         if (user) {
           setUser(user);
           toast.success('Login successful!');
-          navigate(user.role === 'admin' ? '/admin' : '/member');
+          navigate(getRedirectPath(user));
         }
       } else {
         const supabase = getDbClient();
@@ -98,16 +108,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             .single();
 
           if (memberData) {
-            setUser({
+            const { data: userData } = await supabase
+              .from('users')
+              .select('is_super_admin')
+              .eq('id', data.user.id)
+              .single();
+
+            const loggedInUser: NeonUser = {
               id: memberData.id,
               email: memberData.email,
-              name: memberData.name,
+              name: memberData.first_name ? `${memberData.first_name} ${memberData.last_name || ''}`.trim() : memberData.email,
               role: memberData.role,
-              voice_part: memberData.voice_part
-            });
-            
+              voice_part: memberData.voice_part,
+              church_id: memberData.church_id,
+              is_super_admin: userData?.is_super_admin || false,
+              force_password_change: memberData.must_change_password || false,
+            };
+
+            setUser(loggedInUser);
             toast.success('Login successful!');
-            navigate(memberData.role === 'admin' ? '/admin' : '/member');
+            navigate(getRedirectPath(loggedInUser));
           }
         }
       }
@@ -126,7 +146,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const supabase = getDbClient();
         await supabase.auth.signOut();
       }
-      
+
       setUser(null);
       toast.success('Logged out successfully');
       navigate('/login');
