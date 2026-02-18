@@ -147,3 +147,4 @@ self.addEventListener('message', (event) => {
     event.source?.postMessage({ type: 'SW_VERSION', version: SW_VERSION });
   }
 });
+
