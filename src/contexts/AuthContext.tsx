@@ -53,7 +53,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               .from('users')
               .select('is_super_admin')
               .eq('id', session.user.id)
-              .single();
+              .maybeSingle();
 
             setUser({
               id: memberData.id,
@@ -63,7 +63,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               voice_part: memberData.voice_part,
               church_id: memberData.church_id,
               is_super_admin: userData?.is_super_admin || false,
-              force_password_change: memberData.must_change_password || false,
             });
           }
         }
@@ -112,7 +111,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               .from('users')
               .select('is_super_admin')
               .eq('id', data.user.id)
-              .single();
+              .maybeSingle();
 
             const loggedInUser: NeonUser = {
               id: memberData.id,
@@ -122,7 +121,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               voice_part: memberData.voice_part,
               church_id: memberData.church_id,
               is_super_admin: userData?.is_super_admin || false,
-              force_password_change: memberData.must_change_password || false,
             };
 
             setUser(loggedInUser);
