@@ -133,7 +133,7 @@ export const MemberProfile: React.FC = () => {
     : { bg: 'bg-green-50 text-green-700 ring-green-200', label: 'Member' };
 
   return (
-    <div className="space-y-4 max-w-lg mx-auto">
+    <div className="space-y-4 max-w-2xl mx-auto">
       {/* Profile Header */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <div className="flex items-center gap-4">
