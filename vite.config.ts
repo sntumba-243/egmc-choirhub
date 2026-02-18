@@ -1,12 +1,22 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import { writeFileSync } from 'fs';
 
-// https://vitejs.dev/config/
+// Auto-generate version.json with timestamp on each build
+const versionPlugin = {
+  name: 'version-json',
+  buildStart() {
+    const version = Date.now().toString();
+    writeFileSync('public/version.json', JSON.stringify({ version, timestamp: version }));
+    console.log(`📦 Generated version.json: ${version}`);
+  }
+};
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), versionPlugin],
   server: {
-    host: '0.0.0.0', // Listen on all network interfaces
+    host: '0.0.0.0',
     port: 5173,
     strictPort: true,
   },

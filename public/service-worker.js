@@ -1,92 +1,71 @@
 // EGMC Choir App - Service Worker for Offline Support
-// Version: 1.0.0
+// IMPORTANT: Bump this version string on every deploy
+const SW_VERSION = '2.0.0';
+const CACHE_NAME = `egmc-choir-${SW_VERSION}`;
+const SUPABASE_CACHE = `egmc-supabase-${SW_VERSION}`;
+const PDF_CACHE = `egmc-pdfs-${SW_VERSION}`;
 
-const CACHE_NAME = 'egmc-choir-v1';
-const SUPABASE_CACHE = 'egmc-supabase-v1';
-const PDF_CACHE = 'egmc-pdfs-v1';
-
-// Assets to cache immediately on install
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
 ];
 
-// Install event - cache static assets
+// Install - cache static assets and skip waiting
 self.addEventListener('install', (event) => {
-  console.log('[Service Worker] Installing...');
+  console.log(`[SW ${SW_VERSION}] Installing...`);
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[Service Worker] Caching static assets');
-      return cache.addAll(STATIC_ASSETS.map(url => new Request(url, { cache: 'reload' })))
-        .catch(err => {
-          console.warn('[Service Worker] Failed to cache some assets:', err);
-          // Don't fail installation if some assets can't be cached
-        });
+      return cache.addAll(
+        STATIC_ASSETS.map(url => new Request(url, { cache: 'reload' }))
+      ).catch(err => {
+        console.warn('[SW] Failed to cache some assets:', err);
+      });
     })
   );
-  self.skipWaiting(); // Activate immediately
+  self.skipWaiting();
 });
 
-// Activate event - clean up old caches
+// Activate - delete ALL old caches and claim clients
 self.addEventListener('activate', (event) => {
-  console.log('[Service Worker] Activating...');
+  console.log(`[SW ${SW_VERSION}] Activating...`);
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames
-          .filter((name) => {
-            return name !== CACHE_NAME && 
-                   name !== SUPABASE_CACHE && 
-                   name !== PDF_CACHE;
-          })
+          .filter((name) => name !== CACHE_NAME && name !== SUPABASE_CACHE && name !== PDF_CACHE)
           .map((name) => {
-            console.log('[Service Worker] Deleting old cache:', name);
+            console.log('[SW] Deleting old cache:', name);
             return caches.delete(name);
           })
       );
+    }).then(() => {
+      return self.clients.claim();
     })
   );
-  self.clients.claim(); // Take control immediately
 });
 
-// Fetch event - implement caching strategies
+// Fetch - NETWORK FIRST for navigation and JS/CSS, cache-first for media
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Strategy 1: Supabase API calls (Network First, fallback to Cache)
+  // Supabase API: Network first
   if (url.hostname.includes('supabase')) {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          // Clone the response before caching
-          const responseClone = response.clone();
-          
-          // Cache successful GET requests
           if (request.method === 'GET' && response.ok) {
-            caches.open(SUPABASE_CACHE).then((cache) => {
-              cache.put(request, responseClone);
-            });
+            const clone = response.clone();
+            caches.open(SUPABASE_CACHE).then(cache => cache.put(request, clone));
           }
-          
           return response;
         })
         .catch(() => {
-          // If network fails, try cache
-          return caches.match(request).then((cachedResponse) => {
-            if (cachedResponse) {
-              console.log('[Service Worker] Serving Supabase data from cache');
-              return cachedResponse;
-            }
-            // Return a basic error response
-            return new Response(
+          return caches.match(request).then(cached => {
+            return cached || new Response(
               JSON.stringify({ error: 'Offline - no cached data available' }),
-              {
-                status: 503,
-                statusText: 'Service Unavailable',
-                headers: { 'Content-Type': 'application/json' }
-              }
+              { status: 503, headers: { 'Content-Type': 'application/json' } }
             );
           });
         })
@@ -94,24 +73,15 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Strategy 2: PDF files (Cache First, fallback to Network)
+  // PDFs / storage: Cache first (these don't change)
   if (request.url.endsWith('.pdf') || url.pathname.includes('/storage/')) {
     event.respondWith(
-      caches.match(request).then((cachedResponse) => {
-        if (cachedResponse) {
-          console.log('[Service Worker] Serving PDF from cache:', request.url);
-          return cachedResponse;
-        }
-
-        // Not in cache, fetch from network
-        return fetch(request).then((response) => {
-          // Clone and cache if successful
+      caches.match(request).then(cached => {
+        if (cached) return cached;
+        return fetch(request).then(response => {
           if (response.ok) {
-            const responseClone = response.clone();
-            caches.open(PDF_CACHE).then((cache) => {
-              cache.put(request, responseClone);
-              console.log('[Service Worker] Cached PDF:', request.url);
-            });
+            const clone = response.clone();
+            caches.open(PDF_CACHE).then(cache => cache.put(request, clone));
           }
           return response;
         });
@@ -120,23 +90,31 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Strategy 3: Static assets (Cache First, fallback to Network)
+  // KEY FIX: Navigation requests & JS/CSS/HTML → NETWORK FIRST
+  if (request.mode === 'navigate' || 
+      request.url.match(/\.(js|css|html)(\?.*)?$/)) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  // Everything else (images, fonts): Cache first
   if (request.method === 'GET') {
     event.respondWith(
-      caches.match(request).then((cachedResponse) => {
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-
-        return fetch(request).then((response) => {
-          // Cache successful responses for static assets
-          if (response.ok && 
-              (request.url.match(/\.(js|css|png|jpg|jpeg|svg|woff2?|ttf)$/) ||
-               request.url === url.origin + '/')) {
-            const responseClone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, responseClone);
-            });
+      caches.match(request).then(cached => {
+        return cached || fetch(request).then(response => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
           }
           return response;
         });
@@ -145,50 +123,27 @@ self.addEventListener('fetch', (event) => {
   }
 });
 
-// Listen for messages from the client
+// Message handler
 self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
+  if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
-  
-  if (event.data && event.data.type === 'CLEAR_CACHE') {
+
+  if (event.data?.type === 'CLEAR_CACHE') {
     event.waitUntil(
       Promise.all([
         caches.delete(CACHE_NAME),
         caches.delete(SUPABASE_CACHE),
         caches.delete(PDF_CACHE)
       ]).then(() => {
-        console.log('[Service Worker] All caches cleared');
-        // Notify all clients
         self.clients.matchAll().then(clients => {
-          clients.forEach(client => {
-            client.postMessage({ type: 'CACHE_CLEARED' });
-          });
+          clients.forEach(client => client.postMessage({ type: 'CACHE_CLEARED' }));
         });
       })
     );
   }
 
-  if (event.data && event.data.type === 'GET_CACHE_SIZE') {
-    event.waitUntil(
-      Promise.all([
-        caches.open(CACHE_NAME).then(cache => cache.keys()),
-        caches.open(SUPABASE_CACHE).then(cache => cache.keys()),
-        caches.open(PDF_CACHE).then(cache => cache.keys())
-      ]).then(([staticKeys, supabaseKeys, pdfKeys]) => {
-        const stats = {
-          static: staticKeys.length,
-          supabase: supabaseKeys.length,
-          pdfs: pdfKeys.length,
-          total: staticKeys.length + supabaseKeys.length + pdfKeys.length
-        };
-        
-        // Send back to the requesting client
-        event.source.postMessage({
-          type: 'CACHE_SIZE_RESPONSE',
-          stats
-        });
-      })
-    );
+  if (event.data?.type === 'GET_VERSION') {
+    event.source?.postMessage({ type: 'SW_VERSION', version: SW_VERSION });
   }
 });

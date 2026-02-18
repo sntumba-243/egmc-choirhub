@@ -1,121 +1,94 @@
-// Service Worker Registration
-// Add this to your main.jsx or App.jsx
+// Current app version - BUMP THIS ON EVERY DEPLOY (match SW_VERSION in service-worker.js)
+const APP_VERSION = '2.0.0';
 
 export function registerServiceWorker() {
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker
-        .register('/service-worker.js')
-        .then((registration) => {
-          console.log('✅ Service Worker registered:', registration.scope);
+  if (!('serviceWorker' in navigator)) return;
 
-          // Check for updates every hour
-          setInterval(() => {
-            registration.update();
-          }, 60 * 60 * 1000);
+  navigator.serviceWorker
+    .register('/service-worker.js')
+    .then((registration) => {
+      console.log('✅ Service Worker registered:', registration.scope);
 
-          // Listen for updates
-          registration.addEventListener('updatefound', () => {
-            const newWorker = registration.installing;
-            
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                // New service worker available
-                console.log('🆕 New version available! Refresh to update.');
-                
-                // You can show a toast/notification here
-                if (window.showUpdateNotification) {
-                  window.showUpdateNotification();
-                }
-              }
-            });
-          });
-        })
-        .catch((error) => {
-          console.error('❌ Service Worker registration failed:', error);
-        });
+      // CHECK FOR UPDATES AGGRESSIVELY (critical for iOS)
+      setInterval(() => { registration.update(); }, 30 * 1000);
 
-      // Listen for messages from service worker
-      navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data && event.data.type === 'CACHE_CLEARED') {
-          console.log('✅ Cache cleared successfully');
-          // Optionally reload the page
-          window.location.reload();
-        }
-
-        if (event.data && event.data.type === 'CACHE_SIZE_RESPONSE') {
-          console.log('📦 Cache stats:', event.data.stats);
-          // Store or display cache stats
-          if (window.updateCacheStats) {
-            window.updateCacheStats(event.data.stats);
-          }
-        }
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') registration.update();
       });
+
+      window.addEventListener('focus', () => { registration.update(); });
+
+      registration.addEventListener('updatefound', () => {
+        const newWorker = registration.installing;
+        if (!newWorker) return;
+
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            console.log('🆕 New version available!');
+            newWorker.postMessage({ type: 'SKIP_WAITING' });
+          }
+        });
+      });
+    })
+    .catch((error) => {
+      console.error('❌ SW registration failed:', error);
     });
-  }
-}
 
-// Utility function to check if online/offline
-export function setupOnlineOfflineDetection() {
-  const updateOnlineStatus = () => {
-    const isOnline = navigator.onLine;
-    document.body.classList.toggle('offline', !isOnline);
-    
-    // Dispatch custom event
-    window.dispatchEvent(new CustomEvent('online-status-change', {
-      detail: { isOnline }
-    }));
-    
-    console.log(isOnline ? '🟢 Online' : '🔴 Offline');
-  };
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!refreshing) {
+      refreshing = true;
+      console.log('🔄 New service worker activated, reloading...');
+      window.location.reload();
+    }
+  });
 
-  window.addEventListener('online', updateOnlineStatus);
-  window.addEventListener('offline', updateOnlineStatus);
-  
-  // Set initial state
-  updateOnlineStatus();
-}
-
-// Clear all caches (useful for debugging or user-triggered refresh)
-export function clearAllCaches() {
-  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-    navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHE' });
-  }
-}
-
-// Get cache statistics
-export function getCacheStats() {
-  return new Promise((resolve) => {
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-      const messageChannel = new MessageChannel();
-      
-      messageChannel.port1.onmessage = (event) => {
-        if (event.data && event.data.type === 'CACHE_SIZE_RESPONSE') {
-          resolve(event.data.stats);
-        }
-      };
-
-      navigator.serviceWorker.controller.postMessage(
-        { type: 'GET_CACHE_SIZE' },
-        [messageChannel.port2]
-      );
-    } else {
-      resolve(null);
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data?.type === 'CACHE_CLEARED') {
+      console.log('✅ Cache cleared');
+      window.location.reload();
     }
   });
 }
 
-// Prefetch PDFs (call this when user views song list)
-export function prefetchPDF(pdfUrl) {
-  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-    // Just fetch it - service worker will cache it
-    fetch(pdfUrl)
-      .then(() => console.log('✅ Prefetched PDF:', pdfUrl))
-      .catch((err) => console.warn('⚠️ Failed to prefetch PDF:', err));
+export function startVersionPolling() {
+  async function checkVersion() {
+    try {
+      const res = await fetch('/version.json?_t=' + Date.now(), { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.version && data.version !== APP_VERSION) {
+        console.log(`🆕 Version mismatch: app=${APP_VERSION}, server=${data.version}`);
+        if ('caches' in window) {
+          const names = await caches.keys();
+          await Promise.all(names.map(n => caches.delete(n)));
+        }
+        window.location.reload();
+      }
+    } catch (e) {
+      // Offline, ignore
+    }
+  }
+
+  checkVersion();
+  setInterval(checkVersion, 2 * 60 * 1000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') checkVersion();
+  });
+}
+
+export function clearAllCaches() {
+  if (navigator.serviceWorker?.controller) {
+    navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHE' });
   }
 }
 
-// Prefetch multiple PDFs
-export function prefetchMultiplePDFs(pdfUrls) {
-  pdfUrls.forEach(url => prefetchPDF(url));
+export function setupOnlineOfflineDetection() {
+  const update = () => {
+    document.body.classList.toggle('offline', !navigator.onLine);
+    window.dispatchEvent(new CustomEvent('online-status-change', { detail: { isOnline: navigator.onLine } }));
+  };
+  window.addEventListener('online', update);
+  window.addEventListener('offline', update);
+  update();
 }
