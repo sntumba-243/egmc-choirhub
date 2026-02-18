@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Calendar, Clock, MapPin, Users, Grid, List, ArrowUpDown, Plus, Edit, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface Event {
   id: string;
@@ -21,6 +22,7 @@ type SortDirection = 'asc' | 'desc';
 
 export const AdminEvents = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
   const [rsvpCounts, setRsvpCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -38,6 +40,7 @@ export const AdminEvents = () => {
       const { data, error } = await supabase
         .from('events')
         .select('*')
+        .or(`church_id.eq.${user?.church_id},is_global.eq.true`)
         .order('date', { ascending: true });
 
       if (error) throw error;

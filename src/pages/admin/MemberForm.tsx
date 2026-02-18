@@ -3,11 +3,13 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Mail, Phone, Lock, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../contexts/AuthContext';
 import { generateMemorablePassword } from '../../lib/passwordUtils';
 import { PasswordModal } from '../../components/PasswordModal';
 
 export const MemberForm: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { id: memberId } = useParams();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');

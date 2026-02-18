@@ -48,6 +48,7 @@ import { VocalCoach } from './pages/member/VocalCoach';
 // Admin Pages
 import { AdminDashboard } from './pages/admin/Dashboard';
 import { AdminRepertoire } from './pages/admin/Repertoire';
+import { ChurchRepertoire } from './pages/admin/ChurchRepertoire';
 import { AdminFavorites } from './pages/admin/Favorites';
 import { AdminMembers } from './pages/admin/Members';
 import { AdminEvents } from './pages/admin/Events';
@@ -65,6 +66,16 @@ import { MessageForm } from './pages/admin/MessageForm';
 
 // Protected Route Component
 import { ProtectedRoute } from './components/ProtectedRoute';
+
+// Super Admin
+import SuperAdminLayout from "./layouts/SuperAdminLayout";
+import { SuperAdminDashboard } from "./pages/super-admin/Dashboard";
+import { Churches } from "./pages/super-admin/Churches";
+import { ChurchForm } from "./pages/super-admin/ChurchForm";
+import { ChurchDetail } from "./pages/super-admin/ChurchDetail";
+import { GlobalEvents } from "./pages/super-admin/GlobalEvents";
+
+// Super Admin
 
 const Submissions = lazy(() => import('./pages/admin/Submissions'));
 
@@ -132,6 +143,27 @@ function AppRoutes() {
       {/* PDF Viewer */}
       <Route path="/pdf-viewer" element={<PDFViewerPage />} />
 
+      {/* Super Admin Routes */}
+      <Route path="/super-admin" element={
+        <ProtectedRoute requiredRole="super_admin">
+          <SuperAdminLayout />
+        </ProtectedRoute>
+      }>
+        <Route index element={<SuperAdminDashboard />} />
+        <Route path="churches" element={<Churches />} />
+        <Route path="churches/new" element={<ChurchForm />} />
+        <Route path="churches/:id" element={<ChurchDetail />} />
+        <Route path="churches/:id/edit" element={<ChurchForm />} />
+        <Route path="repertoire" element={<AdminRepertoire />} />
+        <Route path="repertoire/new" element={<SongForm />} />
+        <Route path="repertoire/:id/edit" element={<SongForm />} />
+        <Route path="members" element={<AdminMembers />} />
+        <Route path="events" element={<GlobalEvents />} />
+        <Route path="events/new" element={<EventForm />} />
+        <Route path="settings" element={<AdminSettings />} />
+      </Route>
+
+
       {/* Member Routes */}
       <Route path="/member" element={
         <ProtectedRoute requiredRole="member">
@@ -162,7 +194,7 @@ function AppRoutes() {
         </ProtectedRoute>
       }>
         <Route index element={<AdminDashboard />} />
-        <Route path="repertoire" element={<AdminRepertoire />} />
+        <Route path="repertoire" element={<ChurchRepertoire />} />
         <Route path="members" element={<AdminMembers />} />
         <Route path="events" element={<AdminEvents />} />
         <Route path="attendance" element={<AttendanceStats />} />
@@ -170,8 +202,6 @@ function AppRoutes() {
         <Route path="messages" element={<AdminMessages />} />
         <Route path="settings" element={<AdminSettings />} />
         <Route path="bulk-edit" element={<BulkSongEditor />} />
-        <Route path="repertoire/new" element={<SongForm />} />
-        <Route path="repertoire/:id/edit" element={<SongForm />} />
         <Route path="members/new" element={<MemberForm />} />
         <Route path="members/:id/edit" element={<MemberForm />} />
         <Route path="events/new" element={<EventForm />} />

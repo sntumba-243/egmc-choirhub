@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Send } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const MessageForm: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [subject, setSubject] = useState('');
   const [content, setContent] = useState('');
   const [recipientType, setRecipientType] = useState('all');

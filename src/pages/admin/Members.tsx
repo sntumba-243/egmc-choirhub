@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { User, Search, Plus, Edit, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface Member {
   id: string;
@@ -20,6 +21,7 @@ interface Member {
 
 export const AdminMembers = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [members, setMembers] = useState<Member[]>([]);
 
   const isOnline = (lastActive: string | undefined) => {
@@ -57,7 +59,7 @@ export const AdminMembers = () => {
       const { data, error } = await supabase
         .from('members')
         .select('id, first_name, last_name, email, role, voice_part, member_id, phone_number, avatar_url, created_at, status, last_active')
-        .order('last_name', { ascending: true });
+        .eq('church_id', user?.church_id).order('last_name', { ascending: true });
 
       if (error) throw error;
       setMembers(data || []);

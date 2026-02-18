@@ -1,3 +1,22 @@
+#!/bin/bash
+echo "=== Deploy ChoirHub Logo - Concept 1 (Sound Bars) ==="
+
+# Copy icons to public folder
+cp icon-72x72.png public/
+cp icon-96x96.png public/
+cp icon-128x128.png public/
+cp icon-144x144.png public/
+cp icon-152x152.png public/
+cp icon-192x192.png public/
+cp icon-384x384.png public/
+cp icon-512x512.png public/
+cp favicon-32x32.png public/
+cp apple-touch-icon.png public/
+
+echo "  [1/2] Icons copied to public/"
+
+# Update manifest.json
+cat > public/manifest.json << 'MANIFEST'
 {
   "name": "ChoirHub",
   "short_name": "ChoirHub",
@@ -18,3 +37,10 @@
     { "src": "/icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ]
 }
+MANIFEST
+
+echo "  [2/2] manifest.json updated"
+
+echo ""
+echo "=== Done! ==="
+echo "Run: git add -A && git commit -m 'feat: new ChoirHub logo - Concept 1 Sound Bars' && git push"

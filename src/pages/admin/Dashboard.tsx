@@ -97,10 +97,10 @@ export const AdminDashboard = () => {
   const fetchStats = async () => {
     try {
       const [membersRes, songsRes, eventsRes, messagesRes] = await Promise.all([
-        supabase.from('members').select('id, created_at'),
+        supabase.from('members').select('id, created_at').eq('church_id', user?.church_id),
         supabase.from('songs').select('id, created_at'),
-        supabase.from('events').select('id').gte('date', new Date().toISOString().split('T')[0]),
-        supabase.from('messages').select('id, created_at').eq('send_to', 'all')
+        supabase.from('events').select('id').eq('church_id', user?.church_id).gte('date', new Date().toISOString().split('T')[0]),
+        supabase.from('messages').select('id, created_at').eq('church_id', user?.church_id)
       ]);
 
       const sevenDaysAgo = new Date();
@@ -129,7 +129,7 @@ export const AdminDashboard = () => {
     try {
       const { data } = await supabase
         .from('events')
-        .select('*')
+        .select('*').eq('church_id', user?.church_id)
         .gte('date', new Date().toISOString().split('T')[0])
         .order('date', { ascending: true })
         .limit(3);
@@ -160,7 +160,7 @@ export const AdminDashboard = () => {
       const { count: totalMembers } = await supabase
         .from("members")
         .select("*", { count: "exact", head: true })
-        .neq("role", "inactive");
+        .eq('church_id', user?.church_id).neq('role', 'inactive');
       
       if (upcomingEventsData && totalMembers) {
         let eventsNeedingRsvps = 0;
@@ -261,7 +261,7 @@ export const AdminDashboard = () => {
       const { data: members } = await supabase
         .from("members")
         .select("id, first_name, last_name, email, role")
-        .neq("role", "inactive")
+        .eq('church_id', user?.church_id).neq('role', 'inactive')
         .neq("role", "admin");
       
       if (!members) return;

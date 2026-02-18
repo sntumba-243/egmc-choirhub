@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Calendar, Clock, MapPin, Music, X, Eye, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface Song {
   id: string;
@@ -21,6 +22,7 @@ interface Member {
 
 export const EventForm: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { id: eventId } = useParams();
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
