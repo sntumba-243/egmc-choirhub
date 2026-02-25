@@ -390,7 +390,7 @@ export const AdminDashboard = () => {
           <span>📊</span> 
           <span>Quick Stats</span>
         </h2>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2">
           {statCards.map((stat) => {
             const Icon = stat.icon;
             const colorMap = {
@@ -433,7 +433,7 @@ export const AdminDashboard = () => {
           <span>🎯</span> 
           <span>Quick Actions</span>
         </h2>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2">
           {quickActions.map((action) => {
             const Icon = action.icon;
             const colorMap = {

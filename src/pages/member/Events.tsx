@@ -329,7 +329,7 @@ export const MemberEvents = () => {
       {viewMode === 'list' && (
         <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[800px]">
+            <table className="w-full min-w-[600px]">
               <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
                 <tr>
                   <th 

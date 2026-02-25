@@ -173,7 +173,7 @@ export const ChurchRepertoire = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-5 gap-2">
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
         <button
           onClick={() => setStatusFilter('all')}
           className={`bg-white rounded-lg shadow-sm border p-2 text-center transition ${

@@ -27,11 +27,36 @@ interface ChurchContextType {
   loadAllChurches: () => Promise<void>;
 }
 
+const CACHE_KEY = 'choirhub_church_theme';
+
+const applyTheme = (church: Church) => {
+  const root = document.documentElement;
+  root.style.setProperty('--church-primary', church.primary_color);
+  root.style.setProperty('--church-secondary', church.secondary_color);
+  root.style.setProperty('--church-accent', church.accent_color);
+};
+
+// Apply cached theme immediately on load (before React renders)
+try {
+  const cached = localStorage.getItem(CACHE_KEY);
+  if (cached) {
+    const church = JSON.parse(cached) as Church;
+    applyTheme(church);
+  }
+} catch {}
+
 const ChurchContext = createContext<ChurchContextType | undefined>(undefined);
 
 export const ChurchProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
-  const [church, setChurch] = useState<Church | null>(null);
+  const [church, setChurch] = useState<Church | null>(() => {
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
   const [churches, setChurches] = useState<Church[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -40,6 +65,7 @@ export const ChurchProvider = ({ children }: { children: React.ReactNode }) => {
       loadChurch(user.church_id);
     } else {
       setChurch(null);
+      localStorage.removeItem(CACHE_KEY);
       setLoading(false);
     }
   }, [user?.church_id]);
@@ -47,6 +73,7 @@ export const ChurchProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (church) {
       applyTheme(church);
+      localStorage.setItem(CACHE_KEY, JSON.stringify(church));
     }
   }, [church]);
 
@@ -88,13 +115,6 @@ export const ChurchProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error) {
       console.error('Error loading churches:', error);
     }
-  };
-
-  const applyTheme = (church: Church) => {
-    const root = document.documentElement;
-    root.style.setProperty('--church-primary', church.primary_color);
-    root.style.setProperty('--church-secondary', church.secondary_color);
-    root.style.setProperty('--church-accent', church.accent_color);
   };
 
   return (

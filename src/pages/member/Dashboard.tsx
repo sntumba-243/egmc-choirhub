@@ -125,7 +125,7 @@ export const MemberDashboard = () => {
       )}
 
       {/* Quick stats */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         <button onClick={() => navigate('/member/repertoire')}
           className="bg-white/80 backdrop-blur-xl rounded-2xl border border-gray-200/60 shadow-sm p-3 text-center active:scale-[0.98] transition-all">
           <Music className="w-5 h-5 text-purple-500 mx-auto mb-1" />

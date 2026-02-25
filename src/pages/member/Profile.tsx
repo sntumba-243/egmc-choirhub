@@ -227,7 +227,7 @@ export const MemberProfile: React.FC = () => {
       {/* Practice Stats */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Practice Stats</h2>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[
             { value: `${practiceStats.weeklyTotal}m`, label: 'Week', icon: Clock, color: 'text-blue-600 bg-blue-50' },
             { value: `${practiceStats.monthlyTotal}m`, label: 'Month', icon: Target, color: 'text-green-600 bg-green-50' },

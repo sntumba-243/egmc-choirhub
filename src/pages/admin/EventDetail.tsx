@@ -222,7 +222,7 @@ export const AdminEventDetail = () => {
       <div className="bg-white rounded-lg shadow-sm border p-4">
         <h1 className="text-xl font-bold text-gray-900 mb-3">{event.title}</h1>
 
-        <div className="grid grid-cols-3 gap-3 mb-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4 text-indigo-600" />
             <div className="min-w-0">
@@ -368,7 +368,7 @@ export const AdminEventDetail = () => {
               <h3 className="text-xs font-bold text-gray-700 mb-2">
                 {labels[status as keyof typeof labels]} ({statusRsvps.length})
               </h3>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {statusRsvps.map(rsvp => (
                   <div key={rsvp.id} className="p-2 bg-gray-100 rounded border border-gray-200 text-xs">
                     <div className="font-semibold text-gray-900 truncate">

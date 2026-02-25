@@ -167,7 +167,7 @@ export default function AttendanceStats() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-2.5">
           <div className="text-[10px] text-gray-400">Members</div>
           <div className="text-xl font-bold text-gray-900">{memberStats.length}</div>

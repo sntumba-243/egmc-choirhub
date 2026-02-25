@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { RefreshCw, FolderOpen, CheckCircle, AlertCircle } from 'lucide-react';
+import { RefreshCw, FolderOpen, CheckCircle, AlertCircle, Palette } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { googleDriveService } from '../../lib/googleDrive';
 import toast from 'react-hot-toast';
@@ -92,44 +92,48 @@ export const AdminSettings: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-      <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
-        <div className="flex items-center gap-3 mb-4">
-          <FolderOpen className="w-6 h-6 text-blue-600" />
-          <h2 className="text-xl font-bold text-gray-900">Google Drive Sync</h2>
-        </div>
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <p className="text-sm text-blue-900"><strong>Folder:</strong> /EGMC ChoirHub/</p>
-          <p className="text-xs text-blue-700 mt-1">Files will be synced automatically. Name files as: Song Title - Composer.pdf</p>
-        </div>
-        <button 
-          onClick={handleSync} 
-          disabled={syncing} 
-          className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:shadow-lg transition-all font-medium disabled:opacity-50"
-        >
-          <RefreshCw className={'w-5 h-5 ' + (syncing ? 'animate-spin' : '')} />
-          {syncing ? 'Syncing...' : 'Sync from Google Drive'}
-        </button>
-        {syncResult && (
-          <div className="mt-6 space-y-3">
-            <div className="flex items-center gap-2 text-green-700">
-              <CheckCircle className="w-5 h-5" />
-              <span className="font-medium">{syncResult.added} songs added</span>
+      {/* Google Drive Sync */}
+      <button
+        onClick={handleSync}
+        disabled={syncing}
+        className="w-full bg-white rounded-xl shadow-sm p-4 border border-gray-200 hover:shadow-md hover:border-gray-300 transition-all group disabled:opacity-60 text-left"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+              <RefreshCw className={`w-4 h-4 text-white ${syncing ? 'animate-spin' : ''}`} />
             </div>
-            {syncResult.skipped > 0 && (
-              <div className="flex items-center gap-2 text-gray-600">
-                <AlertCircle className="w-5 h-5" />
-                <span className="font-medium">{syncResult.skipped} songs skipped</span>
-              </div>
-            )}
-            {syncResult.errors > 0 && (
-              <div className="flex items-center gap-2 text-red-700">
-                <AlertCircle className="w-5 h-5" />
-                <span className="font-medium">{syncResult.errors} errors</span>
-              </div>
-            )}
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">{syncing ? 'Syncing...' : 'Google Drive Sync'}</h2>
+              <p className="text-xs text-gray-500">Sync sheet music from Drive</p>
+            </div>
+          </div>
+          <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+        {syncResult && (
+          <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-100 text-xs">
+            <span className="text-green-600 font-medium">{syncResult.added} added</span>
+            {syncResult.skipped > 0 && <span className="text-gray-500">{syncResult.skipped} skipped</span>}
+            {syncResult.errors > 0 && <span className="text-red-500">{syncResult.errors} errors</span>}
           </div>
         )}
-      </div>
+      </button>
+
+      {/* Church Theme */}
+      <a href="/admin/theme" className="block bg-white rounded-xl shadow-sm p-4 border border-gray-200 hover:shadow-md hover:border-gray-300 transition-all group">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg theme-gradient flex items-center justify-center">
+              <Palette className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">Church Theme</h2>
+              <p className="text-xs text-gray-500">Colors, logo & branding</p>
+            </div>
+          </div>
+          <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+      </a>
     </div>
   );
 };

@@ -315,7 +315,7 @@ export const AdminRepertoire = () => {
       </div>
 
       {/* Compact Stats */}
-      <div className="grid grid-cols-5 gap-2">
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
         <button
           onClick={() => setStatusFilter('all')}
           className={`bg-white rounded-lg shadow-sm border p-2 text-center transition ${
@@ -360,8 +360,8 @@ export const AdminRepertoire = () => {
 
       {/* Compact Search & Filters */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 space-y-2">
-        <div className="flex gap-2">
-          <div className="flex-1 relative">
+        <div className="flex flex-wrap gap-2">
+          <div className="flex-1 min-w-[200px] relative">
             <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
@@ -413,7 +413,7 @@ export const AdminRepertoire = () => {
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <button
             onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
@@ -424,7 +424,7 @@ export const AdminRepertoire = () => {
             Favorites {favoriteCount > 0 && `(${favoriteCount})`}
           </button>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {selectedSongs.size > 0 && (
               <button
                 onClick={() => setShowEventModal(true)}
@@ -436,9 +436,13 @@ export const AdminRepertoire = () => {
             )}
             <button
               onClick={selectedSongs.size > 0 ? () => setSelectedSongs(new Set()) : selectAllFiltered}
-              className="px-3 py-1.5 text-xs bg-indigo-100 text-indigo-700 rounded-lg font-semibold hover:bg-indigo-200"
+              className={`px-3 py-1.5 text-xs rounded-lg font-semibold ${
+                selectedSongs.size > 0
+                  ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                  : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+              }`}
             >
-              {selectedSongs.size > 0 ? 'Deselect All' : 'Select All'}
+              {selectedSongs.size > 0 ? `✕ Deselect (${selectedSongs.size})` : 'Select All'}
             </button>
             <button
               onClick={() => navigate('../bulk-edit')}

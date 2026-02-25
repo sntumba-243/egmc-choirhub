@@ -23,9 +23,6 @@ export const ProtectedRoute = ({ children, requiredRole, requireAdmin = false }:
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (user.force_password_change && location.pathname !== '/change-password') {
-    return <Navigate to="/change-password" replace />;
-  }
 
   if (requiredRole === 'super_admin') {
     if (!user.is_super_admin) {

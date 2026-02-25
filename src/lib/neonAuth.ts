@@ -6,7 +6,6 @@ export interface NeonUser {
   voice_part: string | null;
   church_id: string;
   is_super_admin: boolean;
-  force_password_change?: boolean;
 }
 
 interface Session {

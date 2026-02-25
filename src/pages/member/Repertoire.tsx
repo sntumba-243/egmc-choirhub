@@ -219,7 +219,7 @@ export const MemberRepertoire = () => {
       </div>
 
       {/* Compact Stats Cards */}
-      <div className="grid grid-cols-5 gap-1.5 mb-3">
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 mb-3">
         <button
           onClick={() => setStatusFilter('all')}
           className={`bg-white rounded-lg shadow-sm p-1.5 text-center transition-all ${

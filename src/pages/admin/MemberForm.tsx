@@ -84,7 +84,6 @@ export const MemberForm: React.FC = () => {
             id: user.id,
             email: email,
             role: userRole,
-            force_password_change: false,
             created_at: new Date().toISOString()
           });
 
