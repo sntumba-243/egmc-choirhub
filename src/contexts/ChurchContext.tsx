@@ -17,6 +17,7 @@ export interface Church {
   contact_email: string | null;
   contact_phone: string | null;
   is_active: boolean;
+  timezone: string;
 }
 
 interface ChurchContextType {

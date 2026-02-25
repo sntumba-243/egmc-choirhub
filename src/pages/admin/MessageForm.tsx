@@ -31,7 +31,8 @@ export const MessageForm: React.FC = () => {
           is_important: isImportant,
           is_read: false,
           created_at: new Date().toISOString(),
-          sent_date: new Date().toISOString()
+          sent_date: new Date().toISOString(),
+          church_id: church?.id
         }]);
 
       if (error) throw error;

@@ -35,7 +35,7 @@ export const AdminEvents = () => {
 
   useEffect(() => {
     fetchEvents();
-  }, []);
+  }, [user?.church_id]);
 
   const fetchEvents = async () => {
     try {

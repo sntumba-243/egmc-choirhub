@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useChurch } from '../../contexts/ChurchContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Mail, Send, Plus, Trash2, X, ArrowLeft } from 'lucide-react';
@@ -22,24 +23,27 @@ export const AdminMessages = () => {
   const [loading, setLoading] = useState(true);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const { user } = useAuth();
+  const { church } = useChurch();
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchMessages();
     fetchReadStatus();
-  }, []);
+  }, [church?.id]);
 
   const fetchMessages = async () => {
     try {
       const { data, error } = await supabase
         .from('messages')
         .select('*')
+        .eq('church_id', church?.id)
         .order('created_at', { ascending: false });
 
       // Also fetch messages from members to admin
       const { data: memberMessages } = await supabase
         .from('messages')
         .select('*')
+        .eq('church_id', church?.id)
         .eq('send_to', 'admin')
         .order('created_at', { ascending: false });
 

@@ -31,6 +31,7 @@ export const ChurchForm = () => {
     address: '',
     city: '',
     country: '',
+    timezone: 'UTC',
     pastor_name: '',
     contact_email: '',
     contact_phone: '',
@@ -63,6 +64,7 @@ export const ChurchForm = () => {
           address: data.address || '',
           city: data.city || '',
           country: data.country || '',
+          timezone: data.timezone || 'UTC',
           pastor_name: data.pastor_name || '',
           contact_email: data.contact_email || '',
           contact_phone: data.contact_phone || '',
@@ -319,6 +321,27 @@ export const ChurchForm = () => {
             <input type="text" value={form.country} onChange={(e) => handleChange('country', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500" />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
+            <select value={form.timezone} onChange={(e) => handleChange('timezone', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500">
+              <option value="UTC">UTC</option>
+              <option value="America/New_York">US Eastern</option>
+              <option value="America/Chicago">US Central</option>
+              <option value="America/Denver">US Mountain</option>
+              <option value="America/Los_Angeles">US Pacific</option>
+              <option value="Europe/London">UK / London</option>
+              <option value="Europe/Paris">Europe / Paris</option>
+              <option value="Europe/Berlin">Europe / Berlin</option>
+              <option value="Africa/Lagos">Africa / Lagos</option>
+              <option value="Africa/Johannesburg">Africa / Johannesburg</option>
+              <option value="Africa/Nairobi">Africa / Nairobi</option>
+              <option value="Africa/Kinshasa">Africa / Kinshasa</option>
+              <option value="Africa/Lubumbashi">Africa / Lubumbashi</option>
+              <option value="Asia/Tokyo">Asia / Tokyo</option>
+              <option value="Australia/Sydney">Australia / Sydney</option>
+            </select>
+        </div>
         </div>
 
         {/* Assign Admin */}

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { Music, Search, Eye, Star, ArrowUpAZ, ArrowDownAZ, SlidersHorizontal } from 'lucide-react';
+import { Music, Search, Eye, Star, SlidersHorizontal } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
+import { useChurch } from '../../contexts/ChurchContext';
 
 interface Song {
   id: string;
@@ -12,14 +13,17 @@ interface Song {
   language: string;
   sheet_music_url?: string;
   created_at?: string;
-  learning_status?: 'learned' | 'learning' | 'not_yet';
+}
+
+interface SongWithStatus extends Song {
+  learning_status: 'learned' | 'learning' | 'not_started';
 }
 
 export const MemberRepertoire = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { user } = useAuth();
-  const [songs, setSongs] = useState<Song[]>([]);
+  const { church } = useChurch();
+  const [songs, setSongs] = useState<SongWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -28,33 +32,56 @@ export const MemberRepertoire = () => {
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [sortBy, setSortBy] = useState<'a-z' | 'z-a' | 'recent'>('a-z');
   const [languageFilter, setLanguageFilter] = useState<'all' | 'english' | 'french' | 'portuguese' | 'lingala' | 'tshiluba' | 'kikongo' | 'swahili'>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'learned' | 'learning' | 'not_yet'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'learned' | 'learning' | 'not_started'>('all');
 
-  // Check URL params for favorites tab
   const [searchParams] = useSearchParams();
-  
+
   useEffect(() => {
     const tab = searchParams.get("tab");
     if (tab === "favorites") {
       setShowFavoritesOnly(true);
     }
   }, [searchParams]);
-  
+
   useEffect(() => {
-    fetchSongs();
-    fetchFavorites();
-  }, []);
+    if (church?.id) {
+      fetchSongs();
+      fetchFavorites();
+    }
+  }, [church?.id]);
 
   const fetchSongs = async () => {
+    if (!church?.id) return;
     try {
-      const { data, error } = await supabase
+      // Fetch all songs (global)
+      const { data: songsData, error: songsError } = await supabase
         .from('songs')
         .select('*')
         .order('title', { ascending: true });
 
-      if (error) throw error;
-      console.log('Loaded songs:', data?.length);
-      setSongs(data || []);
+      if (songsError) throw songsError;
+
+      // Fetch per-church learning status
+      const { data: statusData, error: statusError } = await supabase
+        .from('church_song_status')
+        .select('song_id, status')
+        .eq('church_id', church.id);
+
+      if (statusError) throw statusError;
+
+      // Build a map of song_id -> status
+      const statusMap = new Map<string, 'learned' | 'learning' | 'not_started'>();
+      (statusData || []).forEach((s: any) => {
+        statusMap.set(s.song_id, s.status);
+      });
+
+      // Merge songs with their per-church status
+      const merged: SongWithStatus[] = (songsData || []).map((song: Song) => ({
+        ...song,
+        learning_status: statusMap.get(song.id) || 'not_started',
+      }));
+
+      setSongs(merged);
     } catch (error) {
       console.error('Error:', error);
       toast.error('Failed to load songs');
@@ -63,13 +90,21 @@ export const MemberRepertoire = () => {
     }
   };
 
+  const getAuthUid = async (): Promise<string | null> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.user?.id || null;
+  };
+
   const fetchFavorites = async () => {
     if (!user) return;
     try {
+      const authUid = await getAuthUid();
+      if (!authUid) return;
+
       const { data, error } = await supabase
         .from('user_favorites')
         .select('song_id')
-        .eq('user_id', user.id);
+        .eq('user_id', authUid);
 
       if (error) throw error;
       const favSet = new Set(data?.map(f => f.song_id) || []);
@@ -83,6 +118,9 @@ export const MemberRepertoire = () => {
     e.stopPropagation();
     if (!user) return;
 
+    const authUid = await getAuthUid();
+    if (!authUid) return;
+
     const isFavorite = favorites.has(songId);
 
     try {
@@ -90,7 +128,7 @@ export const MemberRepertoire = () => {
         const { error } = await supabase
           .from('user_favorites')
           .delete()
-          .eq('user_id', user.id)
+          .eq('user_id', authUid)
           .eq('song_id', songId);
 
         if (error) throw error;
@@ -102,7 +140,7 @@ export const MemberRepertoire = () => {
       } else {
         const { error } = await supabase
           .from('user_favorites')
-          .insert({ user_id: user.id, song_id: songId });
+          .insert({ user_id: authUid, song_id: songId });
 
         if (error) throw error;
 
@@ -123,22 +161,19 @@ export const MemberRepertoire = () => {
       navigate("/pdf-viewer", {
         state: { url: song.sheet_music_url, title: song.title, songId: song.id }
       });
-      // Reset after navigation
       setTimeout(() => setPdfLoading(false), 1000);
     }
   };
 
-  // Calculate stats
   const stats = {
     total: songs.length,
     learned: songs.filter(s => s.learning_status === 'learned').length,
     learning: songs.filter(s => s.learning_status === 'learning').length,
-    notYet: songs.filter(s => s.learning_status === 'not_yet' || !s.learning_status).length,
+    notStarted: songs.filter(s => s.learning_status === 'not_started').length,
   };
 
   const masteryRate = stats.total > 0 ? Math.round((stats.learned / stats.total) * 100) : 0;
 
-  // Filter songs by language
   const filterByLanguage = (song: Song): boolean => {
     if (languageFilter === 'all') return true;
     if (languageFilter === 'english') return song.language === 'English';
@@ -151,9 +186,7 @@ export const MemberRepertoire = () => {
     return true;
   };
 
-  // Filter and sort songs
   const filteredSongs = songs.filter(song => {
-    // Learning status filter
     if (statusFilter !== 'all' && song.learning_status !== statusFilter) {
       return false;
     }
@@ -163,11 +196,11 @@ export const MemberRepertoire = () => {
     const composerMatch = song.composer?.toLowerCase().includes(search);
     const matchesSearch = titleMatch || composerMatch;
     const matchesLanguage = filterByLanguage(song);
-    
+
     if (showFavoritesOnly) {
       return matchesSearch && matchesLanguage && favorites.has(song.id);
     }
-    
+
     return matchesSearch && matchesLanguage;
   }).sort((a, b) => {
     switch (sortBy) {
@@ -188,7 +221,7 @@ export const MemberRepertoire = () => {
         return <span className="text-xs">✅</span>;
       case 'learning':
         return <span className="text-xs">📚</span>;
-      case 'not_yet':
+      case 'not_started':
         return <span className="text-xs">⏳</span>;
       default:
         return <span className="text-xs">⏳</span>;
@@ -248,12 +281,12 @@ export const MemberRepertoire = () => {
           <div className="text-[10px] text-gray-600">📚</div>
         </button>
         <button
-          onClick={() => setStatusFilter('not_yet')}
+          onClick={() => setStatusFilter('not_started')}
           className={`bg-gray-50 border border-gray-200 rounded-lg shadow-sm p-1.5 text-center transition-all ${
-            statusFilter === 'not_yet' ? 'ring-2 ring-gray-500' : ''
+            statusFilter === 'not_started' ? 'ring-2 ring-gray-500' : ''
           }`}
         >
-          <div className="text-base font-bold text-gray-600">{stats.notYet}</div>
+          <div className="text-base font-bold text-gray-600">{stats.notStarted}</div>
           <div className="text-[10px] text-gray-600">⏳</div>
         </button>
         <div className="bg-indigo-50 border border-indigo-200 rounded-lg shadow-sm p-1.5 text-center">
@@ -277,8 +310,8 @@ export const MemberRepertoire = () => {
         <button
           onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
           className={`p-2.5 rounded-xl transition-all ${
-            showFavoritesOnly 
-              ? 'bg-yellow-500 text-white shadow-md' 
+            showFavoritesOnly
+              ? 'bg-yellow-500 text-white shadow-md'
               : 'bg-white border border-gray-200 text-gray-600'
           }`}
         >
@@ -287,8 +320,8 @@ export const MemberRepertoire = () => {
         <button
           onClick={() => setShowFilters(!showFilters)}
           className={`p-2.5 rounded-xl transition-all ${
-            showFilters 
-              ? 'bg-purple-600 text-white' 
+            showFilters
+              ? 'bg-purple-600 text-white'
               : 'bg-white border border-gray-200 text-gray-600'
           }`}
         >
@@ -337,9 +370,9 @@ export const MemberRepertoire = () => {
       {statusFilter !== 'all' && (
         <div className="flex items-center justify-between bg-indigo-50 rounded-lg px-3 py-2 mb-3">
           <span className="text-sm font-medium text-indigo-800">
-            Filtering by: {statusFilter === 'learned' ? '✅ Learned' : statusFilter === 'learning' ? '📚 Learning' : '⏳ Not Yet'}
+            Filtering by: {statusFilter === 'learned' ? '✅ Learned' : statusFilter === 'learning' ? '📚 Learning' : '⏳ Not Started'}
           </span>
-          <button 
+          <button
             onClick={() => setStatusFilter('all')}
             className="text-xs text-indigo-600 hover:text-indigo-800"
           >
@@ -354,7 +387,7 @@ export const MemberRepertoire = () => {
           <span className="text-sm font-medium text-yellow-800">
             ⭐ Showing {favoriteCount} favorites
           </span>
-          <button 
+          <button
             onClick={() => setShowFavoritesOnly(false)}
             className="text-xs text-yellow-600 hover:text-yellow-800"
           >
@@ -363,7 +396,7 @@ export const MemberRepertoire = () => {
         </div>
       )}
 
-      {/* Ultra Clean Song List */}
+      {/* Song List — view only for members (no edit/delete/status controls) */}
       <div className="bg-white rounded-xl overflow-hidden shadow-sm">
         {filteredSongs.length === 0 ? (
           <div className="text-center py-12">
@@ -388,7 +421,7 @@ export const MemberRepertoire = () => {
                   index !== filteredSongs.length - 1 ? 'border-b border-gray-100' : ''
                 } ${song.sheet_music_url ? 'cursor-pointer' : ''}`}
               >
-                {/* Star */}
+                {/* Star — members can toggle favorites */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -401,9 +434,9 @@ export const MemberRepertoire = () => {
                   </span>
                 </button>
 
-                {/* Learning Status Badge */}
+                {/* Learning Status Badge (read-only for members) */}
                 <div className="flex-shrink-0">
-                  {getStatusBadge(song.learning_status || 'not_yet')}
+                  {getStatusBadge(song.learning_status)}
                 </div>
 
                 {/* Title */}
@@ -411,7 +444,7 @@ export const MemberRepertoire = () => {
                   {song.title}
                 </span>
 
-                {/* Language Badge - Circle */}
+                {/* Language Badge */}
                 <span className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-bold text-white flex-shrink-0 ${
                   song.language === 'English' ? 'bg-blue-500' :
                   song.language === 'French' ? 'bg-purple-500' :

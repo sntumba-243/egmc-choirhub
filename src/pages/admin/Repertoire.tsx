@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { Music, Search, Edit, Trash2, Grid3x3, List, Eye, Star, Calendar, X, CheckCircle, BookOpen, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
+import { useChurch } from '../../contexts/ChurchContext';
 
 interface Song {
   id: string;
@@ -12,7 +13,10 @@ interface Song {
   language: string;
   sheet_music_url?: string;
   created_at?: string;
-  learning_status?: 'learned' | 'learning' | 'not_yet';
+}
+
+interface SongWithStatus extends Song {
+  learning_status: 'learned' | 'learning' | 'not_started';
 }
 
 interface Event {
@@ -25,7 +29,8 @@ interface Event {
 export const AdminRepertoire = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [songs, setSongs] = useState<Song[]>([]);
+  const { church } = useChurch();
+  const [songs, setSongs] = useState<SongWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
@@ -36,23 +41,50 @@ export const AdminRepertoire = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [sortBy, setSortBy] = useState<'a-z' | 'z-a' | 'recent'>('a-z');
   const [languageFilter, setLanguageFilter] = useState<'all' | 'english' | 'french' | 'portuguese' | 'lingala' | 'tshiluba' | 'kikongo' | 'swahili'>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'learned' | 'learning' | 'not_yet'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'learned' | 'learning' | 'not_started'>('all');
+
+  const isSuperAdmin = user?.is_super_admin === true;
 
   useEffect(() => {
-    fetchSongs();
-    fetchFavorites();
-    fetchUpcomingEvents();
-  }, []);
+    if (church?.id) {
+      fetchSongs();
+      fetchFavorites();
+      fetchUpcomingEvents();
+    }
+  }, [church?.id]);
 
   const fetchSongs = async () => {
+    if (!church?.id) return;
     try {
-      const { data, error } = await supabase
+      // Fetch all songs (global)
+      const { data: songsData, error: songsError } = await supabase
         .from('songs')
         .select('*')
         .order('title', { ascending: true });
 
-      if (error) throw error;
-      setSongs(data || []);
+      if (songsError) throw songsError;
+
+      // Fetch per-church learning status
+      const { data: statusData, error: statusError } = await supabase
+        .from('church_song_status')
+        .select('song_id, status')
+        .eq('church_id', church.id);
+
+      if (statusError) throw statusError;
+
+      // Build a map of song_id -> status
+      const statusMap = new Map<string, 'learned' | 'learning' | 'not_started'>();
+      (statusData || []).forEach((s: any) => {
+        statusMap.set(s.song_id, s.status);
+      });
+
+      // Merge songs with their per-church status
+      const merged: SongWithStatus[] = (songsData || []).map((song: Song) => ({
+        ...song,
+        learning_status: statusMap.get(song.id) || 'not_started',
+      }));
+
+      setSongs(merged);
     } catch (error) {
       console.error('Error:', error);
       toast.error('Failed to load songs');
@@ -61,13 +93,21 @@ export const AdminRepertoire = () => {
     }
   };
 
+  const getAuthUid = async (): Promise<string | null> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.user?.id || null;
+  };
+
   const fetchFavorites = async () => {
     if (!user) return;
     try {
+      const authUid = await getAuthUid();
+      if (!authUid) return;
+
       const { data, error } = await supabase
         .from('user_favorites')
         .select('song_id')
-        .eq('user_id', user.id);
+        .eq('user_id', authUid);
 
       if (error) throw error;
       const favSet = new Set(data?.map(f => f.song_id) || []);
@@ -78,10 +118,12 @@ export const AdminRepertoire = () => {
   };
 
   const fetchUpcomingEvents = async () => {
+    if (!church?.id) return;
     try {
       const { data, error } = await supabase
         .from('events')
         .select('id, title, date, type')
+        .eq('church_id', church.id)
         .gte('date', new Date().toISOString().split('T')[0])
         .order('date', { ascending: true })
         .limit(20);
@@ -97,6 +139,9 @@ export const AdminRepertoire = () => {
     e.stopPropagation();
     if (!user) return;
 
+    const authUid = await getAuthUid();
+    if (!authUid) return;
+
     const isFavorite = favorites.has(songId);
 
     try {
@@ -104,7 +149,7 @@ export const AdminRepertoire = () => {
         const { error } = await supabase
           .from('user_favorites')
           .delete()
-          .eq('user_id', user.id)
+          .eq('user_id', authUid)
           .eq('song_id', songId);
 
         if (error) throw error;
@@ -116,7 +161,7 @@ export const AdminRepertoire = () => {
       } else {
         const { error } = await supabase
           .from('user_favorites')
-          .insert({ user_id: user.id, song_id: songId });
+          .insert({ user_id: authUid, song_id: songId });
 
         if (error) throw error;
 
@@ -173,23 +218,30 @@ export const AdminRepertoire = () => {
     }
   };
 
-  const handleBulkStatusUpdate = async (status: 'learned' | 'learning' | 'not_yet') => {
-    if (selectedSongs.size === 0) {
+  const handleBulkStatusUpdate = async (status: 'learned' | 'learning' | 'not_started') => {
+    if (selectedSongs.size === 0 || !church?.id) {
       toast.error('No songs selected');
       return;
     }
 
     try {
+      // Upsert into church_song_status for each selected song
+      const upsertData = Array.from(selectedSongs).map(songId => ({
+        church_id: church.id,
+        song_id: songId,
+        status,
+        updated_at: new Date().toISOString(),
+      }));
+
       const { error } = await supabase
-        .from('songs')
-        .update({ learning_status: status })
-        .in('id', Array.from(selectedSongs));
+        .from('church_song_status')
+        .upsert(upsertData, { onConflict: 'church_id,song_id' });
 
       if (error) throw error;
 
-      const statusLabel = status === 'learned' ? 'Learned' : status === 'learning' ? 'Learning' : 'Not Yet';
+      const statusLabel = status === 'learned' ? 'Learned' : status === 'learning' ? 'Learning' : 'Not Started';
       toast.success(`${selectedSongs.size} song(s) marked as ${statusLabel}`);
-      
+
       setSelectedSongs(new Set());
       fetchSongs();
     } catch (error) {
@@ -204,6 +256,7 @@ export const AdminRepertoire = () => {
   };
 
   const handleDelete = async (id: string) => {
+    if (!isSuperAdmin) return;
     if (!confirm('Delete this song?')) return;
     try {
       const { error } = await supabase.from('songs').delete().eq('id', id);
@@ -229,7 +282,7 @@ export const AdminRepertoire = () => {
         return <span className="text-xs">✅</span>;
       case 'learning':
         return <span className="text-xs">📚</span>;
-      case 'not_yet':
+      case 'not_started':
         return <span className="text-xs">⏳</span>;
       default:
         return <span className="text-xs">⏳</span>;
@@ -250,20 +303,20 @@ export const AdminRepertoire = () => {
 
   const filteredSongs = songs.filter(song => {
     if (!filterByLanguage(song)) return false;
-    
+
     if (statusFilter !== 'all' && song.learning_status !== statusFilter) {
       return false;
     }
-    
+
     const search = searchTerm.toLowerCase();
     const titleMatch = song.title.toLowerCase().includes(search);
     const composerMatch = song.composer?.toLowerCase().includes(search);
     const matchesSearch = titleMatch || composerMatch;
-    
+
     if (showFavoritesOnly) {
       return matchesSearch && favorites.has(song.id);
     }
-    
+
     return matchesSearch;
   }).sort((a, b) => {
     switch (sortBy) {
@@ -284,7 +337,7 @@ export const AdminRepertoire = () => {
     total: songs.length,
     learned: songs.filter(s => s.learning_status === 'learned').length,
     learning: songs.filter(s => s.learning_status === 'learning').length,
-    notYet: songs.filter(s => s.learning_status === 'not_yet' || !s.learning_status).length,
+    notStarted: songs.filter(s => s.learning_status === 'not_started').length,
   };
   const masteryRate = stats.total > 0 ? Math.round((stats.learned / stats.total) * 100) : 0;
 
@@ -306,12 +359,15 @@ export const AdminRepertoire = () => {
             {filteredSongs.length} of {songs.length} songs
           </p>
         </div>
-        <button
-          onClick={() => navigate('new')}
-          className="text-sm text-indigo-600 hover:text-indigo-700 font-semibold"
-        >
-          + Add Song
-        </button>
+        {/* Only super admin can add songs */}
+        {isSuperAdmin && (
+          <button
+            onClick={() => navigate('new')}
+            className="text-sm text-indigo-600 hover:text-indigo-700 font-semibold"
+          >
+            + Add Song
+          </button>
+        )}
       </div>
 
       {/* Compact Stats */}
@@ -344,12 +400,12 @@ export const AdminRepertoire = () => {
           <div className="text-xs text-gray-700">📚</div>
         </button>
         <button
-          onClick={() => setStatusFilter('not_yet')}
+          onClick={() => setStatusFilter('not_started')}
           className={`bg-gray-50 border rounded-lg shadow-sm p-2 text-center transition ${
-            statusFilter === 'not_yet' ? 'ring-2 ring-gray-500 border-gray-500' : 'border-gray-200'
+            statusFilter === 'not_started' ? 'ring-2 ring-gray-500 border-gray-500' : 'border-gray-200'
           }`}
         >
-          <div className="text-lg font-bold text-gray-700">{stats.notYet}</div>
+          <div className="text-lg font-bold text-gray-700">{stats.notStarted}</div>
           <div className="text-xs text-gray-700">⏳</div>
         </button>
         <div className="bg-indigo-50 border border-indigo-200 rounded-lg shadow-sm p-2 text-center">
@@ -371,7 +427,7 @@ export const AdminRepertoire = () => {
               className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500"
             />
           </div>
-          
+
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
@@ -381,7 +437,7 @@ export const AdminRepertoire = () => {
             <option value="z-a">Z → A</option>
             <option value="recent">Recent</option>
           </select>
-          
+
           <select
             value={languageFilter}
             onChange={(e) => setLanguageFilter(e.target.value as any)}
@@ -423,7 +479,7 @@ export const AdminRepertoire = () => {
             <Star className={`w-3.5 h-3.5 ${showFavoritesOnly ? 'fill-white' : ''}`} />
             Favorites {favoriteCount > 0 && `(${favoriteCount})`}
           </button>
-          
+
           <div className="flex items-center gap-2 flex-wrap">
             {selectedSongs.size > 0 && (
               <button
@@ -444,17 +500,20 @@ export const AdminRepertoire = () => {
             >
               {selectedSongs.size > 0 ? `✕ Deselect (${selectedSongs.size})` : 'Select All'}
             </button>
-            <button
-              onClick={() => navigate('../bulk-edit')}
-              className="px-3 py-1.5 text-xs bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700"
-            >
-              Bulk Edit
-            </button>
+            {/* Only super admin sees Bulk Edit */}
+            {isSuperAdmin && (
+              <button
+                onClick={() => navigate('../bulk-edit')}
+                className="px-3 py-1.5 text-xs bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700"
+              >
+                Bulk Edit
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Bulk Selection Bar */}
+      {/* Bulk Selection Bar — admin + super admin can change status */}
       {selectedSongs.size > 0 && (
         <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
           <div className="flex items-center justify-between">
@@ -466,7 +525,7 @@ export const AdminRepertoire = () => {
                 value=""
                 onChange={(e) => {
                   if (e.target.value) {
-                    handleBulkStatusUpdate(e.target.value as 'learned' | 'learning' | 'not_yet');
+                    handleBulkStatusUpdate(e.target.value as 'learned' | 'learning' | 'not_started');
                   }
                 }}
                 className="px-3 py-1.5 text-xs border border-indigo-300 rounded-lg bg-white font-medium"
@@ -474,7 +533,7 @@ export const AdminRepertoire = () => {
                 <option value="">Mark as...</option>
                 <option value="learned">✅ Learned</option>
                 <option value="learning">📚 Learning</option>
-                <option value="not_yet">⏳ Not Yet</option>
+                <option value="not_started">⏳ Not Started</option>
               </select>
               <button
                 onClick={() => setSelectedSongs(new Set())}
@@ -493,7 +552,7 @@ export const AdminRepertoire = () => {
           {filteredSongs.map((song) => {
             const isFavorite = favorites.has(song.id);
             const isSelected = selectedSongs.has(song.id);
-            
+
             return (
               <div
                 key={song.id}
@@ -508,7 +567,7 @@ export const AdminRepertoire = () => {
                   onChange={(e) => { e.stopPropagation(); toggleSongSelection(song.id); }}
                   className="w-4 h-4 flex-shrink-0"
                 />
-                
+
                 <button
                   onClick={(e) => { e.stopPropagation(); toggleFavorite(song.id, e); }}
                   className="flex-shrink-0"
@@ -517,7 +576,7 @@ export const AdminRepertoire = () => {
                 </button>
 
                 <div className="flex-shrink-0">
-                  {getStatusBadge(song.learning_status || 'not_yet')}
+                  {getStatusBadge(song.learning_status)}
                 </div>
 
                 <div className="flex-1 min-w-0">
@@ -547,18 +606,23 @@ export const AdminRepertoire = () => {
                       <Eye className="w-4 h-4" />
                     </button>
                   )}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); navigate(`${song.id}/edit`); }}
-                    className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDelete(song.id); }}
-                    className="p-1 text-red-600 hover:bg-red-50 rounded"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {/* Only super admin can edit/delete songs */}
+                  {isSuperAdmin && (
+                    <>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); navigate(`${song.id}/edit`); }}
+                        className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDelete(song.id); }}
+                        className="p-1 text-red-600 hover:bg-red-50 rounded"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             );
@@ -581,7 +645,7 @@ export const AdminRepertoire = () => {
             const langCode = (song.language || '??').slice(0, 2).toUpperCase();
             const langTextColor = song.language === 'English' ? 'text-blue-600 bg-blue-50' : song.language === 'French' ? 'text-purple-600 bg-purple-50' : song.language === 'Lingala' ? 'text-green-600 bg-green-50' : song.language === 'Tshiluba' ? 'text-yellow-600 bg-yellow-50' : song.language === 'Swahili' ? 'text-teal-600 bg-teal-50' : song.language === 'Kikongo' ? 'text-orange-600 bg-orange-50' : song.language === 'Portuguese' ? 'text-pink-600 bg-pink-50' : 'text-gray-600 bg-gray-50';
             const statusColor = song.learning_status === 'learned' ? 'bg-green-500' : song.learning_status === 'learning' ? 'bg-yellow-500' : 'bg-gray-300';
-            const statusIcon = song.learning_status === 'learned' ? 'learned' : song.learning_status === 'learning' ? 'learning' : 'not_yet';
+            const statusIcon = song.learning_status === 'learned' ? 'learned' : song.learning_status === 'learning' ? 'learning' : 'not_started';
 
             return (
               <div
@@ -606,7 +670,7 @@ export const AdminRepertoire = () => {
                       <div className={`w-3.5 h-3.5 rounded ${statusColor} flex items-center justify-center`}>
                         {statusIcon === 'learned' && <CheckCircle className="w-2 h-2 text-white" strokeWidth={3} />}
                         {statusIcon === 'learning' && <BookOpen className="w-2 h-2 text-white" strokeWidth={3} />}
-                        {statusIcon === 'not_yet' && <Clock className="w-2 h-2 text-white" strokeWidth={3} />}
+                        {statusIcon === 'not_started' && <Clock className="w-2 h-2 text-white" strokeWidth={3} />}
                       </div>
                     </div>
                     <div className="flex gap-0.5">
@@ -615,12 +679,17 @@ export const AdminRepertoire = () => {
                           <Eye className="w-3 h-3" strokeWidth={3} />
                         </button>
                       )}
-                      <button onClick={(e) => { e.stopPropagation(); navigate(`${song.id}/edit`); }} className="p-1 rounded text-gray-500 hover:text-blue-600 transition-colors" title="Edit">
-                        <Edit className="w-3 h-3" strokeWidth={3} />
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); handleDelete(song.id); }} className="p-1 rounded text-gray-500 hover:text-red-500 transition-colors" title="Delete">
-                        <Trash2 className="w-3 h-3" strokeWidth={3} />
-                      </button>
+                      {/* Only super admin can edit/delete songs */}
+                      {isSuperAdmin && (
+                        <>
+                          <button onClick={(e) => { e.stopPropagation(); navigate(`${song.id}/edit`); }} className="p-1 rounded text-gray-500 hover:text-blue-600 transition-colors" title="Edit">
+                            <Edit className="w-3 h-3" strokeWidth={3} />
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); handleDelete(song.id); }} className="p-1 rounded text-gray-500 hover:text-red-500 transition-colors" title="Delete">
+                            <Trash2 className="w-3 h-3" strokeWidth={3} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>

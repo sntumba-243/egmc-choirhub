@@ -69,7 +69,6 @@ export const EventForm: React.FC = () => {
       const { data, error } = await supabase
         .from('songs')
         .select('id, title, composer')
-        .eq('church_id', church?.id)
         .order('title', { ascending: true });
 
       if (error) throw error;
