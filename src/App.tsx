@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { lazy } from 'react';
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ChurchProvider } from './contexts/ChurchContext';
@@ -20,7 +20,6 @@ import { requestNotificationPermission, setupMessageListener, storeDeviceToken }
 // PDF Viewer
 import { PDFViewerPage } from './components/PDFViewer';
 import { Login } from './pages/Login';
-import { ChangePassword } from './pages/ChangePassword';
 import { Register } from './pages/Register';
 
 // Layouts
@@ -54,6 +53,7 @@ import { AdminMembers } from './pages/admin/Members';
 import { AdminEvents } from './pages/admin/Events';
 import { AdminMessages } from './pages/admin/Messages';
 import { AdminSettings } from './pages/admin/Settings';
+const ChurchThemeSettings = lazy(() => import("./pages/admin/ChurchThemeSettings").then(m => ({ default: m.ChurchThemeSettings })));
 import AdminVocalCoach from './pages/admin/VocalCoach';
 import VocalCoachAssignments from './pages/admin/VocalCoachAssignments';
 import AttendanceStats from './pages/admin/AttendanceStats';
@@ -138,7 +138,6 @@ function AppRoutes() {
       {/* Public Routes */}
       <Route path="/login" element={!user ? <Login /> : <Navigate to={user.is_super_admin ? '/super-admin' : user.role === 'admin' ? '/admin' : '/member'} />} />
       <Route path="/register" element={!user ? <Register /> : <Navigate to={user.is_super_admin ? '/super-admin' : user.role === 'admin' ? '/admin' : '/member'} />} />
-      <Route path="/change-password" element={<ChangePassword />} />
 
       {/* PDF Viewer */}
       <Route path="/pdf-viewer" element={<PDFViewerPage />} />
@@ -161,6 +160,7 @@ function AppRoutes() {
         <Route path="events" element={<GlobalEvents />} />
         <Route path="events/new" element={<EventForm />} />
         <Route path="settings" element={<AdminSettings />} />
+            <Route path="theme" element={<Suspense fallback={<div className="flex items-center justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>}><ChurchThemeSettings /></Suspense>} />
       </Route>
 
 
@@ -195,12 +195,15 @@ function AppRoutes() {
       }>
         <Route index element={<AdminDashboard />} />
         <Route path="repertoire" element={<ChurchRepertoire />} />
+            <Route path="repertoire/new" element={<SongForm />} />
+            <Route path="repertoire/:id/edit" element={<SongForm />} />
         <Route path="members" element={<AdminMembers />} />
         <Route path="events" element={<AdminEvents />} />
         <Route path="attendance" element={<AttendanceStats />} />
                 <Route path="submissions" element={<Submissions />} />
         <Route path="messages" element={<AdminMessages />} />
         <Route path="settings" element={<AdminSettings />} />
+            <Route path="theme" element={<Suspense fallback={<div className="flex items-center justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>}><ChurchThemeSettings /></Suspense>} />
         <Route path="bulk-edit" element={<BulkSongEditor />} />
         <Route path="members/new" element={<MemberForm />} />
         <Route path="members/:id/edit" element={<MemberForm />} />

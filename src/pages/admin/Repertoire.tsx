@@ -307,7 +307,7 @@ export const AdminRepertoire = () => {
           </p>
         </div>
         <button
-          onClick={() => navigate('/admin/repertoire/new')}
+          onClick={() => navigate('new')}
           className="text-sm text-indigo-600 hover:text-indigo-700 font-semibold"
         >
           + Add Song
@@ -435,7 +435,7 @@ export const AdminRepertoire = () => {
               </button>
             )}
             <button
-              onClick={() => navigate('/admin/bulk-edit')}
+              onClick={() => navigate('../bulk-edit')}
               className="px-3 py-1.5 text-xs bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700"
             >
               Bulk Edit
@@ -540,7 +540,7 @@ export const AdminRepertoire = () => {
                     </button>
                   )}
                   <button
-                    onClick={(e) => { e.stopPropagation(); navigate(`/admin/repertoire/${song.id}/edit`); }}
+                    onClick={(e) => { e.stopPropagation(); navigate(`${song.id}/edit`); }}
                     className="p-1 text-blue-600 hover:bg-blue-50 rounded"
                   >
                     <Edit className="w-4 h-4" />
@@ -607,7 +607,7 @@ export const AdminRepertoire = () => {
                           <Eye className="w-3 h-3" strokeWidth={3} />
                         </button>
                       )}
-                      <button onClick={(e) => { e.stopPropagation(); navigate(`/admin/repertoire/${song.id}/edit`); }} className="p-1 rounded text-gray-500 hover:text-blue-600 transition-colors" title="Edit">
+                      <button onClick={(e) => { e.stopPropagation(); navigate(`${song.id}/edit`); }} className="p-1 rounded text-gray-500 hover:text-blue-600 transition-colors" title="Edit">
                         <Edit className="w-3 h-3" strokeWidth={3} />
                       </button>
                       <button onClick={(e) => { e.stopPropagation(); handleDelete(song.id); }} className="p-1 rounded text-gray-500 hover:text-red-500 transition-colors" title="Delete">
@@ -639,7 +639,7 @@ export const AdminRepertoire = () => {
                   <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                   <p className="text-sm text-gray-600 mb-3">No upcoming events</p>
                   <button
-                    onClick={() => { setShowEventModal(false); navigate('/admin/events/new'); }}
+                    onClick={() => { setShowEventModal(false); navigate('../events/new'); }}
                     className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
                   >
                     Create Event

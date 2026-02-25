@@ -70,7 +70,7 @@ export const SongForm: React.FC = () => {
         toast.success('Song created');
       }
 
-      navigate('/admin/repertoire');
+      navigate(-1);
     } catch (error: any) {
       console.error('Error:', error);
       toast.error(error.message || 'Failed to save song');
@@ -108,7 +108,7 @@ export const SongForm: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <button
-          onClick={() => navigate('/admin/repertoire')}
+          onClick={() => navigate(-1)}
           className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -196,7 +196,7 @@ export const SongForm: React.FC = () => {
               </div>
               <iframe
                 src={sheetMusicUrl.includes("drive.google.com") 
-                  ? sheetMusicUrl.replace("/view", "/preview").replace("?usp=sharing", "") 
+                  ? sheetMusicUrl.replace(/\/view.*$/, "/preview") 
                   : sheetMusicUrl}
                 className="w-full h-64 rounded-lg border border-gray-300"
                 title="Sheet Music Preview"
@@ -273,7 +273,7 @@ export const SongForm: React.FC = () => {
         <div className="flex gap-4 pt-4">
           <button
             type="button"
-            onClick={() => navigate('/admin/repertoire')}
+            onClick={() => navigate(-1)}
             className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
           >
             Cancel
