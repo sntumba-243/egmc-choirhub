@@ -5,7 +5,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Church, ArrowLeft, Save, Upload, Image as ImageIcon, UserPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { generateMemorablePassword } from '../../lib/passwordUtils';
-import { generateMemorablePassword } from '../../lib/passwordUtils';
 
 export const ChurchForm = () => {
   const navigate = useNavigate();
@@ -21,8 +20,6 @@ export const ChurchForm = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [adminEmail, setAdminEmail] = useState('');
   const [assigningAdmin, setAssigningAdmin] = useState(false);
-  const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [form, setForm] = useState({
