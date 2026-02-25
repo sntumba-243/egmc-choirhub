@@ -162,7 +162,7 @@ export const MemberForm: React.FC = () => {
 
         // Add user_id if auth account was created
         if (authUserId) {
-          memberData.id = authUserId;
+          // auth user created, member will be linked by email
         }
 
         const { error } = await supabase
