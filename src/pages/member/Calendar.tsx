@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { Calendar, Clock, MapPin, Users, Grid, List, ArrowUpDown, CheckCircle, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -26,6 +27,7 @@ type SortDirection = 'asc' | 'desc';
 
 export const MemberCalendar = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
   const [rsvps, setRsvps] = useState<Record<string, RSVP>>({});
   const [loading, setLoading] = useState(true);
@@ -37,13 +39,14 @@ export const MemberCalendar = () => {
   useEffect(() => {
     fetchEvents();
     fetchRSVPs();
-  }, []);
+  }, [user?.church_id]);
 
   const fetchEvents = async () => {
     try {
       const { data, error } = await supabase
         .from('events')
         .select('*')
+        .eq('church_id', user?.church_id)
         .order('date', { ascending: true });
 
       if (error) throw error;

@@ -28,7 +28,7 @@ export const MemberDashboard = () => {
         setFavoritesCount(favs || 0);
 
         // Unread messages
-        const { data: allMsgs } = await supabase.from('messages').select('id').or(`send_to.eq.all,send_to.eq.${user.id}`);
+        const { data: allMsgs } = await supabase.from('messages').select('id').eq('church_id', user?.church_id);
         const { data: readData } = await supabase.from('message_reads').select('message_id').eq('user_id', user.id);
         const readIds = new Set(readData?.map(r => r.message_id) || []);
         setMessagesCount((allMsgs || []).filter(m => !readIds.has(m.id)).length);
@@ -39,7 +39,7 @@ export const MemberDashboard = () => {
       }
 
       const today = new Date().toISOString().split('T')[0];
-      const { data: events, count: evCount } = await supabase.from('events').select('title, date', { count: 'exact' }).gte('date', today).order('date').limit(1);
+      const { data: events, count: evCount } = await supabase.from('events').select('title, date', { count: 'exact' }).eq('church_id', user?.church_id).gte('date', today).order('date').limit(1);
       setEventsCount(evCount || 0);
       if (events?.[0]) setNextEvent(events[0]);
     } catch (e) { console.error('Dashboard fetch error:', e); }
