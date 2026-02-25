@@ -150,11 +150,11 @@ export const MemberForm: React.FC = () => {
           try {
             const newPassword = generateMemorablePassword();
             setGeneratedPassword(newPassword);
-            const authUser = await createAuthUser(email, newPassword, \`\${firstName} \${lastName}\`, role);
+            const authUser = await createAuthUser(email, newPassword, `${firstName} ${lastName}`, role);
             authUserId = authUser?.id || null;
           } catch (authError: any) {
             console.error('Auth creation failed:', authError);
-            toast.error(\`Auth account failed: \${authError.message}\`);
+            toast.error(`Auth account failed: ${authError.message}`);
             setLoading(false);
             return;
           }
@@ -183,7 +183,7 @@ export const MemberForm: React.FC = () => {
     setShowPasswordModal(false);
     setGeneratedPassword('');
     if (churchIdParam) {
-      navigate(\`/super-admin/churches/\${churchIdParam}\`);
+      navigate(`/super-admin/churches/${churchIdParam}`);
     } else {
       navigate('/admin/members');
     }
