@@ -4,8 +4,8 @@ import { getDbClient, supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Church, ArrowLeft, Save, Upload, Image as ImageIcon, UserPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { generatePassword } from '../../lib/passwordUtils';
-import { generatePassword } from '../../lib/passwordUtils';
+import { generateMemorablePassword } from '../../lib/passwordUtils';
+import { generateMemorablePassword } from '../../lib/passwordUtils';
 
 export const ChurchForm = () => {
   const navigate = useNavigate();
