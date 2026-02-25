@@ -1,3 +1,4 @@
+import { useChurch } from '../../contexts/ChurchContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -36,6 +37,7 @@ const getStatus = (rate: number, attended: number) => {
 export default function AttendanceStats() {
   const [memberStats, setMemberStats] = useState<MemberAttendance[]>([]);
   const [loading, setLoading] = useState(true);
+  const { church } = useChurch();
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('month');
   const [sortBy, setSortBy] = useState<'name' | 'rate'>('rate');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -58,12 +60,12 @@ export default function AttendanceStats() {
     try {
       setLoading(true);
       const { data: members } = await supabase
-        .from('members').select('id, first_name, last_name, email, voice_part, role')
+        .from('members').select('id, first_name, last_name, email, voice_part, role').eq('church_id', church?.id)
         .neq('role', 'inactive').order('first_name', { ascending: true });
 
       const startDate = getDateRange();
       const { data: events } = await supabase
-        .from('events').select('id')
+        .from('events').select('id').eq('church_id', church?.id)
         .gte('date', startDate).lte('date', new Date().toISOString().split('T')[0]);
 
       const eventIds = events?.map(e => e.id) || [];

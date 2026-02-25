@@ -4,6 +4,7 @@ import { ArrowLeft, Calendar, Clock, MapPin, Music, X, Eye, ChevronDown, Chevron
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
+import { useChurch } from '../../contexts/ChurchContext';
 
 interface Song {
   id: string;
@@ -23,6 +24,7 @@ interface Member {
 export const EventForm: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { church } = useChurch();
   const { id: eventId } = useParams();
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
@@ -66,6 +68,7 @@ export const EventForm: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('songs')
+        .eq('church_id', church?.id)
         .select('id, title, composer')
         .order('title', { ascending: true });
 
@@ -80,6 +83,7 @@ export const EventForm: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('members')
+        .eq('church_id', church?.id)
         .select('id, first_name, last_name, email, voice_part, role')
         .order('first_name', { ascending: true });
 
@@ -212,7 +216,7 @@ export const EventForm: React.FC = () => {
       } else {
         const { data, error } = await supabase
           .from('events')
-          .insert([eventData])
+          .insert([{ ...eventData, church_id: church?.id }])
           .select()
           .single();
         

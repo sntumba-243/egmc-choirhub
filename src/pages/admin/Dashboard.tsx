@@ -7,6 +7,7 @@ import {
   Plus, Mail, AlertTriangle, Bell
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useChurch } from '../../contexts/ChurchContext';
 
 interface Stats {
   totalMembers: number;
@@ -41,6 +42,7 @@ interface Alert {
 export const AdminDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { church } = useChurch();
   const [stats, setStats] = useState<Stats>({
     totalMembers: 0,
     totalSongs: 0,

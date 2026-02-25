@@ -5,6 +5,7 @@ import {
   ChevronDown, ChevronRight, Play, Pause, Mic, Square, Send, RotateCcw
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useChurch } from '../../contexts/ChurchContext';
 import { analyzeAudio, AnalysisProgress } from '../../services/audioAnalysis';
 import { generateVocalFeedback, saveVocalFeedback, VocalRatings, VocalAnalysisResult } from '../../services/vocalAnalysis';
 
