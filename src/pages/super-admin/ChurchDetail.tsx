@@ -50,6 +50,7 @@ export const ChurchDetail = () => {
   const [adminName, setAdminName] = useState('');
   const [addingAdmin, setAddingAdmin] = useState(false);
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
+  const [createdAdminEmail, setCreatedAdminEmail] = useState<string>('');
   const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   useEffect(() => {
@@ -200,6 +201,7 @@ export const ChurchDetail = () => {
           });
         }
 
+        setCreatedAdminEmail(adminEmail.trim().toLowerCase());
         setGeneratedPassword(password);
         setShowAddAdmin(false);
         setShowPasswordModal(true);
@@ -500,7 +502,7 @@ export const ChurchDetail = () => {
             <div className="bg-gray-50 rounded-lg p-4 space-y-3 mb-4">
               <div>
                 <p className="text-xs text-gray-500 font-medium">Email</p>
-                <p className="text-sm font-mono font-semibold text-gray-900">{adminEmail || 'N/A'}</p>
+                <p className="text-sm font-mono font-semibold text-gray-900">{createdAdminEmail}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-500 font-medium">Temporary Password</p>
