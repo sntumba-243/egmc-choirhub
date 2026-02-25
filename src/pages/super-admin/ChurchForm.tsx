@@ -158,7 +158,7 @@ export const ChurchForm = () => {
       const db = getDbClient();
       const email = adminEmail.trim().toLowerCase();
       
-      // Check if user already exists (.maybeSingle returns null instead of throwing)
+      // Check if user already exists
       const { data: existingUser } = await db
         .from('users')
         .select('id')
@@ -188,64 +188,49 @@ export const ChurchForm = () => {
           toast.success(`${email} added as admin`);
         }
       } else {
-        // User doesn't exist — create auth user + member with generated password
-        const password = generatePassword();
+        // User doesn't exist — create via Edge Function
+        const password = generateMemorablePassword();
         
-        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-          email,
-          password,
-          email_confirm: true,
-          user_metadata: { full_name: email.split('@')[0] }
-        });
-        
-        if (authError) {
-          // Try signUp if admin API not available
-          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-            email,
-            password,
-            options: { data: { full_name: email.split('@')[0] } }
-          });
-          if (signUpError) throw signUpError;
-          
-          const userId = signUpData.user?.id;
-          if (!userId) throw new Error('Failed to create user');
-          
-          // Create user record
-          await db.from('users').insert({
-            id: userId,
-            email,
-            full_name: email.split('@')[0],
-            is_super_admin: false
-          });
-          
-          // Create member record
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData.session?.access_token;
+        if (!token) throw new Error('Not authenticated');
+
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-member`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email,
+              password,
+              name: email.split('@')[0],
+              role: 'admin',
+              voice_part: 'soprano',
+              status: 'active',
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error || 'Failed to create admin account');
+        }
+
+        // Link to church via members table
+        const result = await response.json();
+        if (result.data?.id) {
           await db.from('members').insert({
-            user_id: userId,
+            user_id: result.data.id,
             church_id: churchId,
             role: 'admin',
             voice_part: 'soprano',
-            status: 'active'
-          });
-        } else {
-          const userId = authData.user?.id;
-          if (!userId) throw new Error('Failed to create user');
-          
-          await db.from('users').insert({
-            id: userId,
-            email,
-            full_name: email.split('@')[0],
-            is_super_admin: false
-          });
-          
-          await db.from('members').insert({
-            user_id: userId,
-            church_id: churchId,
-            role: 'admin',
-            voice_part: 'soprano',
-            status: 'active'
+            status: 'active',
           });
         }
-        
+
         setGeneratedPassword(password);
         setShowPasswordModal(true);
         toast.success(`Admin account created for ${email}`);
