@@ -197,7 +197,6 @@ export const ChurchDetail = () => {
             role: 'admin',
             voice_part: 'soprano',
             status: 'active',
-              church_id: id,
           });
         }
 
