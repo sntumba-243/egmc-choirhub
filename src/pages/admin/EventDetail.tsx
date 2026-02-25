@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { Calendar, Clock, MapPin, Music, Eye, Trash2 } from 'lucide-react';
+import { Calendar, Clock, MapPin, Music, Eye, Trash2, Search, X, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Event {
@@ -43,6 +43,9 @@ export const AdminEventDetail = () => {
   const [rsvps, setRsvps] = useState<RSVP[]>([]);
   const [eventSongs, setEventSongs] = useState<EventSong[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showSongPicker, setShowSongPicker] = useState(false);
+  const [allSongs, setAllSongs] = useState<any[]>([]);
+  const [songSearch, setSongSearch] = useState('');
 
   useEffect(() => {
     fetchEventAndRsvps();
@@ -93,6 +96,45 @@ export const AdminEventDetail = () => {
     } catch (error) {
       console.error('Error loading event songs:', error);
     }
+  };
+
+  const fetchAllSongs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('songs')
+        .select('id, title, composer, language')
+        .order('title', { ascending: true });
+      if (error) throw error;
+      setAllSongs(data || []);
+    } catch (error) {
+      console.error('Error loading songs:', error);
+    }
+  };
+
+  const addSongToEvent = async (songId: string) => {
+    try {
+      const { error } = await supabase
+        .from('event_songs')
+        .insert({ event_id: id, song_id: songId });
+      if (error) {
+        if (error.message?.includes('duplicate')) {
+          toast.error('Song already in setlist');
+          return;
+        }
+        throw error;
+      }
+      toast.success('Song added');
+      fetchEventSongs();
+    } catch (error) {
+      console.error('Error adding song:', error);
+      toast.error('Failed to add song');
+    }
+  };
+
+  const openSongPicker = () => {
+    if (allSongs.length === 0) fetchAllSongs();
+    setShowSongPicker(true);
+    setSongSearch('');
   };
 
   const removeSongFromEvent = async (eventSongId: string, songTitle: string) => {
@@ -221,7 +263,7 @@ export const AdminEventDetail = () => {
           </h2>
 
           <button
-            onClick={() => navigate('/admin/repertoire', { state: { addToEvent: id } })}
+            onClick={openSongPicker}
             className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold"
           >
             + Add
@@ -233,10 +275,10 @@ export const AdminEventDetail = () => {
             <Music className="w-8 h-8 text-gray-400 mx-auto mb-2" />
             <p className="text-xs text-gray-600 mb-3">No songs added</p>
             <button
-              onClick={() => navigate('/admin/repertoire', { state: { addToEvent: id } })}
+              onClick={openSongPicker}
               className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold"
             >
-              Browse Repertoire
+              + Add Songs
             </button>
           </div>
         ) : (
@@ -346,6 +388,77 @@ export const AdminEventDetail = () => {
           </div>
         )}
       </div>
+
+      {/* Song Picker Modal */}
+      {showSongPicker && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-lg w-full max-h-[80vh] flex flex-col">
+            <div className="p-4 border-b flex items-center justify-between">
+              <h2 className="text-lg font-bold">Add Songs to Setlist</h2>
+              <button onClick={() => setShowSongPicker(false)} className="p-1 hover:bg-gray-100 rounded">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3 border-b">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={songSearch}
+                  onChange={(e) => setSongSearch(e.target.value)}
+                  placeholder="Search songs..."
+                  autoFocus
+                  className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-2">
+              {(() => {
+                const existingSongIds = new Set(eventSongs.map(es => es.song_id));
+                const filtered = allSongs.filter(s =>
+                  !existingSongIds.has(s.id) &&
+                  (songSearch === '' ||
+                    s.title?.toLowerCase().includes(songSearch.toLowerCase()) ||
+                    s.composer?.toLowerCase().includes(songSearch.toLowerCase()))
+                );
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="text-center py-8 text-sm text-gray-500">
+                      {songSearch ? 'No matching songs found' : 'All songs already in setlist'}
+                    </div>
+                  );
+                }
+
+                return filtered.map(song => (
+                  <button
+                    key={song.id}
+                    onClick={() => addSongToEvent(song.id)}
+                    className="w-full flex items-center justify-between p-2.5 rounded-lg hover:bg-indigo-50 transition text-left group"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold text-gray-900 truncate group-hover:text-indigo-700">{song.title}</div>
+                      <div className="text-xs text-gray-500 truncate">{song.composer} · {song.language}</div>
+                    </div>
+                    <Plus className="w-4 h-4 text-indigo-500 flex-shrink-0 ml-2" />
+                  </button>
+                ));
+              })()}
+            </div>
+
+            <div className="p-3 border-t">
+              <button
+                onClick={() => setShowSongPicker(false)}
+                className="w-full px-4 py-2 text-sm bg-gray-100 rounded-lg hover:bg-gray-200 font-medium"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

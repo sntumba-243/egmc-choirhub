@@ -154,6 +154,7 @@ function AppRoutes() {
         <Route path="churches/:id" element={<ChurchDetail />} />
         <Route path="churches/:id/edit" element={<ChurchForm />} />
         <Route path="repertoire" element={<AdminRepertoire />} />
+        <Route path="favorites" element={<AdminFavorites />} />
         <Route path="repertoire/new" element={<SongForm />} />
         <Route path="repertoire/:id/edit" element={<SongForm />} />
         <Route path="members" element={<AdminMembers />} />
@@ -194,7 +195,7 @@ function AppRoutes() {
         </ProtectedRoute>
       }>
         <Route index element={<AdminDashboard />} />
-        <Route path="repertoire" element={<ChurchRepertoire />} />
+        <Route path="repertoire" element={<AdminRepertoire />} />
             <Route path="repertoire/new" element={<SongForm />} />
             <Route path="repertoire/:id/edit" element={<SongForm />} />
         <Route path="members" element={<AdminMembers />} />

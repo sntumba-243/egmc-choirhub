@@ -82,7 +82,7 @@ export const AdminRepertoire = () => {
       const { data, error } = await supabase
         .from('events')
         .select('id, title, date, type')
-        .gte('date', new Date().toISOString())
+        .gte('date', new Date().toISOString().split('T')[0])
         .order('date', { ascending: true })
         .limit(20);
 
@@ -435,6 +435,12 @@ export const AdminRepertoire = () => {
               </button>
             )}
             <button
+              onClick={selectedSongs.size > 0 ? () => setSelectedSongs(new Set()) : selectAllFiltered}
+              className="px-3 py-1.5 text-xs bg-indigo-100 text-indigo-700 rounded-lg font-semibold hover:bg-indigo-200"
+            >
+              {selectedSongs.size > 0 ? 'Deselect All' : 'Select All'}
+            </button>
+            <button
               onClick={() => navigate('../bulk-edit')}
               className="px-3 py-1.5 text-xs bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700"
             >
@@ -492,14 +498,12 @@ export const AdminRepertoire = () => {
                   song.sheet_music_url ? 'cursor-pointer' : ''
                 } ${isSelected ? 'bg-indigo-50' : ''}`}
               >
-                {selectedSongs.size > 0 && (
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => toggleSongSelection(song.id)}
-                    className="w-4 h-4"
-                  />
-                )}
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={(e) => { e.stopPropagation(); toggleSongSelection(song.id); }}
+                  className="w-4 h-4 flex-shrink-0"
+                />
                 
                 <button
                   onClick={(e) => { e.stopPropagation(); toggleFavorite(song.id, e); }}

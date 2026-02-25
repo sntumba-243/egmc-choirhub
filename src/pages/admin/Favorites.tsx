@@ -63,7 +63,7 @@ export const AdminFavorites = () => {
       const { data, error } = await supabase
         .from('events')
         .select('id, title, date, type')
-        .gte('date', new Date().toISOString())
+        .gte('date', new Date().toISOString().split('T')[0])
         .order('date', { ascending: true })
         .limit(10);
 
