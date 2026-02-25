@@ -393,7 +393,7 @@ export const ChurchDetail = () => {
             <Users className="w-5 h-5" /> Members ({members.length})
           </h2>
           <button
-            onClick={() => navigate(`/admin/members/new?church_id=${id}`)}
+            onClick={() => setShowAddAdmin(true)}
             className="flex items-center gap-1 px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700"
           >
             <UserPlus className="w-3.5 h-3.5" /> Add Admin
