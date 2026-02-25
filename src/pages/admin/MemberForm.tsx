@@ -4,12 +4,14 @@ import { ArrowLeft, Mail, Phone, Lock, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
+import { useChurch } from '../../contexts/ChurchContext';
 import { generateMemorablePassword } from '../../lib/passwordUtils';
 import { PasswordModal } from '../../components/PasswordModal';
 
 export const MemberForm: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { church } = useChurch();
   const { id: memberId } = useParams();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -112,7 +114,13 @@ export const MemberForm: React.FC = () => {
     setLoading(true);
 
     try {
-      const memberData = {
+      if (!church?.id) {
+        toast.error('No church selected');
+        setLoading(false);
+        return;
+      }
+
+      const memberData: any = {
         first_name: firstName,
         last_name: lastName,
         member_id: generateMemberId(firstName, lastName),
@@ -120,27 +128,39 @@ export const MemberForm: React.FC = () => {
         phone,
         voice_part: voicePart,
         role,
-        status
+        status,
+        church_id: church.id,
       };
 
       if (memberId) {
+        const { church_id, ...updateData } = memberData;
         const { error } = await supabase
           .from('members')
-          .update(memberData)
+          .update(updateData)
           .eq('id', memberId);
         if (error) throw error;
         toast.success('Member updated');
         navigate('/admin/members');
       } else {
+        let authUserId: string | null = null;
+
         if (createAuthAccount) {
           try {
             const newPassword = generateMemorablePassword();
             setGeneratedPassword(newPassword);
-            await createAuthUser(email, newPassword, role);
+            const authUser = await createAuthUser(email, newPassword, \`\${firstName} \${lastName}\`, role);
+            authUserId = authUser?.id || null;
           } catch (authError: any) {
             console.error('Auth creation failed:', authError);
-            toast.error(`Member added, but auth account failed: ${authError.message}`);
+            toast.error(\`Auth account failed: \${authError.message}\`);
+            setLoading(false);
+            return;
           }
+        }
+
+        // Add user_id if auth account was created
+        if (authUserId) {
+          memberData.user_id = authUserId;
         }
 
         const { error } = await supabase
