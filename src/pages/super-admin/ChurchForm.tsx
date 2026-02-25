@@ -207,6 +207,7 @@ export const ChurchForm = () => {
               role: 'admin',
               voice_part: 'soprano',
               status: 'active',
+              church_id: churchId,
             }),
           }
         );
@@ -225,6 +226,7 @@ export const ChurchForm = () => {
             role: 'admin',
             voice_part: 'soprano',
             status: 'active',
+              church_id: churchId,
           });
         }
 
