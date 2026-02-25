@@ -151,7 +151,7 @@ export const ChurchDetail = () => {
             last_name: '',
             member_id: email.split('@')[0].charAt(0).toUpperCase() + 'Admin',
             role: 'admin',
-            voice_part: 'soprano',
+            voice_part: 'Soprano',
             status: 'active'
           });
           toast.success(`${email} added as admin`);
@@ -181,7 +181,7 @@ export const ChurchDetail = () => {
               password,
               name: adminName.trim() || email.split('@')[0],
               role: 'admin',
-              voice_part: 'soprano',
+              voice_part: 'Soprano',
               status: 'active',
               church_id: id,
             }),
@@ -204,7 +204,7 @@ export const ChurchDetail = () => {
             last_name: adminName.trim() ? adminName.trim().split(' ').slice(1).join(' ') : '',
             member_id: memberId,
             role: 'admin',
-            voice_part: 'soprano',
+            voice_part: 'Soprano',
             status: 'active',
           });
         }

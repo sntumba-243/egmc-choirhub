@@ -179,7 +179,7 @@ export const ChurchForm = () => {
                         church_id: churchId,
             member_id: email.split('@')[0].charAt(0).toUpperCase() + 'Admin',
             role: 'admin',
-            voice_part: 'soprano',
+            voice_part: 'Soprano',
             status: 'active'
           });
           toast.success(`${email} added as admin`);
@@ -205,7 +205,7 @@ export const ChurchForm = () => {
               password,
               name: email.split('@')[0],
               role: 'admin',
-              voice_part: 'soprano',
+              voice_part: 'Soprano',
               status: 'active',
               church_id: churchId,
             }),
@@ -223,7 +223,7 @@ export const ChurchForm = () => {
           await db.from('members').insert({
                         church_id: churchId,
             role: 'admin',
-            voice_part: 'soprano',
+            voice_part: 'Soprano',
             status: 'active',
               church_id: churchId,
           });
