@@ -4,6 +4,8 @@ import { getDbClient, supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Church, ArrowLeft, Save, Upload, Image as ImageIcon, UserPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { generatePassword } from '../../lib/passwordUtils';
+import { generatePassword } from '../../lib/passwordUtils';
 
 export const ChurchForm = () => {
   const navigate = useNavigate();
@@ -19,6 +21,10 @@ export const ChurchForm = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [adminEmail, setAdminEmail] = useState('');
   const [assigningAdmin, setAssigningAdmin] = useState(false);
+  const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [form, setForm] = useState({
     name: '',
     short_name: '',
@@ -83,6 +89,7 @@ export const ChurchForm = () => {
     setSaving(true);
     try {
       const supabase = getDbClient();
+      let churchId = id;
 
       if (isEdit) {
         const { error } = await supabase
@@ -92,21 +99,23 @@ export const ChurchForm = () => {
         if (error) throw error;
         toast.success('Church updated!');
       } else {
-        const { error } = await supabase
+        const { data: insertData, error } = await supabase
           .from('churches')
-          .insert([{ ...form, logo_url: logoUrl, created_by: user?.id }]).select();
+          .insert([{ ...form, logo_url: logoUrl, created_by: user?.id }])
+          .select();
         if (error) throw error;
+        churchId = insertData?.[0]?.id;
         toast.success('Church created!');
       }
 
-      // If new church and admin email provided, assign admin
-      if (!isEdit && adminEmail.trim() && data?.[0]?.id) {
-        await assignAdmin(data[0].id);
+      // Assign admin if email provided
+      if (adminEmail.trim() && churchId) {
+        await assignAdmin(churchId);
       }
-      if (isEdit && adminEmail.trim() && id) {
-        await assignAdmin(id);
+
+      if (!showPasswordModal) {
+        navigate('/super-admin/churches');
       }
-      navigate('/super-admin/churches');
     } catch (error: any) {
       console.error('Error:', error);
       toast.error(error.message || 'Failed to save church');
@@ -146,17 +155,19 @@ export const ChurchForm = () => {
     if (!adminEmail.trim()) return;
     setAssigningAdmin(true);
     try {
-      const supabase = getDbClient();
-      // Check if user exists in auth (via members table or users)
-      const { data: existingUser } = await supabase
+      const db = getDbClient();
+      const email = adminEmail.trim().toLowerCase();
+      
+      // Check if user already exists
+      const { data: existingUser } = await db
         .from('users')
         .select('id')
-        .eq('email', adminEmail.trim().toLowerCase())
+        .eq('email', email)
         .single();
 
       if (existingUser) {
-        // User exists — create member record with admin role
-        const { data: existingMember } = await supabase
+        // User exists — add/promote as admin
+        const { data: existingMember } = await db
           .from('members')
           .select('id, role')
           .eq('user_id', existingUser.id)
@@ -164,25 +175,84 @@ export const ChurchForm = () => {
           .single();
 
         if (existingMember) {
-          await supabase.from('members').update({ role: 'admin' }).eq('id', existingMember.id);
-          toast.success(`${adminEmail} promoted to admin`);
+          await db.from('members').update({ role: 'admin' }).eq('id', existingMember.id);
+          toast.success(`${email} promoted to admin`);
         } else {
-          await supabase.from('members').insert({
+          await db.from('members').insert({
             user_id: existingUser.id,
             church_id: churchId,
             role: 'admin',
             voice_part: 'soprano',
             status: 'active'
           });
-          toast.success(`${adminEmail} added as admin`);
+          toast.success(`${email} added as admin`);
         }
       } else {
-        // User doesn't exist yet — create an invite/placeholder
-        toast.error('User not found. They must sign up first, then you can assign them.');
+        // User doesn't exist — create auth user + member with generated password
+        const password = generatePassword();
+        
+        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: { full_name: email.split('@')[0] }
+        });
+        
+        if (authError) {
+          // Try signUp if admin API not available
+          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+            email,
+            password,
+            options: { data: { full_name: email.split('@')[0] } }
+          });
+          if (signUpError) throw signUpError;
+          
+          const userId = signUpData.user?.id;
+          if (!userId) throw new Error('Failed to create user');
+          
+          // Create user record
+          await db.from('users').insert({
+            id: userId,
+            email,
+            full_name: email.split('@')[0],
+            is_super_admin: false
+          });
+          
+          // Create member record
+          await db.from('members').insert({
+            user_id: userId,
+            church_id: churchId,
+            role: 'admin',
+            voice_part: 'soprano',
+            status: 'active'
+          });
+        } else {
+          const userId = authData.user?.id;
+          if (!userId) throw new Error('Failed to create user');
+          
+          await db.from('users').insert({
+            id: userId,
+            email,
+            full_name: email.split('@')[0],
+            is_super_admin: false
+          });
+          
+          await db.from('members').insert({
+            user_id: userId,
+            church_id: churchId,
+            role: 'admin',
+            voice_part: 'soprano',
+            status: 'active'
+          });
+        }
+        
+        setGeneratedPassword(password);
+        setShowPasswordModal(true);
+        toast.success(`Admin account created for ${email}`);
       }
     } catch (error: any) {
       console.error('Admin assign error:', error);
-      toast.error('Failed to assign admin');
+      toast.error(error.message || 'Failed to assign admin');
     } finally {
       setAssigningAdmin(false);
     }
@@ -347,6 +417,104 @@ export const ChurchForm = () => {
           </button>
         </div>
       </form>
+      {/* Generated Password Modal */}
+      {showPasswordModal && generatedPassword && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl">
+            <div className="text-center mb-4">
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <UserPlus className="w-6 h-6 text-green-600" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">Admin Account Created</h3>
+              <p className="text-sm text-gray-500 mt-1">Share these credentials with the admin</p>
+            </div>
+            
+            <div className="bg-gray-50 rounded-lg p-4 space-y-3 mb-4">
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Email</p>
+                <p className="text-sm font-mono font-semibold text-gray-900">{adminEmail}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Temporary Password</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-mono font-semibold text-gray-900 bg-amber-50 px-2 py-1 rounded border border-amber-200">{generatedPassword}</p>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(generatedPassword);
+                      toast.success('Password copied!');
+                    }}
+                    className="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded font-medium hover:bg-amber-200"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-red-500 mb-4">⚠️ This password will not be shown again. Please save it now.</p>
+
+            <button
+              onClick={() => {
+                setShowPasswordModal(false);
+                setGeneratedPassword(null);
+                navigate('/super-admin/churches');
+              }}
+              className="w-full py-2.5 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700 text-sm"
+            >
+              Done — Go to Churches
+            </button>
+          </div>
+        </div>
+      )}
+      {/* Generated Password Modal */}
+      {showPasswordModal && generatedPassword && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl">
+            <div className="text-center mb-4">
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <UserPlus className="w-6 h-6 text-green-600" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">Admin Account Created</h3>
+              <p className="text-sm text-gray-500 mt-1">Share these credentials with the admin</p>
+            </div>
+            
+            <div className="bg-gray-50 rounded-lg p-4 space-y-3 mb-4">
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Email</p>
+                <p className="text-sm font-mono font-semibold text-gray-900">{adminEmail}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Temporary Password</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-mono font-semibold text-gray-900 bg-amber-50 px-2 py-1 rounded border border-amber-200">{generatedPassword}</p>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(generatedPassword);
+                      toast.success('Password copied!');
+                    }}
+                    className="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded font-medium hover:bg-amber-200"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-red-500 mb-4">⚠️ This password will not be shown again. Please save it now.</p>
+
+            <button
+              onClick={() => {
+                setShowPasswordModal(false);
+                setGeneratedPassword(null);
+                navigate('/super-admin/churches');
+              }}
+              className="w-full py-2.5 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700 text-sm"
+            >
+              Done — Go to Churches
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
