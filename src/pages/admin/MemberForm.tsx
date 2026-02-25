@@ -66,45 +66,39 @@ export const MemberForm: React.FC = () => {
 
   const createAuthUser = async (email: string, password: string, userRole: string) => {
     try {
-      const { data: { session: adminSession } } = await supabase.auth.getSession();
-      
-      const { data: { user }, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            role: userRole,
-            first_login: true
-          }
-        }
-      });
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error('Not authenticated');
 
-      if (error) throw error;
-      
-      if (user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .upsert({
-            id: user.id,
-            email: email,
-            role: userRole,
-            created_at: new Date().toISOString()
-          });
+      const churchId = churchIdParam || church?.id;
 
-        if (profileError) {
-          console.error('Profile creation error:', profileError);
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-member`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email,
+            password,
+            name: `${firstName} ${lastName}`.trim(),
+            role: userRole,
+            voice_part: voicePart,
+            status: 'active',
+            church_id: churchId,
+          }),
         }
-        
-        if (adminSession) {
-          await supabase.auth.setSession({
-            access_token: adminSession.access_token,
-            refresh_token: adminSession.refresh_token
-          });
-          console.log('✅ Admin session restored');
-        }
+      );
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Failed to create auth account');
       }
 
-      return user;
+      const result = await response.json();
+      return result.data;
     } catch (error) {
       console.error('Auth creation error:', error);
       throw error;
@@ -150,7 +144,7 @@ export const MemberForm: React.FC = () => {
           try {
             const newPassword = generateMemorablePassword();
             setGeneratedPassword(newPassword);
-            const authUser = await createAuthUser(email, newPassword, `${firstName} ${lastName}`, role);
+            const authUser = await createAuthUser(email, newPassword, role);
             authUserId = authUser?.id || null;
           } catch (authError: any) {
             console.error('Auth creation failed:', authError);
