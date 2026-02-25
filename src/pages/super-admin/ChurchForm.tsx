@@ -177,6 +177,7 @@ export const ChurchForm = () => {
         } else {
           await db.from('members').insert({
                         church_id: churchId,
+            member_id: email.split('@')[0].charAt(0).toUpperCase() + 'Admin',
             role: 'admin',
             voice_part: 'soprano',
             status: 'active'

@@ -149,6 +149,7 @@ export const ChurchDetail = () => {
             email: email,
             first_name: email.split('@')[0],
             last_name: '',
+            member_id: email.split('@')[0].charAt(0).toUpperCase() + 'Admin',
             role: 'admin',
             voice_part: 'soprano',
             status: 'active'
@@ -194,11 +195,14 @@ export const ChurchDetail = () => {
 
         const result = await response.json();
         if (result.data?.id) {
+          const nameForId = adminName.trim() || email.split('@')[0];
+          const memberId = nameForId.split(' ').map((w: string) => w.charAt(0).toUpperCase()).join('') + Math.floor(Math.random() * 1000);
           await db.from('members').insert({
             church_id: id,
             email: email,
-            first_name: adminName.trim() || email.split('@')[0],
-            last_name: '',
+            first_name: adminName.trim() ? adminName.trim().split(' ')[0] : email.split('@')[0],
+            last_name: adminName.trim() ? adminName.trim().split(' ').slice(1).join(' ') : '',
+            member_id: memberId,
             role: 'admin',
             voice_part: 'soprano',
             status: 'active',
