@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getDbClient } from '../../lib/supabase';
-import { Church, Users, Music, Calendar, ArrowLeft, Edit, Shield, ShieldOff, Trash2, Clock, MapPin, Plus } from 'lucide-react';
+import { getDbClient, supabase } from '../../lib/supabase';
+import { Church, Users, Music, Calendar, ArrowLeft, Edit, Shield, ShieldOff, Trash2, Clock, MapPin, Plus, UserPlus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { generateMemorablePassword } from '../../lib/passwordUtils';
 
 interface ChurchData {
   id: string;
@@ -44,6 +45,12 @@ export const ChurchDetail = () => {
   const [churchEvents, setChurchEvents] = useState<EventData[]>([]);
   const [stats, setStats] = useState({ members: 0, events: 0, songsLearned: 0 });
   const [loading, setLoading] = useState(true);
+  const [showAddAdmin, setShowAddAdmin] = useState(false);
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminName, setAdminName] = useState('');
+  const [addingAdmin, setAddingAdmin] = useState(false);
+  const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   useEffect(() => {
     if (id) fetchAll();
@@ -106,6 +113,104 @@ export const ChurchDetail = () => {
     } catch (error) {
       console.error("Error:", error);
       toast.error("Failed to deactivate church");
+    }
+  };
+
+  const assignAdmin = async () => {
+    if (!adminEmail.trim()) { toast.error('Email is required'); return; }
+    setAddingAdmin(true);
+    try {
+      const db = getDbClient();
+      const email = adminEmail.trim().toLowerCase();
+
+      // Check if user already exists
+      const { data: existingUser } = await db
+        .from('users')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (existingUser) {
+        // User exists — add/promote as admin for this church
+        const { data: existingMember } = await db
+          .from('members')
+          .select('id, role')
+          .eq('user_id', existingUser.id)
+          .eq('church_id', id)
+          .maybeSingle();
+
+        if (existingMember) {
+          await db.from('members').update({ role: 'admin' }).eq('id', existingMember.id);
+          toast.success(`${email} promoted to admin`);
+        } else {
+          await db.from('members').insert({
+            user_id: existingUser.id,
+            church_id: id,
+            role: 'admin',
+            voice_part: 'soprano',
+            status: 'active'
+          });
+          toast.success(`${email} added as admin`);
+        }
+        setShowAddAdmin(false);
+        setAdminEmail('');
+        setAdminName('');
+        fetchAll();
+      } else {
+        // Create new user via Edge Function
+        const password = generateMemorablePassword();
+
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData.session?.access_token;
+        if (!token) throw new Error('Not authenticated');
+
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-member`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email,
+              password,
+              name: adminName.trim() || email.split('@')[0],
+              role: 'admin',
+              voice_part: 'soprano',
+              status: 'active',
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error || 'Failed to create admin');
+        }
+
+        const result = await response.json();
+        if (result.data?.id) {
+          await db.from('members').insert({
+            user_id: result.data.id,
+            church_id: id,
+            role: 'admin',
+            voice_part: 'soprano',
+            status: 'active',
+          });
+        }
+
+        setGeneratedPassword(password);
+        setShowAddAdmin(false);
+        setShowPasswordModal(true);
+        setAdminEmail('');
+        setAdminName('');
+        fetchAll();
+      }
+    } catch (error: any) {
+      console.error('Admin assign error:', error);
+      toast.error(error.message || 'Failed to assign admin');
+    } finally {
+      setAddingAdmin(false);
     }
   };
 
@@ -324,6 +429,102 @@ export const ChurchDetail = () => {
           ))}
         </div>
       </div>
+
+      {/* Add Admin Modal */}
+      {showAddAdmin && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-amber-600" /> Add Admin
+              </h3>
+              <button onClick={() => { setShowAddAdmin(false); setAdminEmail(''); setAdminName(''); }} className="p-1 hover:bg-gray-100 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                <input
+                  type="text"
+                  value={adminName}
+                  onChange={(e) => setAdminName(e.target.value)}
+                  placeholder="John Doe"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                <input
+                  type="email"
+                  value={adminEmail}
+                  onChange={(e) => setAdminEmail(e.target.value)}
+                  placeholder="admin@example.com"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500"
+                  required
+                />
+              </div>
+              <p className="text-xs text-gray-400">If the email already has an account, they will be promoted to admin. Otherwise a new account will be created with a generated password.</p>
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => { setShowAddAdmin(false); setAdminEmail(''); setAdminName(''); }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={assignAdmin}
+                  disabled={addingAdmin || !adminEmail.trim()}
+                  className="flex-1 px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 disabled:opacity-50"
+                >
+                  {addingAdmin ? 'Adding...' : 'Add Admin'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Password Modal */}
+      {showPasswordModal && generatedPassword && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl">
+            <div className="text-center mb-4">
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <UserPlus className="w-6 h-6 text-green-600" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">Admin Account Created</h3>
+              <p className="text-sm text-gray-500 mt-1">Share these credentials with the admin</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-4 space-y-3 mb-4">
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Email</p>
+                <p className="text-sm font-mono font-semibold text-gray-900">{adminEmail || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Temporary Password</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-mono font-semibold text-gray-900 bg-amber-50 px-2 py-1 rounded border border-amber-200">{generatedPassword}</p>
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(generatedPassword); toast.success('Password copied!'); }}
+                    className="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded font-medium hover:bg-amber-200"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-red-500 mb-4">⚠️ This password will not be shown again. Please save it now.</p>
+            <button
+              onClick={() => { setShowPasswordModal(false); setGeneratedPassword(null); }}
+              className="w-full py-2.5 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700 text-sm"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
