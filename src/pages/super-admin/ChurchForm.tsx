@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getDbClient } from '../../lib/supabase';
+import { getDbClient, supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Church, ArrowLeft, Save } from 'lucide-react';
+import { Church, ArrowLeft, Save, Upload, Image as ImageIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export const ChurchForm = () => {
@@ -13,6 +13,10 @@ export const ChurchForm = () => {
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     name: '',
     short_name: '',
@@ -43,6 +47,8 @@ export const ChurchForm = () => {
 
       if (error) throw error;
       if (data) {
+        setLogoUrl(data.logo_url || null);
+        setLogoPreview(data.logo_url || null);
         setForm({
           name: data.name || '',
           short_name: data.short_name || '',
@@ -79,14 +85,14 @@ export const ChurchForm = () => {
       if (isEdit) {
         const { error } = await supabase
           .from('churches')
-          .update({ ...form, updated_at: new Date().toISOString() })
+          .update({ ...form, logo_url: logoUrl, updated_at: new Date().toISOString() })
           .eq('id', id);
         if (error) throw error;
         toast.success('Church updated!');
       } else {
         const { error } = await supabase
           .from('churches')
-          .insert([{ ...form, created_by: user?.id }]);
+          .insert([{ ...form, logo_url: logoUrl, created_by: user?.id }]);
         if (error) throw error;
         toast.success('Church created!');
       }
@@ -97,6 +103,33 @@ export const ChurchForm = () => {
       toast.error(error.message || 'Failed to save church');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { toast.error('Logo must be under 2MB'); return; }
+    if (!file.type.startsWith('image/')) { toast.error('Please upload an image'); return; }
+
+    setUploading(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = (ev) => setLogoPreview(ev.target?.result as string);
+      reader.readAsDataURL(file);
+
+      const ext = file.name.split('.').pop();
+      const path = `church-logos/${id || 'new-' + Date.now()}/logo.${ext}`;
+      const { error: uploadError } = await supabase.storage.from('church-assets').upload(path, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      const { data: { publicUrl } } = supabase.storage.from('church-assets').getPublicUrl(path);
+      setLogoUrl(publicUrl);
+      toast.success('Logo uploaded!');
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast.error('Failed to upload logo');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -177,6 +210,36 @@ export const ChurchForm = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
             <input type="text" value={form.country} onChange={(e) => handleChange('country', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500" />
+          </div>
+        </div>
+
+        {/* Church Logo */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Church Logo</label>
+          <div className="flex items-center gap-4">
+            <div
+              className="w-16 h-16 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden cursor-pointer hover:border-gray-400 transition"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {logoPreview ? (
+                <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
+              ) : (
+                <ImageIcon className="w-6 h-6 text-gray-300" />
+              )}
+            </div>
+            <div>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="text-sm font-medium px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                {uploading ? 'Uploading...' : 'Upload Logo'}
+              </button>
+              <p className="text-[10px] text-gray-400 mt-1">PNG or JPG, max 2MB</p>
+            </div>
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
           </div>
         </div>
 
