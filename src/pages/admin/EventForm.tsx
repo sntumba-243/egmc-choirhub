@@ -68,8 +68,8 @@ export const EventForm: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('songs')
-        .eq('church_id', church?.id)
         .select('id, title, composer')
+        .eq('church_id', church?.id)
         .order('title', { ascending: true });
 
       if (error) throw error;
@@ -83,8 +83,8 @@ export const EventForm: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('members')
-        .eq('church_id', church?.id)
         .select('id, first_name, last_name, email, voice_part, role')
+        .eq('church_id', church?.id)
         .order('first_name', { ascending: true });
 
       if (error) throw error;
