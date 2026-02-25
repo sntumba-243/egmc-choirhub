@@ -147,6 +147,9 @@ export const ChurchDetail = () => {
           await db.from('members').insert({
             user_id: existingUser.id,
             church_id: id,
+            email: email,
+            first_name: email.split('@')[0],
+            last_name: '',
             role: 'admin',
             voice_part: 'soprano',
             status: 'active'
@@ -195,6 +198,9 @@ export const ChurchDetail = () => {
           await db.from('members').insert({
             user_id: result.data.id,
             church_id: id,
+            email: email,
+            first_name: adminName.trim() || email.split('@')[0],
+            last_name: '',
             role: 'admin',
             voice_part: 'soprano',
             status: 'active',
