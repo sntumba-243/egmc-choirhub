@@ -45,7 +45,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           const { data: memberData } = await supabase
             .from('members')
             .select('*')
-            .eq('id', session.user.id)
+            .eq('email', session.user.email)
             .single();
 
           if (memberData) {
@@ -103,7 +103,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           const { data: memberData } = await supabase
             .from('members')
             .select('*')
-            .eq('id', data.user.id)
+            .eq('email', data.user.email)
             .single();
 
           if (memberData) {
