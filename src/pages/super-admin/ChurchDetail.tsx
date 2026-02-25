@@ -117,6 +117,23 @@ export const ChurchDetail = () => {
     }
   };
 
+  const deleteAdmin = async (memberId: string, memberEmail: string) => {
+    if (!confirm(`Remove ${memberEmail} from this church? This will delete their member record.`)) return;
+    try {
+      const db = getDbClient();
+      const { error } = await db
+        .from('members')
+        .delete()
+        .eq('id', memberId);
+      if (error) throw error;
+      toast.success(`${memberEmail} removed`);
+      fetchAll();
+    } catch (error: any) {
+      console.error('Delete error:', error);
+      toast.error(error.message || 'Failed to remove member');
+    }
+  };
+
   const resetPassword = async (memberEmail: string) => {
     if (!confirm(`Reset password for ${memberEmail}?`)) return;
     try {
@@ -496,6 +513,13 @@ export const ChurchDetail = () => {
                 title="Reset password"
               >
                 <KeyRound className="w-3 h-3" /> Reset PW
+              </button>
+              <button
+                onClick={() => deleteAdmin(member.id, member.email)}
+                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-red-600 hover:bg-red-50"
+                title="Remove from church"
+              >
+                <Trash2 className="w-3 h-3" /> Remove
               </button>
             </div>
           ))}
