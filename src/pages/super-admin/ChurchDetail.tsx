@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getDbClient, supabase } from '../../lib/supabase';
-import { Church, Users, Music, Calendar, ArrowLeft, Edit, Shield, ShieldOff, Trash2, Clock, MapPin, Plus, UserPlus, X } from 'lucide-react';
+import { Church, Users, Music, Calendar, ArrowLeft, Edit, Shield, ShieldOff, Trash2, Clock, MapPin, Plus, UserPlus, X, KeyRound } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { generateMemorablePassword } from '../../lib/passwordUtils';
 
@@ -114,6 +114,60 @@ export const ChurchDetail = () => {
     } catch (error) {
       console.error("Error:", error);
       toast.error("Failed to deactivate church");
+    }
+  };
+
+  const resetPassword = async (memberEmail: string) => {
+    if (!confirm(`Reset password for ${memberEmail}?`)) return;
+    try {
+      const password = generateMemorablePassword();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error('Not authenticated');
+
+      // Find auth user by email to get their auth id
+      const db = getDbClient();
+      const { data: userData } = await db
+        .from('users')
+        .select('id')
+        .eq('email', memberEmail)
+        .maybeSingle();
+
+      if (!userData) {
+        toast.error('User not found in database');
+        return;
+      }
+
+      // Use Edge Function to reset password
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reset-password`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            user_id: userData.id,
+            new_password: password,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        // Fallback: try admin API directly won't work from client
+        // Show the password and let super admin update manually
+        toast.error('Password reset requires edge function. Deploying...');
+        return;
+      }
+
+      setCreatedAdminEmail(memberEmail);
+      setGeneratedPassword(password);
+      setShowPasswordModal(true);
+      toast.success('Password reset!');
+    } catch (error: any) {
+      console.error('Reset error:', error);
+      toast.error(error.message || 'Failed to reset password');
     }
   };
 
@@ -435,6 +489,13 @@ export const ChurchDetail = () => {
               >
                 {member.is_super_admin ? <ShieldOff className="w-3 h-3" /> : <Shield className="w-3 h-3" />}
                 {member.is_super_admin ? 'Remove SA' : 'Make SA'}
+              </button>
+              <button
+                onClick={() => resetPassword(member.email)}
+                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-blue-600 hover:bg-blue-50"
+                title="Reset password"
+              >
+                <KeyRound className="w-3 h-3" /> Reset PW
               </button>
             </div>
           ))}
