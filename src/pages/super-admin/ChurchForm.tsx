@@ -158,12 +158,12 @@ export const ChurchForm = () => {
       const db = getDbClient();
       const email = adminEmail.trim().toLowerCase();
       
-      // Check if user already exists
+      // Check if user already exists (.maybeSingle returns null instead of throwing)
       const { data: existingUser } = await db
         .from('users')
         .select('id')
         .eq('email', email)
-        .single();
+        .maybeSingle();
 
       if (existingUser) {
         // User exists — add/promote as admin
@@ -172,7 +172,7 @@ export const ChurchForm = () => {
           .select('id, role')
           .eq('user_id', existingUser.id)
           .eq('church_id', churchId)
-          .single();
+          .maybeSingle();
 
         if (existingMember) {
           await db.from('members').update({ role: 'admin' }).eq('id', existingMember.id);
