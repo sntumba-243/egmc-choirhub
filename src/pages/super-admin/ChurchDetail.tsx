@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getDbClient } from '../../lib/supabase';
-import { Church, Users, Music, Calendar, ArrowLeft, Edit, Shield, ShieldOff, Trash2, Clock, MapPin } from 'lucide-react';
+import { Church, Users, Music, Calendar, ArrowLeft, Edit, Shield, ShieldOff, Trash2, Clock, MapPin, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface ChurchData {
@@ -283,9 +283,17 @@ export const ChurchDetail = () => {
 
       {/* Members */}
       <div id="church-members" className="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-          <Users className="w-5 h-5" /> Members ({members.length})
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold flex items-center gap-2">
+            <Users className="w-5 h-5" /> Members ({members.length})
+          </h2>
+          <button
+            onClick={() => navigate(`/admin/members/new?church_id=${id}`)}
+            className="flex items-center gap-1 px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700"
+          >
+            <Plus className="w-3.5 h-3.5" /> Add Member
+          </button>
+        </div>
         <div className="space-y-2">
           {members.map((member) => (
             <div key={member.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50">

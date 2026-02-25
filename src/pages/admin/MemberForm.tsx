@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Mail, Phone, Lock, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
@@ -12,6 +12,8 @@ export const MemberForm: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { church } = useChurch();
+  const [searchParams] = useSearchParams();
+  const churchIdParam = searchParams.get('church_id');
   const { id: memberId } = useParams();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -114,7 +116,7 @@ export const MemberForm: React.FC = () => {
     setLoading(true);
 
     try {
-      if (!church?.id) {
+      if (!churchIdParam && !church?.id) {
         toast.error('No church selected');
         setLoading(false);
         return;
@@ -129,7 +131,7 @@ export const MemberForm: React.FC = () => {
         voice_part: voicePart,
         role,
         status,
-        church_id: church.id,
+        church_id: churchIdParam || church?.id,
       };
 
       if (memberId) {
@@ -180,7 +182,11 @@ export const MemberForm: React.FC = () => {
   const handleClosePasswordModal = () => {
     setShowPasswordModal(false);
     setGeneratedPassword('');
-    navigate('/admin/members');
+    if (churchIdParam) {
+      navigate(\`/super-admin/churches/\${churchIdParam}\`);
+    } else {
+      navigate('/admin/members');
+    }
   };
 
   return (
