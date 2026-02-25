@@ -9,6 +9,7 @@ interface ChurchData {
   name: string;
   short_name: string;
   primary_color: string;
+  logo_url: string | null;
   city: string | null;
   country: string | null;
   is_active: boolean;
@@ -107,12 +108,16 @@ export const Churches = () => {
             className="w-full bg-white rounded-lg p-4 border border-gray-100 hover:shadow-md transition-all text-left flex items-center justify-between"
           >
             <div className="flex items-center gap-3">
-              <div
-                className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold"
-                style={{ backgroundColor: church.primary_color }}
-              >
-                {church.short_name.substring(0, 2)}
-              </div>
+              {church.logo_url ? (
+                <img src={church.logo_url} alt={church.short_name} className="w-12 h-12 rounded-lg object-cover" />
+              ) : (
+                <div
+                  className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold"
+                  style={{ backgroundColor: church.primary_color || '#6366f1' }}
+                >
+                  {church.short_name.substring(0, 2)}
+                </div>
+              )}
               <div>
                 <h3 className="font-semibold text-gray-900">{church.name}</h3>
                 <div className="flex items-center gap-3 mt-0.5">

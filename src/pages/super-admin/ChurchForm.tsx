@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getDbClient, supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Church, ArrowLeft, Save, Upload, Image as ImageIcon } from 'lucide-react';
+import { Church, ArrowLeft, Save, Upload, Image as ImageIcon, UserPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export const ChurchForm = () => {
@@ -17,6 +17,8 @@ export const ChurchForm = () => {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [adminEmail, setAdminEmail] = useState('');
+  const [assigningAdmin, setAssigningAdmin] = useState(false);
   const [form, setForm] = useState({
     name: '',
     short_name: '',
@@ -92,11 +94,18 @@ export const ChurchForm = () => {
       } else {
         const { error } = await supabase
           .from('churches')
-          .insert([{ ...form, logo_url: logoUrl, created_by: user?.id }]);
+          .insert([{ ...form, logo_url: logoUrl, created_by: user?.id }]).select();
         if (error) throw error;
         toast.success('Church created!');
       }
 
+      // If new church and admin email provided, assign admin
+      if (!isEdit && adminEmail.trim() && data?.[0]?.id) {
+        await assignAdmin(data[0].id);
+      }
+      if (isEdit && adminEmail.trim() && id) {
+        await assignAdmin(id);
+      }
       navigate('/super-admin/churches');
     } catch (error: any) {
       console.error('Error:', error);
@@ -130,6 +139,52 @@ export const ChurchForm = () => {
       toast.error('Failed to upload logo');
     } finally {
       setUploading(false);
+    }
+  };
+
+  const assignAdmin = async (churchId: string) => {
+    if (!adminEmail.trim()) return;
+    setAssigningAdmin(true);
+    try {
+      const supabase = getDbClient();
+      // Check if user exists in auth (via members table or users)
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', adminEmail.trim().toLowerCase())
+        .single();
+
+      if (existingUser) {
+        // User exists — create member record with admin role
+        const { data: existingMember } = await supabase
+          .from('members')
+          .select('id, role')
+          .eq('user_id', existingUser.id)
+          .eq('church_id', churchId)
+          .single();
+
+        if (existingMember) {
+          await supabase.from('members').update({ role: 'admin' }).eq('id', existingMember.id);
+          toast.success(`${adminEmail} promoted to admin`);
+        } else {
+          await supabase.from('members').insert({
+            user_id: existingUser.id,
+            church_id: churchId,
+            role: 'admin',
+            voice_part: 'soprano',
+            status: 'active'
+          });
+          toast.success(`${adminEmail} added as admin`);
+        }
+      } else {
+        // User doesn't exist yet — create an invite/placeholder
+        toast.error('User not found. They must sign up first, then you can assign them.');
+      }
+    } catch (error: any) {
+      console.error('Admin assign error:', error);
+      toast.error('Failed to assign admin');
+    } finally {
+      setAssigningAdmin(false);
     }
   };
 
@@ -211,6 +266,21 @@ export const ChurchForm = () => {
             <input type="text" value={form.country} onChange={(e) => handleChange('country', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500" />
           </div>
+        </div>
+
+        {/* Assign Admin */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            <span className="flex items-center gap-1.5"><UserPlus className="w-4 h-4" /> Assign Admin</span>
+          </label>
+          <input
+            type="email"
+            value={adminEmail}
+            onChange={(e) => setAdminEmail(e.target.value)}
+            placeholder="admin@example.com"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+          />
+          <p className="text-xs text-gray-400 mt-1">Email of the person who will manage this church. They must have an account.</p>
         </div>
 
         {/* Church Logo */}
