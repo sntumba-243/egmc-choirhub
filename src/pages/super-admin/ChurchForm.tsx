@@ -167,7 +167,7 @@ export const ChurchForm = () => {
         const { data: existingMember } = await db
           .from('members')
           .select('id, role')
-          .eq('user_id', existingUser.id)
+          .eq('id', existingUser.id)
           .eq('church_id', churchId)
           .maybeSingle();
 
@@ -176,7 +176,7 @@ export const ChurchForm = () => {
           toast.success(`${email} promoted to admin`);
         } else {
           await db.from('members').insert({
-            user_id: existingUser.id,
+            id: existingUser.id,
             church_id: churchId,
             role: 'admin',
             voice_part: 'soprano',
@@ -221,7 +221,7 @@ export const ChurchForm = () => {
         const result = await response.json();
         if (result.data?.id) {
           await db.from('members').insert({
-            user_id: result.data.id,
+            id: result.data.id,
             church_id: churchId,
             role: 'admin',
             voice_part: 'soprano',
