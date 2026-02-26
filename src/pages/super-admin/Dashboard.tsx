@@ -34,7 +34,7 @@ export const SuperAdminDashboard = () => {
         supabase.from('churches').select('*').eq('is_active', true),
         supabase.from('songs').select('id', { count: 'exact', head: true }),
         supabase.from('members').select('id', { count: 'exact', head: true }),
-        supabase.from('events').select('id', { count: 'exact', head: true }).gte('date', new Date().toISOString().split('T')[0]),
+        supabase.from('events').select('id', { count: 'exact', head: true }).eq('is_global', true).gte('date', new Date().toISOString().split('T')[0]),
       ]);
 
       setTotalSongs(songsRes.count || 0);

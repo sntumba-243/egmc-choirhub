@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
 interface LoginProps {
@@ -14,7 +15,31 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister }) => {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [churchLogo, setChurchLogo] = useState<string | null>(localStorage.getItem('login_church_logo'));
+  const [churchName, setChurchName] = useState<string | null>(localStorage.getItem('login_church_name'));
 
+
+  const lookupChurch = async (emailValue: string) => {
+    if (!emailValue.trim()) return;
+    try {
+      const { data: member } = await supabase
+        .from('members')
+        .select('church_id, churches(name, short_name, logo_url)')
+        .eq('email', emailValue.trim().toLowerCase())
+        .single();
+      if (member?.churches) {
+        const c = member.churches as any;
+        const name = c.short_name || c.name || null;
+        const logo = c.logo_url || null;
+        setChurchName(name);
+        setChurchLogo(logo);
+        if (name) localStorage.setItem('login_church_name', name);
+        if (logo) localStorage.setItem('login_church_logo', logo);
+      }
+    } catch (err) {
+      // silently fail - just show default branding
+    }
+  };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -98,49 +123,58 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister }) => {
       <div className="w-full max-w-[380px] relative z-10">
         {/* Logo */}
         <div className="text-center mb-5">
-          <div
-            className="w-14 h-14 mx-auto mb-3 flex items-center justify-center relative overflow-hidden"
-            style={{
-              background: 'linear-gradient(145deg, #1a3a6e, #0d2247)',
-              borderRadius: '14px',
-              boxShadow: '0 4px 16px rgba(26,58,110,0.2)',
-            }}
-          >
-            <div
-              className="absolute rounded-full"
-              style={{
-                top: '-30%', right: '-30%', width: '80%', height: '80%',
-                background: 'radial-gradient(circle, rgba(91,155,255,0.2), transparent)',
-              }}
+          {churchLogo ? (
+            <img
+              src={churchLogo}
+              alt={churchName || 'Church'}
+              className="w-16 h-16 mx-auto mb-3 rounded-2xl object-cover"
+              style={{ boxShadow: '0 4px 16px rgba(26,58,110,0.2)' }}
             />
+          ) : (
             <div
-              className="absolute z-10"
-              style={{ top: '5px', right: '7px', fontSize: '7px', color: 'rgba(200,175,100,0.65)' }}
+              className="w-14 h-14 mx-auto mb-3 flex items-center justify-center relative overflow-hidden"
+              style={{
+                background: 'linear-gradient(145deg, #1a3a6e, #0d2247)',
+                borderRadius: '14px',
+                boxShadow: '0 4px 16px rgba(26,58,110,0.2)',
+              }}
             >
-              ✟
+              <div
+                className="absolute rounded-full"
+                style={{
+                  top: '-30%', right: '-30%', width: '80%', height: '80%',
+                  background: 'radial-gradient(circle, rgba(91,155,255,0.2), transparent)',
+                }}
+              />
+              <div
+                className="absolute z-10"
+                style={{ top: '5px', right: '7px', fontSize: '7px', color: 'rgba(200,175,100,0.65)' }}
+              >
+                ✟
+              </div>
+              <div className="flex items-end relative z-10" style={{ gap: '2.5px' }}>
+                {[10, 17, 24, 17, 10].map((h, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      width: '3.5px',
+                      height: `${h}px`,
+                      borderRadius: '2px',
+                      background: 'linear-gradient(to top, #5b9bff, #a8cdff)',
+                    }}
+                  />
+                ))}
+              </div>
             </div>
-            <div className="flex items-end relative z-10" style={{ gap: '2.5px' }}>
-              {[10, 17, 24, 17, 10].map((h, i) => (
-                <div
-                  key={i}
-                  style={{
-                    width: '3.5px',
-                    height: `${h}px`,
-                    borderRadius: '2px',
-                    background: 'linear-gradient(to top, #5b9bff, #a8cdff)',
-                  }}
-                />
-              ))}
-            </div>
-          </div>
+          )}
           <h1 className="font-bold tracking-tight" style={{ fontSize: '1.3rem', color: '#152640' }}>
-            Choir<span style={{ color: '#1e4480' }}>Hub</span>
+            {churchName || (<>Choir<span style={{ color: '#1e4480' }}>Hub</span></>)}
           </h1>
           <p
             className="font-light uppercase"
             style={{ fontSize: '0.65rem', marginTop: '2px', letterSpacing: '1.5px', color: 'rgba(30,50,80,0.35)' }}
           >
-            Harmony in every voice
+            {churchName ? 'Welcome back' : 'Harmony in every voice'}
           </p>
         </div>
 
@@ -198,7 +232,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister }) => {
                   required
                   style={{ ...inputStyle, paddingLeft: '34px', paddingRight: '12px' }}
                   onFocus={handleFocus}
-                  onBlur={handleBlur}
+                  onBlur={(e) => { handleBlur(e); lookupChurch(email); }}
                 />
               </div>
             </div>

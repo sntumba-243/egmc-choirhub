@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { Music, Search, Edit, Trash2, Grid3x3, List, Eye, Star, Calendar, X, CheckCircle, BookOpen, Clock } from 'lucide-react';
+import { Music, Search, Edit, Trash2, Star, Calendar, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { useChurch } from '../../contexts/ChurchContext';
@@ -33,15 +33,15 @@ export const AdminRepertoire = () => {
   const [songs, setSongs] = useState<SongWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [selectedSongs, setSelectedSongs] = useState<Set<string>>(new Set());
   const [showEventModal, setShowEventModal] = useState(false);
   const [events, setEvents] = useState<Event[]>([]);
   const [sortBy, setSortBy] = useState<'a-z' | 'z-a' | 'recent'>('a-z');
-  const [languageFilter, setLanguageFilter] = useState<'all' | 'english' | 'french' | 'portuguese' | 'lingala' | 'tshiluba' | 'kikongo' | 'swahili'>('all');
+  const [languageFilter, setLanguageFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'learned' | 'learning' | 'not_started'>('all');
+  const [showFilters, setShowFilters] = useState(false);
 
   const isSuperAdmin = user?.is_super_admin === true;
 
@@ -53,38 +53,33 @@ export const AdminRepertoire = () => {
     }
   }, [church?.id]);
 
+  const getAuthUid = async (): Promise<string | null> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.user?.id || null;
+  };
+
   const fetchSongs = async () => {
     if (!church?.id) return;
     try {
-      // Fetch all songs (global)
       const { data: songsData, error: songsError } = await supabase
         .from('songs')
         .select('*')
         .order('title', { ascending: true });
-
       if (songsError) throw songsError;
 
-      // Fetch per-church learning status
       const { data: statusData, error: statusError } = await supabase
         .from('church_song_status')
         .select('song_id, status')
         .eq('church_id', church.id);
-
       if (statusError) throw statusError;
 
-      // Build a map of song_id -> status
       const statusMap = new Map<string, 'learned' | 'learning' | 'not_started'>();
-      (statusData || []).forEach((s: any) => {
-        statusMap.set(s.song_id, s.status);
-      });
+      (statusData || []).forEach((s: any) => statusMap.set(s.song_id, s.status));
 
-      // Merge songs with their per-church status
-      const merged: SongWithStatus[] = (songsData || []).map((song: Song) => ({
+      setSongs((songsData || []).map((song: Song) => ({
         ...song,
         learning_status: statusMap.get(song.id) || 'not_started',
-      }));
-
-      setSongs(merged);
+      })));
     } catch (error) {
       console.error('Error:', error);
       toast.error('Failed to load songs');
@@ -93,25 +88,14 @@ export const AdminRepertoire = () => {
     }
   };
 
-  const getAuthUid = async (): Promise<string | null> => {
-    const { data: { session } } = await supabase.auth.getSession();
-    return session?.user?.id || null;
-  };
-
   const fetchFavorites = async () => {
     if (!user) return;
     try {
       const authUid = await getAuthUid();
       if (!authUid) return;
-
-      const { data, error } = await supabase
-        .from('user_favorites')
-        .select('song_id')
-        .eq('user_id', authUid);
-
+      const { data, error } = await supabase.from('user_favorites').select('song_id').eq('user_id', authUid);
       if (error) throw error;
-      const favSet = new Set(data?.map(f => f.song_id) || []);
-      setFavorites(favSet);
+      setFavorites(new Set(data?.map(f => f.song_id) || []));
     } catch (error) {
       console.error('Error loading favorites:', error);
     }
@@ -127,7 +111,6 @@ export const AdminRepertoire = () => {
         .gte('date', new Date().toISOString().split('T')[0])
         .order('date', { ascending: true })
         .limit(20);
-
       if (error) throw error;
       setEvents(data || []);
     } catch (error) {
@@ -138,200 +121,110 @@ export const AdminRepertoire = () => {
   const toggleFavorite = async (songId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!user) return;
-
     const authUid = await getAuthUid();
     if (!authUid) return;
-
-    const isFavorite = favorites.has(songId);
-
+    const isFav = favorites.has(songId);
     try {
-      if (isFavorite) {
-        const { error } = await supabase
-          .from('user_favorites')
-          .delete()
-          .eq('user_id', authUid)
-          .eq('song_id', songId);
-
-        if (error) throw error;
-
-        const newFavorites = new Set(favorites);
-        newFavorites.delete(songId);
-        setFavorites(newFavorites);
+      if (isFav) {
+        await supabase.from('user_favorites').delete().eq('user_id', authUid).eq('song_id', songId);
+        const nf = new Set(favorites); nf.delete(songId); setFavorites(nf);
         toast.success('Removed from favorites');
       } else {
-        const { error } = await supabase
-          .from('user_favorites')
-          .insert({ user_id: authUid, song_id: songId });
-
-        if (error) throw error;
-
-        const newFavorites = new Set(favorites);
-        newFavorites.add(songId);
-        setFavorites(newFavorites);
+        await supabase.from('user_favorites').insert({ user_id: authUid, song_id: songId });
+        const nf = new Set(favorites); nf.add(songId); setFavorites(nf);
         toast.success('Added to favorites');
       }
     } catch (error) {
-      console.error('Error toggling favorite:', error);
       toast.error('Failed to update favorite');
     }
   };
 
-  const toggleSongSelection = (songId: string) => {
-    const newSelection = new Set(selectedSongs);
-    if (newSelection.has(songId)) {
-      newSelection.delete(songId);
-    } else {
-      newSelection.add(songId);
+  const handleStatusCycle = async (songId: string, currentStatus: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!church?.id) return;
+    const cycle: Record<string, 'learned' | 'learning' | 'not_started'> = {
+      not_started: 'learning', learning: 'learned', learned: 'not_started',
+    };
+    const nextStatus = cycle[currentStatus] || 'learning';
+    try {
+      const { error } = await supabase
+        .from('church_song_status')
+        .upsert({ church_id: church.id, song_id: songId, status: nextStatus, updated_at: new Date().toISOString() }, { onConflict: 'church_id,song_id' });
+      if (error) throw error;
+      setSongs(songs.map(s => s.id === songId ? { ...s, learning_status: nextStatus } : s));
+      toast.success(`→ ${nextStatus === 'learned' ? 'Learned' : nextStatus === 'learning' ? 'Learning' : 'Not Started'}`);
+    } catch (error) {
+      toast.error('Failed to update status');
     }
-    setSelectedSongs(newSelection);
+  };
+
+  const toggleSongSelection = (songId: string) => {
+    const ns = new Set(selectedSongs);
+    ns.has(songId) ? ns.delete(songId) : ns.add(songId);
+    setSelectedSongs(ns);
   };
 
   const addSongsToEvent = async (eventId: string) => {
-    if (selectedSongs.size === 0) {
-      toast.error('No songs selected');
-      return;
-    }
-
+    if (selectedSongs.size === 0) return;
     try {
-      const songsToAdd = Array.from(selectedSongs).map(songId => ({
-        event_id: eventId,
-        song_id: songId,
-        created_at: new Date().toISOString(),
-      }));
-
-      const { error } = await supabase
-        .from('event_songs')
-        .insert(songsToAdd);
-
+      const { error } = await supabase.from('event_songs').insert(
+        Array.from(selectedSongs).map(songId => ({ event_id: eventId, song_id: songId, created_at: new Date().toISOString() }))
+      );
       if (error) throw error;
-
       toast.success(`Added ${selectedSongs.size} songs to event`);
       setSelectedSongs(new Set());
       setShowEventModal(false);
     } catch (error: any) {
-      console.error('Error adding songs to event:', error);
-      if (error.message?.includes('duplicate key')) {
-        toast.error('Some songs already in this event');
-      } else {
-        toast.error('Failed to add songs to event');
-      }
+      toast.error(error.message?.includes('duplicate') ? 'Some songs already in this event' : 'Failed to add songs');
     }
   };
 
   const handleBulkStatusUpdate = async (status: 'learned' | 'learning' | 'not_started') => {
-    if (selectedSongs.size === 0 || !church?.id) {
-      toast.error('No songs selected');
-      return;
-    }
-
+    if (selectedSongs.size === 0 || !church?.id) return;
     try {
-      // Upsert into church_song_status for each selected song
-      const upsertData = Array.from(selectedSongs).map(songId => ({
-        church_id: church.id,
-        song_id: songId,
-        status,
-        updated_at: new Date().toISOString(),
-      }));
-
-      const { error } = await supabase
-        .from('church_song_status')
-        .upsert(upsertData, { onConflict: 'church_id,song_id' });
-
+      const { error } = await supabase.from('church_song_status').upsert(
+        Array.from(selectedSongs).map(songId => ({ church_id: church.id, song_id: songId, status, updated_at: new Date().toISOString() })),
+        { onConflict: 'church_id,song_id' }
+      );
       if (error) throw error;
-
-      const statusLabel = status === 'learned' ? 'Learned' : status === 'learning' ? 'Learning' : 'Not Started';
-      toast.success(`${selectedSongs.size} song(s) marked as ${statusLabel}`);
-
+      toast.success(`${selectedSongs.size} song(s) updated`);
       setSelectedSongs(new Set());
       fetchSongs();
     } catch (error) {
-      console.error('Error updating songs:', error);
-      toast.error('Failed to update songs');
+      toast.error('Failed to update');
     }
   };
 
-  const selectAllFiltered = () => {
-    setSelectedSongs(new Set(filteredSongs.map(s => s.id)));
-    toast.success(`Selected ${filteredSongs.length} songs`);
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!isSuperAdmin) return;
-    if (!confirm('Delete this song?')) return;
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isSuperAdmin || !confirm('Delete this song?')) return;
     try {
-      const { error } = await supabase.from('songs').delete().eq('id', id);
-      if (error) throw error;
+      await supabase.from('songs').delete().eq('id', id);
       setSongs(songs.filter(s => s.id !== id));
       toast.success('Song deleted');
-    } catch (error) {
-      toast.error('Failed to delete song');
-    }
+    } catch { toast.error('Failed to delete'); }
   };
 
   const handleViewPDF = (song: Song) => {
-    if (song.sheet_music_url) {
-      navigate('/pdf-viewer', {
-        state: { url: song.sheet_music_url, title: song.title }
-      });
-    }
+    if (song.sheet_music_url) navigate('/pdf-viewer', { state: { url: song.sheet_music_url, title: song.title } });
   };
 
-  const getStatusBadge = (status?: string) => {
-    switch (status) {
-      case 'learned':
-        return <span className="text-xs">✅</span>;
-      case 'learning':
-        return <span className="text-xs">📚</span>;
-      case 'not_started':
-        return <span className="text-xs">⏳</span>;
-      default:
-        return <span className="text-xs">⏳</span>;
-    }
-  };
-
-  const filterByLanguage = (song: Song): boolean => {
-    if (languageFilter === 'all') return true;
-    if (languageFilter === 'english') return song.language === 'English';
-    if (languageFilter === 'french') return song.language === 'French';
-    if (languageFilter === 'portuguese') return song.language === 'Portuguese';
-    if (languageFilter === 'lingala') return song.language === 'Lingala';
-    if (languageFilter === 'tshiluba') return song.language === 'Tshiluba';
-    if (languageFilter === 'kikongo') return song.language === 'Kikongo';
-    if (languageFilter === 'swahili') return song.language === 'Swahili';
-    return true;
+  const getLangColor = (lang: string) => {
+    const c: Record<string, string> = { English: 'bg-blue-500', French: 'bg-purple-500', Lingala: 'bg-green-500', Tshiluba: 'bg-yellow-500', Swahili: 'bg-teal-500', Kikongo: 'bg-orange-500', Portuguese: 'bg-pink-500' };
+    return c[lang] || 'bg-gray-400';
   };
 
   const filteredSongs = songs.filter(song => {
-    if (!filterByLanguage(song)) return false;
-
-    if (statusFilter !== 'all' && song.learning_status !== statusFilter) {
-      return false;
-    }
-
-    const search = searchTerm.toLowerCase();
-    const titleMatch = song.title.toLowerCase().includes(search);
-    const composerMatch = song.composer?.toLowerCase().includes(search);
-    const matchesSearch = titleMatch || composerMatch;
-
-    if (showFavoritesOnly) {
-      return matchesSearch && favorites.has(song.id);
-    }
-
-    return matchesSearch;
+    if (languageFilter !== 'all' && song.language?.toLowerCase() !== languageFilter) return false;
+    if (statusFilter !== 'all' && song.learning_status !== statusFilter) return false;
+    const s = searchTerm.toLowerCase();
+    const m = song.title.toLowerCase().includes(s) || song.composer?.toLowerCase().includes(s);
+    return showFavoritesOnly ? m && favorites.has(song.id) : m;
   }).sort((a, b) => {
-    switch (sortBy) {
-      case 'a-z':
-        return a.title.localeCompare(b.title);
-      case 'z-a':
-        return b.title.localeCompare(a.title);
-      case 'recent':
-        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-      default:
-        return 0;
-    }
+    if (sortBy === 'z-a') return b.title.localeCompare(a.title);
+    if (sortBy === 'recent') return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    return a.title.localeCompare(b.title);
   });
-
-  const favoriteCount = favorites.size;
 
   const stats = {
     total: songs.length,
@@ -341,412 +234,174 @@ export const AdminRepertoire = () => {
   };
   const masteryRate = stats.total > 0 ? Math.round((stats.learned / stats.total) * 100) : 0;
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+    </div>
+  );
 
   return (
-    <div className="space-y-4 p-4">
-      {/* Compact Header */}
-      <div className="flex justify-between items-center">
+    <div className="space-y-2 p-3 max-w-4xl mx-auto">
+      {/* Header */}
+      <div className="flex justify-between items-baseline">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Repertoire</h1>
-          <p className="text-xs text-gray-600 mt-0.5">
-            {filteredSongs.length} of {songs.length} songs
-          </p>
+          <h1 className="text-lg font-bold text-gray-900">Repertoire</h1>
+          <p className="text-[10px] text-gray-400">{filteredSongs.length} of {songs.length}</p>
         </div>
-        {/* Only super admin can add songs */}
         {isSuperAdmin && (
-          <button
-            onClick={() => navigate('new')}
-            className="text-sm text-indigo-600 hover:text-indigo-700 font-semibold"
-          >
-            + Add Song
-          </button>
+          <button onClick={() => navigate('new')} className="text-xs text-indigo-600 font-semibold">+ Add</button>
         )}
       </div>
 
-      {/* Compact Stats */}
-      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-        <button
-          onClick={() => setStatusFilter('all')}
-          className={`bg-white rounded-lg shadow-sm border p-2 text-center transition ${
-            statusFilter === 'all' ? 'ring-2 ring-indigo-500 border-indigo-500' : 'border-gray-200'
-          }`}
-        >
-          <div className="text-lg font-bold text-gray-900">{stats.total}</div>
-          <div className="text-xs text-gray-600">Total</div>
-        </button>
-        <button
-          onClick={() => setStatusFilter('learned')}
-          className={`bg-green-50 border rounded-lg shadow-sm p-2 text-center transition ${
-            statusFilter === 'learned' ? 'ring-2 ring-green-500 border-green-500' : 'border-green-200'
-          }`}
-        >
-          <div className="text-lg font-bold text-green-700">{stats.learned}</div>
-          <div className="text-xs text-gray-700">✅</div>
-        </button>
-        <button
-          onClick={() => setStatusFilter('learning')}
-          className={`bg-yellow-50 border rounded-lg shadow-sm p-2 text-center transition ${
-            statusFilter === 'learning' ? 'ring-2 ring-yellow-500 border-yellow-500' : 'border-yellow-200'
-          }`}
-        >
-          <div className="text-lg font-bold text-yellow-700">{stats.learning}</div>
-          <div className="text-xs text-gray-700">📚</div>
-        </button>
-        <button
-          onClick={() => setStatusFilter('not_started')}
-          className={`bg-gray-50 border rounded-lg shadow-sm p-2 text-center transition ${
-            statusFilter === 'not_started' ? 'ring-2 ring-gray-500 border-gray-500' : 'border-gray-200'
-          }`}
-        >
-          <div className="text-lg font-bold text-gray-700">{stats.notStarted}</div>
-          <div className="text-xs text-gray-700">⏳</div>
-        </button>
-        <div className="bg-indigo-50 border border-indigo-200 rounded-lg shadow-sm p-2 text-center">
-          <div className="text-lg font-bold text-indigo-700">{masteryRate}%</div>
-          <div className="text-xs text-gray-700">Rate</div>
-        </div>
-      </div>
-
-      {/* Compact Search & Filters */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 space-y-2">
-        <div className="flex flex-wrap gap-2">
-          <div className="flex-1 min-w-[200px] relative">
-            <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search songs..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
-            className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white font-medium text-gray-700"
-          >
-            <option value="a-z">A → Z</option>
-            <option value="z-a">Z → A</option>
-            <option value="recent">Recent</option>
-          </select>
-
-          <select
-            value={languageFilter}
-            onChange={(e) => setLanguageFilter(e.target.value as any)}
-            className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white font-medium text-gray-700"
-          >
-            <option value="all">All</option>
-            <option value="english">English</option>
-            <option value="french">French</option>
-            <option value="portuguese">Portuguese</option>
-            <option value="lingala">Lingala</option>
-            <option value="tshiluba">Tshiluba</option>
-            <option value="kikongo">Kikongo</option>
-            <option value="swahili">Swahili</option>
-          </select>
-
-          <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'}`}
-            >
-              <Grid3x3 className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'}`}
-            >
-              <List className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <button
-            onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-              showFavoritesOnly ? 'bg-yellow-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            <Star className={`w-3.5 h-3.5 ${showFavoritesOnly ? 'fill-white' : ''}`} />
-            Favorites {favoriteCount > 0 && `(${favoriteCount})`}
+      {/* Stats */}
+      <div className="flex gap-1">
+        {[
+          { key: 'all' as const, label: 'Total', value: stats.total, cls: '' },
+          { key: 'learned' as const, label: '✅', value: stats.learned, cls: 'bg-green-50 border-green-200' },
+          { key: 'learning' as const, label: '📚', value: stats.learning, cls: 'bg-yellow-50 border-yellow-200' },
+          { key: 'not_started' as const, label: '⏳', value: stats.notStarted, cls: 'bg-gray-50' },
+        ].map(s => (
+          <button key={s.key} onClick={() => setStatusFilter(s.key)}
+            className={`flex-1 rounded-lg border p-1.5 text-center transition ${s.cls} ${statusFilter === s.key ? 'ring-2 ring-indigo-500' : 'border-gray-200'}`}>
+            <div className="text-sm font-bold">{s.value}</div>
+            <div className="text-[8px] text-gray-500">{s.label}</div>
           </button>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            {selectedSongs.size > 0 && (
-              <button
-                onClick={() => setShowEventModal(true)}
-                className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-semibold hover:bg-green-700"
-              >
-                <Calendar className="w-3.5 h-3.5" />
-                Add to Event ({selectedSongs.size})
-              </button>
-            )}
-            <button
-              onClick={selectedSongs.size > 0 ? () => setSelectedSongs(new Set()) : selectAllFiltered}
-              className={`px-3 py-1.5 text-xs rounded-lg font-semibold ${
-                selectedSongs.size > 0
-                  ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                  : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
-              }`}
-            >
-              {selectedSongs.size > 0 ? `✕ Deselect (${selectedSongs.size})` : 'Select All'}
-            </button>
-            {/* Only super admin sees Bulk Edit */}
-            {isSuperAdmin && (
-              <button
-                onClick={() => navigate('../bulk-edit')}
-                className="px-3 py-1.5 text-xs bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700"
-              >
-                Bulk Edit
-              </button>
-            )}
-          </div>
+        ))}
+        <div className="flex-1 rounded-lg border border-indigo-200 bg-indigo-50 p-1.5 text-center">
+          <div className="text-sm font-bold text-indigo-700">{masteryRate}%</div>
+          <div className="text-[8px] text-gray-500">Rate</div>
         </div>
       </div>
 
-      {/* Bulk Selection Bar — admin + super admin can change status */}
-      {selectedSongs.size > 0 && (
-        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-indigo-900">
-              {selectedSongs.size} selected
-            </span>
-            <div className="flex items-center gap-2">
-              <select
-                value=""
-                onChange={(e) => {
-                  if (e.target.value) {
-                    handleBulkStatusUpdate(e.target.value as 'learned' | 'learning' | 'not_started');
-                  }
-                }}
-                className="px-3 py-1.5 text-xs border border-indigo-300 rounded-lg bg-white font-medium"
-              >
-                <option value="">Mark as...</option>
-                <option value="learned">✅ Learned</option>
-                <option value="learning">📚 Learning</option>
-                <option value="not_started">⏳ Not Started</option>
-              </select>
-              <button
-                onClick={() => setSelectedSongs(new Set())}
-                className="text-xs text-gray-700 hover:text-gray-900 font-medium"
-              >
-                Clear
-              </button>
-            </div>
+      {/* Search */}
+      <div className="flex gap-1.5">
+        <div className="flex-1 relative">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-300 w-3.5 h-3.5" />
+          <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-7 pr-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+        </div>
+        <button onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+          className={`w-8 h-8 flex items-center justify-center rounded-lg border text-sm ${showFavoritesOnly ? 'bg-yellow-500 border-yellow-500 text-white' : 'bg-white border-gray-200'}`}>
+          <Star className={`w-3.5 h-3.5 ${showFavoritesOnly ? 'fill-white' : 'text-gray-400'}`} />
+        </button>
+        <button onClick={() => setShowFilters(!showFilters)}
+          className={`w-8 h-8 flex items-center justify-center rounded-lg border text-xs font-bold ${showFilters ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-gray-200 text-gray-400'}`}>
+          ⚙
+        </button>
+      </div>
+
+      {/* Filters */}
+      {showFilters && (
+        <div className="bg-white rounded-lg border border-gray-200 p-2 flex gap-2">
+          <div className="flex-1">
+            <label className="text-[9px] font-medium text-gray-400 uppercase">Sort</label>
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)} className="w-full mt-0.5 px-2 py-1 text-xs border border-gray-200 rounded bg-white">
+              <option value="a-z">A → Z</option><option value="z-a">Z → A</option><option value="recent">Recent</option>
+            </select>
+          </div>
+          <div className="flex-1">
+            <label className="text-[9px] font-medium text-gray-400 uppercase">Language</label>
+            <select value={languageFilter} onChange={(e) => setLanguageFilter(e.target.value)} className="w-full mt-0.5 px-2 py-1 text-xs border border-gray-200 rounded bg-white">
+              <option value="all">All</option><option value="english">English</option><option value="french">French</option><option value="portuguese">Portuguese</option><option value="lingala">Lingala</option><option value="tshiluba">Tshiluba</option><option value="kikongo">Kikongo</option><option value="swahili">Swahili</option>
+            </select>
           </div>
         </div>
       )}
 
-      {/* Songs List */}
-      {viewMode === 'list' ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          {filteredSongs.map((song) => {
-            const isFavorite = favorites.has(song.id);
-            const isSelected = selectedSongs.has(song.id);
-
-            return (
-              <div
-                key={song.id}
-                onClick={() => song.sheet_music_url && handleViewPDF(song)}
-                className={`flex items-center gap-3 px-3 py-2 border-b last:border-b-0 hover:bg-gray-50 transition ${
-                  song.sheet_music_url ? 'cursor-pointer' : ''
-                } ${isSelected ? 'bg-indigo-50' : ''}`}
-              >
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={(e) => { e.stopPropagation(); toggleSongSelection(song.id); }}
-                  className="w-4 h-4 flex-shrink-0"
-                />
-
-                <button
-                  onClick={(e) => { e.stopPropagation(); toggleFavorite(song.id, e); }}
-                  className="flex-shrink-0"
-                >
-                  <Star className={`w-4 h-4 ${isFavorite ? 'fill-yellow-500 text-yellow-500' : 'text-gray-300'}`} />
-                </button>
-
-                <div className="flex-shrink-0">
-                  {getStatusBadge(song.learning_status)}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-sm font-semibold text-gray-900 truncate">{song.title}</h4>
-                  <p className="text-xs text-gray-600 truncate">{song.composer}</p>
-                </div>
-
-                <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold text-white flex-shrink-0 ${
-                  song.language === 'English' ? 'bg-blue-500' :
-                  song.language === 'French' ? 'bg-purple-500' :
-                  song.language === 'Lingala' ? 'bg-green-500' :
-                  song.language === 'Tshiluba' ? 'bg-yellow-500' :
-                  song.language === 'Swahili' ? 'bg-teal-500' :
-                  song.language === 'Kikongo' ? 'bg-orange-500' :
-                  song.language === 'Portuguese' ? 'bg-pink-500' :
-                  'bg-gray-400'
-                }`}>
-                  {(song.language || '??').slice(0, 1)}
-                </span>
-
-                <div className="flex items-center gap-1">
-                  {song.sheet_music_url && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleViewPDF(song); }}
-                      className="p-1 text-green-600 hover:bg-green-50 rounded"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                  )}
-                  {/* Only super admin can edit/delete songs */}
-                  {isSuperAdmin && (
-                    <>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); navigate(`${song.id}/edit`); }}
-                        className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDelete(song.id); }}
-                        className="p-1 text-red-600 hover:bg-red-50 rounded"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-
-          {filteredSongs.length === 0 && (
-            <div className="text-center py-12">
-              <Music className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <h3 className="text-sm font-medium text-gray-900 mb-1">No songs found</h3>
-              <p className="text-xs text-gray-500">Try adjusting your filters</p>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
-          {filteredSongs.map((song) => {
-            const isFavorite = favorites.has(song.id);
-            const isSelected = selectedSongs.has(song.id);
-            const langColor = song.language === 'English' ? 'bg-blue-500' : song.language === 'French' ? 'bg-purple-500' : song.language === 'Lingala' ? 'bg-green-500' : song.language === 'Tshiluba' ? 'bg-yellow-500' : song.language === 'Swahili' ? 'bg-teal-500' : song.language === 'Kikongo' ? 'bg-orange-500' : song.language === 'Portuguese' ? 'bg-pink-500' : 'bg-gray-400';
-            const langCode = (song.language || '??').slice(0, 2).toUpperCase();
-            const langTextColor = song.language === 'English' ? 'text-blue-600 bg-blue-50' : song.language === 'French' ? 'text-purple-600 bg-purple-50' : song.language === 'Lingala' ? 'text-green-600 bg-green-50' : song.language === 'Tshiluba' ? 'text-yellow-600 bg-yellow-50' : song.language === 'Swahili' ? 'text-teal-600 bg-teal-50' : song.language === 'Kikongo' ? 'text-orange-600 bg-orange-50' : song.language === 'Portuguese' ? 'text-pink-600 bg-pink-50' : 'text-gray-600 bg-gray-50';
-            const statusColor = song.learning_status === 'learned' ? 'bg-green-500' : song.learning_status === 'learning' ? 'bg-yellow-500' : 'bg-gray-300';
-            const statusIcon = song.learning_status === 'learned' ? 'learned' : song.learning_status === 'learning' ? 'learning' : 'not_started';
-
-            return (
-              <div
-                key={song.id}
-                onClick={() => song.sheet_music_url && handleViewPDF(song)}
-                className={`group bg-white rounded-2xl shadow-sm hover:shadow-md transition-all border overflow-hidden flex ${
-                  isSelected ? 'ring-2 ring-blue-500 border-blue-500' : 'border-gray-100 hover:border-gray-200'
-                } ${song.sheet_music_url ? 'cursor-pointer' : ''}`}
-              >
-                <div className={`w-1 ${langColor} flex-shrink-0 rounded-l-2xl`} />
-                <div className="flex-1 p-2.5">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <h3 className="text-[13px] font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors flex-1 mr-2">{song.title}</h3>
-                    <button onClick={(e) => { e.stopPropagation(); toggleFavorite(song.id, e); }} className="flex-shrink-0">
-                      <Star className={`w-3.5 h-3.5 ${isFavorite ? 'fill-yellow-400 text-yellow-400' : 'text-gray-200'}`} />
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-gray-400 truncate mb-2">{song.composer}</p>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${langTextColor}`}>{langCode}</span>
-                      <div className={`w-3.5 h-3.5 rounded ${statusColor} flex items-center justify-center`}>
-                        {statusIcon === 'learned' && <CheckCircle className="w-2 h-2 text-white" strokeWidth={3} />}
-                        {statusIcon === 'learning' && <BookOpen className="w-2 h-2 text-white" strokeWidth={3} />}
-                        {statusIcon === 'not_started' && <Clock className="w-2 h-2 text-white" strokeWidth={3} />}
-                      </div>
-                    </div>
-                    <div className="flex gap-0.5">
-                      {song.sheet_music_url && (
-                        <button onClick={(e) => { e.stopPropagation(); handleViewPDF(song); }} className="p-1 rounded text-gray-500 hover:text-green-600 transition-colors" title="View PDF">
-                          <Eye className="w-3 h-3" strokeWidth={3} />
-                        </button>
-                      )}
-                      {/* Only super admin can edit/delete songs */}
-                      {isSuperAdmin && (
-                        <>
-                          <button onClick={(e) => { e.stopPropagation(); navigate(`${song.id}/edit`); }} className="p-1 rounded text-gray-500 hover:text-blue-600 transition-colors" title="Edit">
-                            <Edit className="w-3 h-3" strokeWidth={3} />
-                          </button>
-                          <button onClick={(e) => { e.stopPropagation(); handleDelete(song.id); }} className="p-1 rounded text-gray-500 hover:text-red-500 transition-colors" title="Delete">
-                            <Trash2 className="w-3 h-3" strokeWidth={3} />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+      {/* Bulk bar */}
+      {selectedSongs.size > 0 && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-2 flex items-center justify-between">
+          <span className="text-[10px] font-semibold text-indigo-900">{selectedSongs.size} selected</span>
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => setShowEventModal(true)} className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white rounded text-[10px] font-semibold">
+              <Calendar className="w-3 h-3" /> Event
+            </button>
+            <select value="" onChange={(e) => { if (e.target.value) handleBulkStatusUpdate(e.target.value as any); }}
+              className="px-2 py-1 text-[10px] border border-indigo-300 rounded bg-white font-medium">
+              <option value="">Mark as...</option><option value="learned">✅ Learned</option><option value="learning">📚 Learning</option><option value="not_started">⏳ Not Started</option>
+            </select>
+            <button onClick={() => setSelectedSongs(new Set())} className="text-[10px] text-gray-500 px-1">✕</button>
+          </div>
         </div>
       )}
+
+      {/* Select all */}
+      <div className="flex justify-end">
+        <button onClick={selectedSongs.size > 0 ? () => setSelectedSongs(new Set()) : () => { setSelectedSongs(new Set(filteredSongs.map(s => s.id))); toast.success(`Selected ${filteredSongs.length}`); }}
+          className={`px-2 py-1 text-[10px] rounded font-semibold ${selectedSongs.size > 0 ? 'bg-red-100 text-red-700' : 'bg-indigo-100 text-indigo-700'}`}>
+          {selectedSongs.size > 0 ? `Deselect (${selectedSongs.size})` : 'Select All'}
+        </button>
+      </div>
+
+      {/* Songs */}
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        {filteredSongs.length === 0 ? (
+          <div className="text-center py-10">
+            <Music className="w-10 h-10 text-gray-200 mx-auto mb-2" />
+            <h3 className="text-xs font-medium text-gray-900">No songs found</h3>
+            <p className="text-[10px] text-gray-400">Try adjusting your filters</p>
+          </div>
+        ) : filteredSongs.map((song) => {
+          const isFav = favorites.has(song.id);
+          const isSel = selectedSongs.has(song.id);
+          return (
+            <div key={song.id}
+              className={`flex items-center gap-2 px-2 py-[7px] border-b border-gray-100 last:border-b-0 transition ${isSel ? 'bg-indigo-50' : ''}`}>
+              <input type="checkbox" checked={isSel} onChange={() => toggleSongSelection(song.id)} className="w-3.5 h-3.5 flex-shrink-0 accent-indigo-600" />
+              <button onClick={(e) => toggleFavorite(song.id, e)} className="flex-shrink-0 text-[13px] leading-none">
+                <span className={isFav ? 'text-yellow-500' : 'text-gray-300'}>{isFav ? '★' : '☆'}</span>
+              </button>
+              <div className="flex-1 min-w-0 cursor-pointer" onClick={() => song.sheet_music_url && handleViewPDF(song)}>
+                <div className={`text-xs font-semibold truncate ${song.sheet_music_url ? 'text-gray-900 hover:text-indigo-600' : 'text-gray-900'}`}>{song.title}</div>
+                <div className="text-[9px] text-gray-400 truncate">{song.composer}</div>
+              </div>
+              <span className={`w-[18px] h-[18px] flex items-center justify-center rounded-full text-[8px] font-bold text-white flex-shrink-0 ${getLangColor(song.language)}`}>
+                {(song.language || '?').slice(0, 1)}
+              </span>
+              <button onClick={(e) => handleStatusCycle(song.id, song.learning_status, e)}
+                className="flex-shrink-0 text-[13px] leading-none hover:scale-125 active:scale-90 transition-transform"
+                title="Tap to change status">
+                {song.learning_status === 'learned' ? '✅' : song.learning_status === 'learning' ? '📚' : '⏳'}
+              </button>
+              {isSuperAdmin && (
+                <div className="flex flex-shrink-0">
+                  <button onClick={(e) => { e.stopPropagation(); navigate(`${song.id}/edit`); }} className="w-[22px] h-[22px] flex items-center justify-center rounded text-blue-500 hover:bg-blue-50"><Edit className="w-3 h-3" /></button>
+                  <button onClick={(e) => handleDelete(song.id, e)} className="w-[22px] h-[22px] flex items-center justify-center rounded text-red-400 hover:bg-red-50"><Trash2 className="w-3 h-3" /></button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
 
       {/* Event Modal */}
       {showEventModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-md w-full max-h-[80vh] flex flex-col">
-            <div className="p-4 border-b flex items-center justify-between">
-              <h2 className="text-lg font-bold">Add to Event ({selectedSongs.size})</h2>
-              <button onClick={() => setShowEventModal(false)} className="p-1 hover:bg-gray-100 rounded">
-                <X className="w-5 h-5" />
-              </button>
+          <div className="bg-white rounded-lg max-w-sm w-full max-h-[70vh] flex flex-col">
+            <div className="p-3 border-b flex items-center justify-between">
+              <h2 className="text-sm font-bold">Add to Event ({selectedSongs.size})</h2>
+              <button onClick={() => setShowEventModal(false)} className="p-1 hover:bg-gray-100 rounded"><X className="w-4 h-4" /></button>
             </div>
-
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto p-3">
               {events.length === 0 ? (
-                <div className="text-center py-8">
-                  <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-sm text-gray-600 mb-3">No upcoming events</p>
-                  <button
-                    onClick={() => { setShowEventModal(false); navigate('../events/new'); }}
-                    className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-                  >
-                    Create Event
-                  </button>
+                <div className="text-center py-6">
+                  <Calendar className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                  <p className="text-xs text-gray-500 mb-2">No upcoming events</p>
+                  <button onClick={() => { setShowEventModal(false); navigate('../events/new'); }} className="px-3 py-1.5 text-xs bg-indigo-600 text-white rounded">Create Event</button>
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   {events.map((event) => (
-                    <button
-                      key={event.id}
-                      onClick={() => addSongsToEvent(event.id)}
-                      className="w-full text-left p-3 rounded-lg border-2 border-gray-200 hover:border-indigo-500 hover:bg-indigo-50 transition"
-                    >
-                      <div className="font-semibold text-sm">{event.title}</div>
-                      <div className="text-xs text-gray-600 mt-0.5">
-                        {new Date(event.date).toLocaleDateString()}
-                      </div>
+                    <button key={event.id} onClick={() => addSongsToEvent(event.id)} className="w-full text-left p-2 rounded-lg border-2 border-gray-200 hover:border-indigo-500 hover:bg-indigo-50 transition">
+                      <div className="font-semibold text-xs">{event.title}</div>
+                      <div className="text-[10px] text-gray-500">{new Date(event.date).toLocaleDateString()}</div>
                     </button>
                   ))}
                 </div>
               )}
             </div>
-
-            <div className="p-4 border-t">
-              <button
-                onClick={() => setShowEventModal(false)}
-                className="w-full px-4 py-2 text-sm bg-gray-200 rounded-lg hover:bg-gray-300"
-              >
-                Cancel
-              </button>
+            <div className="p-3 border-t">
+              <button onClick={() => setShowEventModal(false)} className="w-full px-3 py-1.5 text-xs bg-gray-200 rounded hover:bg-gray-300">Cancel</button>
             </div>
           </div>
         </div>

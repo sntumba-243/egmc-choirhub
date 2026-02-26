@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { User, Search, Plus, Edit, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
+import { useChurch } from '../../contexts/ChurchContext';
 
 interface Member {
   id: string;
@@ -17,11 +18,15 @@ interface Member {
   voice_part: string;
   role: string;
   status: string;
+  church_id?: string;
+  churches?: { name: string };
 }
 
 export const AdminMembers = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { church } = useChurch();
+  const isSuperAdmin = user?.is_super_admin === true;
   const [members, setMembers] = useState<Member[]>([]);
 
   const isOnline = (lastActive: string | undefined) => {
@@ -52,14 +57,17 @@ export const AdminMembers = () => {
 
   useEffect(() => {
     fetchMembers();
-  }, []);
+  }, [user?.church_id, isSuperAdmin]);
 
   const fetchMembers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('members')
-        .select('id, first_name, last_name, email, role, voice_part, member_id, phone_number, avatar_url, created_at, status, last_active')
-        .eq('church_id', user?.church_id).order('last_name', { ascending: true });
+      let query = supabase.from('members').select('id, first_name, last_name, email, role, voice_part, member_id, phone_number, avatar_url, created_at, status, last_active, church_id, churches(name)');
+      if (isSuperAdmin) {
+        query = query.eq('role', 'admin');
+      } else {
+        query = query.eq('church_id', user?.church_id);
+      }
+      const { data, error } = await query.order('last_name', { ascending: true });
 
       if (error) throw error;
       setMembers(data || []);
@@ -130,9 +138,9 @@ export const AdminMembers = () => {
       {/* Compact Header */}
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-bold">Members</h1>
+          <h1 className="text-2xl font-bold">{isSuperAdmin ? "Church Admins" : "Members"}</h1>
           <p className="text-xs text-gray-600">
-            {members.length} total · {roleCounts.admin} admin · {roleCounts.member} member · {roleCounts.guest} guest
+            {isSuperAdmin ? `${members.length} admins across all churches` : `${members.length} total · ${roleCounts.admin} admin · ${roleCounts.member} member · ${roleCounts.guest} guest`}
           </p>
         </div>
         <button
@@ -267,6 +275,9 @@ export const AdminMembers = () => {
                   <p className="text-xs text-gray-600 mb-1 truncate">
                     {member.email}
                   </p>
+                  {isSuperAdmin && member.churches?.name && (
+                    <p className="text-xs text-indigo-600 font-medium mb-1 truncate">🏛 {member.churches.name}</p>
+                  )}
                   
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-xs font-medium px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded">
