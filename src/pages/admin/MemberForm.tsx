@@ -11,6 +11,7 @@ import { PasswordModal } from '../../components/PasswordModal';
 export const MemberForm: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isSuperAdmin = user?.is_super_admin === true;
   const { church } = useChurch();
   const [searchParams] = useSearchParams();
   const churchIdParam = searchParams.get('church_id');
@@ -136,7 +137,7 @@ export const MemberForm: React.FC = () => {
           .eq('id', memberId);
         if (error) throw error;
         toast.success('Member updated');
-        navigate('/admin/members');
+        navigate(isSuperAdmin ? '/super-admin/members' : '/admin/members');
       } else {
         let authUserId: string | null = null;
 
@@ -179,14 +180,14 @@ export const MemberForm: React.FC = () => {
     if (churchIdParam) {
       navigate(`/super-admin/churches/${churchIdParam}`);
     } else {
-      navigate('/admin/members');
+      navigate(isSuperAdmin ? '/super-admin/members' : '/admin/members');
     }
   };
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
-        <button onClick={() => navigate('/admin/members')} className="p-2 hover:bg-gray-100 rounded-lg">
+        <button onClick={() => navigate(isSuperAdmin ? '/super-admin/members' : '/admin/members')} className="p-2 hover:bg-gray-100 rounded-lg">
           <ArrowLeft className="w-5 h-5" />
         </button>
         <h1 className="text-3xl font-bold">{memberId ? 'Edit Member' : 'Add New Member'}</h1>
@@ -350,7 +351,7 @@ export const MemberForm: React.FC = () => {
         <div className="flex gap-4 pt-4">
           <button
             type="button"
-            onClick={() => navigate('/admin/members')}
+            onClick={() => navigate(isSuperAdmin ? '/super-admin/members' : '/admin/members')}
             className="flex-1 px-6 py-3 border text-gray-700 rounded-lg hover:bg-gray-50"
           >
             Cancel

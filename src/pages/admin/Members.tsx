@@ -144,7 +144,7 @@ export const AdminMembers = () => {
           </p>
         </div>
         <button
-          onClick={() => navigate('/admin/members/new')}
+          onClick={() => navigate(isSuperAdmin ? '/super-admin/members/new' : '/admin/members/new')}
           className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-500 text-white rounded-xl text-[13px] font-semibold hover:bg-blue-600 shadow-sm transition-all flex-shrink-0"
         >
           <Plus className="w-4 h-4" />
@@ -228,7 +228,7 @@ export const AdminMembers = () => {
           {filteredMembers.map((member) => (
             <div
               key={member.id}
-              onClick={() => navigate(`/admin/members/${member.id}/edit`)}
+              onClick={() => navigate(isSuperAdmin ? `/super-admin/members/${member.id}/edit` : `/admin/members/${member.id}/edit`)}
               className="bg-white rounded-lg shadow-sm hover:shadow-md transition-all p-3 cursor-pointer border border-gray-100"
             >
               <div className="flex items-start justify-between gap-3">
@@ -297,7 +297,7 @@ export const AdminMembers = () => {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigate(`/admin/members/${member.id}/edit`);
+                      navigate(isSuperAdmin ? `/super-admin/members/${member.id}/edit` : `/admin/members/${member.id}/edit`);
                     }}
                     className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                   >

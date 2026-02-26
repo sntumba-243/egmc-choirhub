@@ -159,6 +159,8 @@ function AppRoutes() {
         <Route path="repertoire/:id/edit" element={<SongForm />} />
         <Route path="members" element={<AdminMembers />} />
         <Route path="events" element={<GlobalEvents />} />
+        <Route path="members/new" element={<MemberForm />} />
+        <Route path="members/:id/edit" element={<MemberForm />} />
         <Route path="events/new" element={<EventForm />} />
         <Route path="settings" element={<AdminSettings />} />
             <Route path="theme" element={<Suspense fallback={<div className="flex items-center justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>}><ChurchThemeSettings /></Suspense>} />
