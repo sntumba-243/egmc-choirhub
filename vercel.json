@@ -1,12 +1,6 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "crons": [
-    {
-      "path": "/api/neon/sync",
-      "schedule": "0 */6 * * *"
-    }
-  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],
