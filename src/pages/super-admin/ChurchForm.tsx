@@ -223,11 +223,13 @@ export const ChurchForm = () => {
         const result = await response.json();
         if (result.data?.id) {
           await db.from('members').insert({
-                        church_id: churchId,
+            first_name: email.split('@')[0],
+            last_name: 'Admin',
+            email: email,
+            church_id: churchId,
             role: 'admin',
             voice_part: 'Soprano',
             status: 'active',
-              church_id: churchId,
           });
         }
 
