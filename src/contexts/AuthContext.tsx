@@ -1,3 +1,4 @@
+import { preCacheUserData } from '../lib/offlineCache';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getDbClient } from '../lib/supabase';
@@ -64,6 +65,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               church_id: memberData.church_id,
               is_super_admin: userData?.is_super_admin || false,
             });
+            // Pre-cache data for offline use on session restore
+            if (memberData.church_id) {
+              preCacheUserData(supabase, memberData.church_id).catch(() => {});
+            }
           }
         }
       }
@@ -124,6 +129,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             };
 
             setUser(loggedInUser);
+            // Pre-cache data for offline use
+            if (loggedInUser.church_id) {
+              preCacheUserData(supabase, loggedInUser.church_id).catch(() => {});
+            }
             toast.success('Login successful!');
             navigate(getRedirectPath(loggedInUser));
           }

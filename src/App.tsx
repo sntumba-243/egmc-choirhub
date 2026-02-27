@@ -1,3 +1,4 @@
+import { OfflineBanner } from "./components/OfflineBanner";
 import { useEffect } from 'react';
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
@@ -83,6 +84,7 @@ function App() {
   return (
     <AuthProvider>
       <ChurchProvider>
+      <OfflineBanner />
       <AppRoutes />
       <Toaster 
         position="top-center"
