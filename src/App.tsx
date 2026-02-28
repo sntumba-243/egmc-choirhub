@@ -28,7 +28,7 @@ import MemberLayout from './layouts/MemberLayout';
 import AdminLayout from './layouts/AdminLayout';
 
 // Member Pages
-import { MemberDashboard } from './pages/member/Dashboard-MOBILE';
+import { MemberDashboard } from './pages/member/Dashboard';
 import { MemberRepertoire } from './pages/member/Repertoire';
 import { MemberCalendar } from './pages/member/Calendar';
 import { EventDetail as MemberEventDetail } from './pages/member/EventDetail';

@@ -46,7 +46,7 @@ export const MemberCalendar = () => {
       const { data, error } = await supabase
         .from('events')
         .select('*')
-        .eq('church_id', user?.church_id)
+        .or(`church_id.eq.${user?.church_id},is_global.eq.true`)
         .order('date', { ascending: true });
 
       if (error) throw error;
