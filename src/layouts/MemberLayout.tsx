@@ -86,7 +86,7 @@ export default function MemberLayout() {
       )}
 
       {/* Sidebar */}
-      <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 flex flex-col transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+      <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 min-w-[256px] flex-shrink-0 bg-white border-r border-gray-200 flex flex-col transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         {/* Desktop Header */}
         <div className="hidden lg:block p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
@@ -158,7 +158,7 @@ export default function MemberLayout() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 w-full overflow-auto" style={{ paddingTop: 'max(calc(env(safe-area-inset-top) + 64px), 64px)', paddingBottom: 'env(safe-area-inset-bottom)', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }}>
+      <main className="flex-1 min-w-0 overflow-auto" style={{ paddingTop: 'max(calc(env(safe-area-inset-top) + 64px), 64px)', paddingBottom: 'env(safe-area-inset-bottom)', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }}>
         <div className="p-4 sm:p-6 lg:p-8 lg:pt-0">
           <Outlet />
         </div>

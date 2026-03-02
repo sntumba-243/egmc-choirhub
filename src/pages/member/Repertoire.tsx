@@ -26,6 +26,7 @@ export const MemberRepertoire = () => {
   const [songs, setSongs] = useState<SongWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [viewingSong, setViewingSong] = useState<Song | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -114,10 +115,8 @@ export const MemberRepertoire = () => {
   };
 
   const handleViewPDF = (song: Song) => {
-    if (song.sheet_music_url && !pdfLoading) {
-      setPdfLoading(true);
-      navigate("/pdf-viewer", { state: { url: song.sheet_music_url, title: song.title, songId: song.id } });
-      setTimeout(() => setPdfLoading(false), 1000);
+    if (song.sheet_music_url) {
+      setViewingSong(song);
     }
   };
 
@@ -266,6 +265,30 @@ export const MemberRepertoire = () => {
           );
         })}
       </div>
+
+      {/* PDF Modal Overlay */}
+      {viewingSong && viewingSong.sheet_music_url && (
+        <div className="fixed inset-0 z-[9999] bg-black/90 flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 bg-black/50">
+            <button onClick={() => setViewingSong(null)}
+              className="flex items-center gap-2 text-white text-sm font-medium">
+              ← Back
+            </button>
+            <h2 className="text-white text-sm font-semibold truncate flex-1 text-center px-4">{viewingSong.title}</h2>
+            <div className="w-12" />
+          </div>
+          <iframe
+            src={(() => {
+              const url = viewingSong.sheet_music_url || '';
+              const match = url.match(/\/d\/([^/]+)/);
+              if (match) return `https://drive.google.com/file/d/${match[1]}/preview`;
+              return url;
+            })()}
+            className="flex-1 w-full border-0"
+            allow="autoplay"
+          />
+        </div>
+      )}
     </div>
   );
 };
