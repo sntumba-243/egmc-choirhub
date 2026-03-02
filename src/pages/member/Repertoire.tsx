@@ -156,8 +156,8 @@ export const MemberRepertoire = () => {
     <div className="space-y-2 p-3 max-w-4xl mx-auto pb-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold text-gray-900">Repertoire</h1>
-        <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{filteredSongs.length} songs</span>
+        <h1 className="text-xl font-bold text-gray-900">Repertoire</h1>
+        <span className="text-sm text-gray-400 bg-gray-100 px-3 py-1 rounded-full">{filteredSongs.length} songs</span>
       </div>
 
       {/* Stats */}
@@ -170,13 +170,13 @@ export const MemberRepertoire = () => {
         ].map(s => (
           <button key={s.key} onClick={() => setStatusFilter(s.key)}
             className={`flex-1 rounded-lg border p-1.5 text-center transition ${s.cls} ${statusFilter === s.key ? 'ring-2 ring-indigo-500' : 'border-gray-200'}`}>
-            <div className="text-sm font-bold">{s.value}</div>
-            <div className="text-[8px] text-gray-500">{s.label}</div>
+            <div className="text-base font-bold">{s.value}</div>
+            <div className="text-xs text-gray-500">{s.label}</div>
           </button>
         ))}
         <div className="flex-1 rounded-lg border border-indigo-200 bg-indigo-50 p-1.5 text-center">
           <div className="text-sm font-bold text-indigo-700">{masteryRate}%</div>
-          <div className="text-[8px] text-gray-500">Rate</div>
+          <div className="text-xs text-gray-500">Rate</div>
         </div>
       </div>
 
@@ -185,14 +185,14 @@ export const MemberRepertoire = () => {
         <div className="flex-1 relative">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-300 w-3.5 h-3.5" />
           <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-7 pr-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+            className="w-full pl-8 pr-3 py-2.5 text-base border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
         </div>
         <button onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-          className={`w-8 h-8 flex items-center justify-center rounded-lg border text-sm ${showFavoritesOnly ? 'bg-yellow-500 border-yellow-500 text-white' : 'bg-white border-gray-200'}`}>
+          className={`w-10 h-10 flex items-center justify-center rounded-lg border text-sm ${showFavoritesOnly ? 'bg-yellow-500 border-yellow-500 text-white' : 'bg-white border-gray-200'}`}>
           <Star className={`w-3.5 h-3.5 ${showFavoritesOnly ? 'fill-white' : 'text-gray-400'}`} />
         </button>
         <button onClick={() => setShowFilters(!showFilters)}
-          className={`w-8 h-8 flex items-center justify-center rounded-lg border transition ${showFilters ? 'bg-purple-600 border-purple-600 text-white' : 'bg-white border-gray-200 text-gray-400'}`}>
+          className={`w-10 h-10 flex items-center justify-center rounded-lg border transition ${showFilters ? 'bg-purple-600 border-purple-600 text-white' : 'bg-white border-gray-200 text-gray-400'}`}>
           <SlidersHorizontal className="w-3.5 h-3.5" />
         </button>
       </div>
@@ -201,14 +201,14 @@ export const MemberRepertoire = () => {
       {showFilters && (
         <div className="bg-white rounded-lg border border-gray-200 p-2 flex gap-2">
           <div className="flex-1">
-            <label className="text-[9px] font-medium text-gray-400 uppercase">Sort</label>
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)} className="w-full mt-0.5 px-2 py-1 text-xs border border-gray-200 rounded bg-white">
+            <label className="text-xs font-medium text-gray-400 uppercase">Sort</label>
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)} className="w-full mt-0.5 px-2 py-2 text-sm border border-gray-200 rounded bg-white">
               <option value="a-z">A → Z</option><option value="z-a">Z → A</option><option value="recent">Recent</option>
             </select>
           </div>
           <div className="flex-1">
-            <label className="text-[9px] font-medium text-gray-400 uppercase">Language</label>
-            <select value={languageFilter} onChange={(e) => setLanguageFilter(e.target.value)} className="w-full mt-0.5 px-2 py-1 text-xs border border-gray-200 rounded bg-white">
+            <label className="text-xs font-medium text-gray-400 uppercase">Language</label>
+            <select value={languageFilter} onChange={(e) => setLanguageFilter(e.target.value)} className="w-full mt-0.5 px-2 py-2 text-sm border border-gray-200 rounded bg-white">
               <option value="all">All</option><option value="english">English</option><option value="french">French</option><option value="portuguese">Portuguese</option><option value="lingala">Lingala</option><option value="tshiluba">Tshiluba</option><option value="kikongo">Kikongo</option><option value="swahili">Swahili</option>
             </select>
           </div>
@@ -218,17 +218,17 @@ export const MemberRepertoire = () => {
       {/* Active filters */}
       {statusFilter !== 'all' && (
         <div className="flex items-center justify-between bg-indigo-50 rounded-lg px-2 py-1.5">
-          <span className="text-[10px] font-medium text-indigo-800">
+          <span className="text-sm font-medium text-indigo-800">
             {statusFilter === 'learned' ? '✅ Learned' : statusFilter === 'learning' ? '📚 Learning' : '⏳ Not Started'}
           </span>
-          <button onClick={() => setStatusFilter('all')} className="text-[10px] text-indigo-600">Clear</button>
+          <button onClick={() => setStatusFilter('all')} className="text-sm text-indigo-600">Clear</button>
         </div>
       )}
 
       {showFavoritesOnly && (
         <div className="flex items-center justify-between bg-yellow-50 rounded-lg px-2 py-1.5">
-          <span className="text-[10px] font-medium text-yellow-800">⭐ {favorites.size} favorites</span>
-          <button onClick={() => setShowFavoritesOnly(false)} className="text-[10px] text-yellow-600">Clear</button>
+          <span className="text-sm font-medium text-yellow-800">⭐ {favorites.size} favorites</span>
+          <button onClick={() => setShowFavoritesOnly(false)} className="text-sm text-yellow-600">Clear</button>
         </div>
       )}
 
@@ -237,29 +237,29 @@ export const MemberRepertoire = () => {
         {filteredSongs.length === 0 ? (
           <div className="text-center py-10">
             <Music className="w-10 h-10 text-gray-200 mx-auto mb-2" />
-            <h3 className="text-xs font-medium text-gray-900">{showFavoritesOnly ? 'No favorites yet' : 'No songs found'}</h3>
-            <p className="text-[10px] text-gray-400">{showFavoritesOnly ? 'Tap ★ to add favorites' : 'Try adjusting your filters'}</p>
+            <h3 className="text-sm font-medium text-gray-900">{showFavoritesOnly ? 'No favorites yet' : 'No songs found'}</h3>
+            <p className="text-sm text-gray-400">{showFavoritesOnly ? 'Tap ★ to add favorites' : 'Try adjusting your filters'}</p>
           </div>
         ) : filteredSongs.map((song, i) => {
           const isFav = favorites.has(song.id);
           return (
             <div key={song.id}
-              className={`flex items-center gap-2 px-2 py-[7px] ${i !== filteredSongs.length - 1 ? 'border-b border-gray-100' : ''}`}>
+              className={`flex items-center gap-3 px-3 py-3 ${i !== filteredSongs.length - 1 ? 'border-b border-gray-100' : ''}`}>
               {/* Star */}
-              <button onClick={(e) => toggleFavorite(song.id, e)} className="flex-shrink-0 text-[13px] leading-none">
+              <button onClick={(e) => toggleFavorite(song.id, e)} className="flex-shrink-0 text-base leading-none">
                 <span className={isFav ? 'text-yellow-500' : 'text-gray-300'}>{isFav ? '★' : '☆'}</span>
               </button>
               {/* Info — tap to open PDF */}
               <div className="flex-1 min-w-0 cursor-pointer" onClick={() => song.sheet_music_url && handleViewPDF(song)}>
-                <div className={`text-xs font-semibold truncate ${song.sheet_music_url ? 'text-gray-900 active:text-indigo-600' : 'text-gray-900'}`}>{song.title}</div>
-                <div className="text-[9px] text-gray-400 truncate">{song.composer}</div>
+                <div className={`text-sm font-semibold truncate ${song.sheet_music_url ? 'text-gray-900 active:text-indigo-600' : 'text-gray-900'}`}>{song.title}</div>
+                <div className="text-sm text-gray-400 truncate">{song.composer}</div>
               </div>
               {/* Language */}
-              <span className={`w-[18px] h-[18px] flex items-center justify-center rounded-full text-[8px] font-bold text-white flex-shrink-0 ${getLangColor(song.language)}`}>
+              <span className={`w-6 h-6 flex items-center justify-center rounded-full text-sm font-bold text-white flex-shrink-0 ${getLangColor(song.language)}`}>
                 {(song.language || '?').slice(0, 1)}
               </span>
               {/* Status — read only */}
-              <span className="flex-shrink-0 text-[13px] leading-none">
+              <span className="flex-shrink-0 text-base leading-none">
                 {song.learning_status === 'learned' ? '✅' : song.learning_status === 'learning' ? '📚' : '⏳'}
               </span>
             </div>
