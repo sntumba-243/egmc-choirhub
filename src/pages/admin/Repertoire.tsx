@@ -241,20 +241,20 @@ export const AdminRepertoire = () => {
   );
 
   return (
-    <div className="space-y-2 p-3 max-w-4xl mx-auto">
+    <div className="space-y-3 p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       {/* Header */}
       <div className="flex justify-between items-baseline">
         <div>
-          <h1 className="text-lg font-bold text-gray-900">Repertoire</h1>
-          <p className="text-[10px] text-gray-400">{filteredSongs.length} of {songs.length}</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Repertoire</h1>
+          <p className="text-sm text-gray-500">{filteredSongs.length} of {songs.length}</p>
         </div>
         {isSuperAdmin && (
-          <button onClick={() => navigate('new')} className="text-xs text-indigo-600 font-semibold">+ Add</button>
+          <button onClick={() => navigate('new')} className="text-sm text-indigo-600 font-semibold">+ Add</button>
         )}
       </div>
 
       {/* Stats */}
-      <div className="flex gap-1">
+      <div className="flex gap-2 flex-wrap">
         {[
           { key: 'all' as const, label: 'Total', value: stats.total, cls: '' },
           { key: 'learned' as const, label: '✅', value: stats.learned, cls: 'bg-green-50 border-green-200' },
@@ -264,12 +264,12 @@ export const AdminRepertoire = () => {
           <button key={s.key} onClick={() => setStatusFilter(s.key)}
             className={`flex-1 rounded-lg border p-1.5 text-center transition ${s.cls} ${statusFilter === s.key ? 'ring-2 ring-indigo-500' : 'border-gray-200'}`}>
             <div className="text-sm font-bold">{s.value}</div>
-            <div className="text-[8px] text-gray-500">{s.label}</div>
+            <div className="text-sm text-gray-500">{s.label}</div>
           </button>
         ))}
         <div className="flex-1 rounded-lg border border-indigo-200 bg-indigo-50 p-1.5 text-center">
           <div className="text-sm font-bold text-indigo-700">{masteryRate}%</div>
-          <div className="text-[8px] text-gray-500">Rate</div>
+          <div className="text-sm text-gray-500">Rate</div>
         </div>
       </div>
 
@@ -278,14 +278,14 @@ export const AdminRepertoire = () => {
         <div className="flex-1 relative">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-300 w-3.5 h-3.5" />
           <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-7 pr-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+            className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
         </div>
         <button onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
           className={`w-8 h-8 flex items-center justify-center rounded-lg border text-sm ${showFavoritesOnly ? 'bg-yellow-500 border-yellow-500 text-white' : 'bg-white border-gray-200'}`}>
           <Star className={`w-3.5 h-3.5 ${showFavoritesOnly ? 'fill-white' : 'text-gray-400'}`} />
         </button>
         <button onClick={() => setShowFilters(!showFilters)}
-          className={`w-8 h-8 flex items-center justify-center rounded-lg border text-xs font-bold ${showFilters ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-gray-200 text-gray-400'}`}>
+          className={`w-10 h-10 flex items-center justify-center rounded-lg border text-sm font-bold ${showFilters ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-gray-200 text-gray-400'}`}>
           ⚙
         </button>
       </div>
@@ -294,14 +294,14 @@ export const AdminRepertoire = () => {
       {showFilters && (
         <div className="bg-white rounded-lg border border-gray-200 p-2 flex gap-2">
           <div className="flex-1">
-            <label className="text-[9px] font-medium text-gray-400 uppercase">Sort</label>
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)} className="w-full mt-0.5 px-2 py-1 text-xs border border-gray-200 rounded bg-white">
+            <label className="text-sm font-medium text-gray-400 uppercase">Sort</label>
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)} className="w-full mt-0.5 px-3 py-2 text-sm border border-gray-200 rounded bg-white">
               <option value="a-z">A → Z</option><option value="z-a">Z → A</option><option value="recent">Recent</option>
             </select>
           </div>
           <div className="flex-1">
-            <label className="text-[9px] font-medium text-gray-400 uppercase">Language</label>
-            <select value={languageFilter} onChange={(e) => setLanguageFilter(e.target.value)} className="w-full mt-0.5 px-2 py-1 text-xs border border-gray-200 rounded bg-white">
+            <label className="text-sm font-medium text-gray-400 uppercase">Language</label>
+            <select value={languageFilter} onChange={(e) => setLanguageFilter(e.target.value)} className="w-full mt-0.5 px-3 py-2 text-sm border border-gray-200 rounded bg-white">
               <option value="all">All</option><option value="english">English</option><option value="french">French</option><option value="portuguese">Portuguese</option><option value="lingala">Lingala</option><option value="tshiluba">Tshiluba</option><option value="kikongo">Kikongo</option><option value="swahili">Swahili</option>
             </select>
           </div>
@@ -311,16 +311,16 @@ export const AdminRepertoire = () => {
       {/* Bulk bar */}
       {selectedSongs.size > 0 && (
         <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-2 flex items-center justify-between">
-          <span className="text-[10px] font-semibold text-indigo-900">{selectedSongs.size} selected</span>
+          <span className="text-sm font-semibold text-indigo-900">{selectedSongs.size} selected</span>
           <div className="flex items-center gap-1.5">
-            <button onClick={() => setShowEventModal(true)} className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white rounded text-[10px] font-semibold">
+            <button onClick={() => setShowEventModal(true)} className="flex items-center gap-1 px-3 py-2 bg-green-600 text-white rounded text-sm font-semibold">
               <Calendar className="w-3 h-3" /> Event
             </button>
             <select value="" onChange={(e) => { if (e.target.value) handleBulkStatusUpdate(e.target.value as any); }}
-              className="px-2 py-1 text-[10px] border border-indigo-300 rounded bg-white font-medium">
+              className="px-3 py-2 text-sm border border-indigo-300 rounded bg-white font-medium">
               <option value="">Mark as...</option><option value="learned">✅ Learned</option><option value="learning">📚 Learning</option><option value="not_started">⏳ Not Started</option>
             </select>
-            <button onClick={() => setSelectedSongs(new Set())} className="text-[10px] text-gray-500 px-1">✕</button>
+            <button onClick={() => setSelectedSongs(new Set())} className="text-sm text-gray-500 px-1">✕</button>
           </div>
         </div>
       )}
@@ -328,7 +328,7 @@ export const AdminRepertoire = () => {
       {/* Select all */}
       <div className="flex justify-end">
         <button onClick={selectedSongs.size > 0 ? () => setSelectedSongs(new Set()) : () => { setSelectedSongs(new Set(filteredSongs.map(s => s.id))); toast.success(`Selected ${filteredSongs.length}`); }}
-          className={`px-2 py-1 text-[10px] rounded font-semibold ${selectedSongs.size > 0 ? 'bg-red-100 text-red-700' : 'bg-indigo-100 text-indigo-700'}`}>
+          className={`px-3 py-2 text-sm rounded font-semibold ${selectedSongs.size > 0 ? 'bg-red-100 text-red-700' : 'bg-indigo-100 text-indigo-700'}`}>
           {selectedSongs.size > 0 ? `Deselect (${selectedSongs.size})` : 'Select All'}
         </button>
       </div>
@@ -338,28 +338,28 @@ export const AdminRepertoire = () => {
         {filteredSongs.length === 0 ? (
           <div className="text-center py-10">
             <Music className="w-10 h-10 text-gray-200 mx-auto mb-2" />
-            <h3 className="text-xs font-medium text-gray-900">No songs found</h3>
-            <p className="text-[10px] text-gray-400">Try adjusting your filters</p>
+            <h3 className="text-sm font-medium text-gray-900">No songs found</h3>
+            <p className="text-sm text-gray-400">Try adjusting your filters</p>
           </div>
         ) : filteredSongs.map((song) => {
           const isFav = favorites.has(song.id);
           const isSel = selectedSongs.has(song.id);
           return (
             <div key={song.id}
-              className={`flex items-center gap-2 px-2 py-[7px] border-b border-gray-100 last:border-b-0 transition ${isSel ? 'bg-indigo-50' : ''}`}>
+              className={`flex items-center gap-3 px-3 py-3 border-b border-gray-100 last:border-b-0 transition ${isSel ? 'bg-indigo-50' : ''}`}>
               <input type="checkbox" checked={isSel} onChange={() => toggleSongSelection(song.id)} className="w-3.5 h-3.5 flex-shrink-0 accent-indigo-600" />
-              <button onClick={(e) => toggleFavorite(song.id, e)} className="flex-shrink-0 text-[13px] leading-none">
+              <button onClick={(e) => toggleFavorite(song.id, e)} className="flex-shrink-0 text-base leading-none">
                 <span className={isFav ? 'text-yellow-500' : 'text-gray-300'}>{isFav ? '★' : '☆'}</span>
               </button>
               <div className="flex-1 min-w-0 cursor-pointer" onClick={() => song.sheet_music_url && handleViewPDF(song)}>
-                <div className={`text-xs font-semibold truncate ${song.sheet_music_url ? 'text-gray-900 hover:text-indigo-600' : 'text-gray-900'}`}>{song.title}</div>
-                <div className="text-[9px] text-gray-400 truncate">{song.composer}</div>
+                <div className={`text-base font-semibold truncate ${song.sheet_music_url ? 'text-gray-900 hover:text-indigo-600' : 'text-gray-900'}`}>{song.title}</div>
+                <div className="text-sm text-gray-400 truncate">{song.composer}</div>
               </div>
-              <span className={`w-[18px] h-[18px] flex items-center justify-center rounded-full text-[8px] font-bold text-white flex-shrink-0 ${getLangColor(song.language)}`}>
+              <span className={`w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold text-white flex-shrink-0 ${getLangColor(song.language)}`}>
                 {(song.language || '?').slice(0, 1)}
               </span>
               <button onClick={(e) => handleStatusCycle(song.id, song.learning_status, e)}
-                className="flex-shrink-0 text-[13px] leading-none hover:scale-125 active:scale-90 transition-transform"
+                className="flex-shrink-0 text-base leading-none hover:scale-125 active:scale-90 transition-transform"
                 title="Tap to change status">
                 {song.learning_status === 'learned' ? '✅' : song.learning_status === 'learning' ? '📚' : '⏳'}
               </button>
@@ -386,7 +386,7 @@ export const AdminRepertoire = () => {
               {events.length === 0 ? (
                 <div className="text-center py-6">
                   <Calendar className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                  <p className="text-xs text-gray-500 mb-2">No upcoming events</p>
+                  <p className="text-sm text-gray-500 mb-2">No upcoming events</p>
                   <button onClick={() => { setShowEventModal(false); navigate('../events/new'); }} className="px-3 py-1.5 text-xs bg-indigo-600 text-white rounded">Create Event</button>
                 </div>
               ) : (
@@ -394,7 +394,7 @@ export const AdminRepertoire = () => {
                   {events.map((event) => (
                     <button key={event.id} onClick={() => addSongsToEvent(event.id)} className="w-full text-left p-2 rounded-lg border-2 border-gray-200 hover:border-indigo-500 hover:bg-indigo-50 transition">
                       <div className="font-semibold text-xs">{event.title}</div>
-                      <div className="text-[10px] text-gray-500">{new Date(event.date).toLocaleDateString()}</div>
+                      <div className="text-sm text-gray-500">{new Date(event.date).toLocaleDateString()}</div>
                     </button>
                   ))}
                 </div>
