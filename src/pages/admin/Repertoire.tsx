@@ -42,6 +42,7 @@ export const AdminRepertoire = () => {
   const [languageFilter, setLanguageFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'learned' | 'learning' | 'not_started'>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [viewingSong, setViewingSong] = useState<any>(null);
 
   const isSuperAdmin = user?.is_super_admin === true;
 
@@ -206,7 +207,7 @@ export const AdminRepertoire = () => {
   };
 
   const handleViewPDF = (song: Song) => {
-    if (song.sheet_music_url) navigate('/pdf-viewer', { state: { url: song.sheet_music_url, title: song.title } });
+    if (song.sheet_music_url) setViewingSong(song);
   };
 
   const getLangColor = (lang: string) => {
@@ -241,6 +242,7 @@ export const AdminRepertoire = () => {
   );
 
   return (
+    <>
     <div className="space-y-3 p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       {/* Header */}
       <div className="flex justify-between items-baseline">
@@ -407,5 +409,26 @@ export const AdminRepertoire = () => {
         </div>
       )}
     </div>
+
+    {/* PDF Modal Overlay */}
+    {viewingSong && viewingSong.sheet_music_url && (
+      <div className="fixed inset-0 z-[9999] bg-white">
+        <button onClick={() => setViewingSong(null)}
+          className="fixed top-3 left-3 z-[10000] px-4 py-2 text-sm font-semibold text-gray-700 bg-white/90 backdrop-blur border border-gray-200 rounded-full shadow-sm hover:bg-gray-100 transition">
+          ← Back
+        </button>
+        <iframe
+          src={(() => {
+            const url = viewingSong.sheet_music_url || '';
+            const match = url.match(/\/d\/([^/]+)/);
+            if (match) return `https://drive.google.com/file/d/${match[1]}/preview?rm=minimal`;
+            return url;
+          })()}
+          className="w-full h-full border-0"
+          allow="autoplay"
+        />
+      </div>
+    )}
+  </>
   );
 };

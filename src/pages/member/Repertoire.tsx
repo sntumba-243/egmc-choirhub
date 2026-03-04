@@ -268,23 +268,19 @@ export const MemberRepertoire = () => {
 
       {/* PDF Modal Overlay */}
       {viewingSong && viewingSong.sheet_music_url && (
-        <div className="fixed inset-0 z-[9999] bg-black/90 flex flex-col">
-          <div className="flex items-center justify-between px-4 py-3 bg-black/50">
-            <button onClick={() => setViewingSong(null)}
-              className="flex items-center gap-2 text-white text-sm font-medium">
-              ← Back
-            </button>
-            <h2 className="text-white text-sm font-semibold truncate flex-1 text-center px-4">{viewingSong.title}</h2>
-            <div className="w-12" />
-          </div>
+        <div className="fixed inset-0 z-[9999] bg-white">
+          <button onClick={() => setViewingSong(null)}
+            className="fixed top-3 left-3 z-[10000] px-4 py-2 text-sm font-semibold text-gray-700 bg-white/90 backdrop-blur border border-gray-200 rounded-full shadow-sm hover:bg-gray-100 transition">
+            ← Back
+          </button>
           <iframe
             src={(() => {
               const url = viewingSong.sheet_music_url || '';
               const match = url.match(/\/d\/([^/]+)/);
-              if (match) return `https://drive.google.com/file/d/${match[1]}/preview`;
+              if (match) return `https://drive.google.com/file/d/${match[1]}/preview?rm=minimal`;
               return url;
             })()}
-            className="flex-1 w-full border-0"
+            className="w-full h-full border-0"
             allow="autoplay"
           />
         </div>
