@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Mail, Lock, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, Loader2, WifiOff } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -15,6 +15,18 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister }) => {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
   const [churchLogo, setChurchLogo] = useState<string | null>(localStorage.getItem('login_church_logo'));
   const [churchName, setChurchName] = useState<string | null>(localStorage.getItem('login_church_name'));
 
@@ -211,6 +223,15 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister }) => {
           )}
 
           <form onSubmit={handleSubmit}>
+            {isOffline && (
+              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3">
+                <WifiOff className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-800">You're offline</p>
+                  <p className="text-xs text-amber-600">Login requires an internet connection. Please connect and try again.</p>
+                </div>
+              </div>
+            )}
             {/* Email */}
             <div className="mb-3">
               <label
@@ -298,7 +319,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister }) => {
             {/* Submit */}
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || isOffline}
               className="w-full text-white flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.99] transition-all"
               style={{
                 padding: '12px',
