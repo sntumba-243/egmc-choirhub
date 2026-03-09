@@ -94,10 +94,10 @@ export const EventDetail = () => {
 
     try {
       const { data } = await supabase
-        .from('rsvps')
+        .from('event_rsvps')
         .select('status')
         .eq('event_id', eventId)
-        .eq('user_id', user.id)
+        .eq('member_id', user.id)
         .single();
 
       if (data) {
@@ -122,18 +122,18 @@ export const EventDetail = () => {
     try {
       if (rsvpStatus) {
         const { error } = await supabase
-          .from('rsvps')
+          .from('event_rsvps')
           .update({ status: dbStatus })
           .eq('event_id', event.id)
-          .eq('user_id', user.id);
+          .eq('member_id', user.id);
 
         if (error) throw error;
       } else {
         const { error } = await supabase
-          .from('rsvps')
+          .from('event_rsvps')
           .insert([{
             event_id: event.id,
-            user_id: user.id,
+            member_id: user.id,
             status: dbStatus
           }]);
 

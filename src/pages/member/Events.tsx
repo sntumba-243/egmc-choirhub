@@ -81,23 +81,32 @@ export const MemberEvents = () => {
   };
 
   const handleRSVP = async (eventId: string, status: 'yes' | 'no' | 'maybe') => {
+    if (!user) {
+      toast.error('You must be logged in to RSVP');
+      return;
+    }
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast.error('You must be logged in to RSVP');
-        return;
-      }
-
       const { error } = await supabase
         .from('event_rsvps')
         .upsert({
           event_id: eventId,
           member_id: user.id,
           status,
-        });
+        }, { onConflict: 'event_id,member_id' });
 
       if (error) throw error;
 
+      setRsvps((prev) => ({
+        ...prev,
+        [eventId]: { event_id: eventId, status },
+      }));
+
+      toast.success(`RSVP updated to "${status}"`);
+    } catch (error) {
+      console.error('Error updating RSVP:', error);
+      toast.error('Failed to update RSVP');
+    }
+  };
       setRsvps((prev) => ({
         ...prev,
         [eventId]: { event_id: eventId, status },

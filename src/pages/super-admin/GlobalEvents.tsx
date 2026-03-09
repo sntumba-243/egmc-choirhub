@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getDbClient } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Calendar, Plus, Clock, MapPin, Trash2, Edit, Globe } from 'lucide-react';
+import { Calendar, Plus, Clock, MapPin, Trash2, Edit, Globe, Music, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface GlobalEvent {
@@ -33,8 +33,12 @@ export const GlobalEvents = () => {
     type: 'concert',
   });
 
+  const [allSongs, setAllSongs] = useState<{id: string; title: string; composer?: string}[]>([]);
+  const [selectedSongIds, setSelectedSongIds] = useState<string[]>([]);
+  const [songSearch, setSongSearch] = useState('');
   useEffect(() => {
     fetchEvents();
+    fetchSongs();
   }, []);
 
   const fetchEvents = async () => {
@@ -56,6 +60,14 @@ export const GlobalEvents = () => {
     }
   };
 
+
+  const fetchSongs = async () => {
+    try {
+      const supabase = getDbClient();
+      const { data } = await supabase.from('songs').select('id, title, composer').order('title');
+      setAllSongs(data || []);
+    } catch (e) { console.error('Error fetching songs:', e); }
+  };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title || !form.date || !form.time || !form.location) {
@@ -77,17 +89,40 @@ export const GlobalEvents = () => {
           })
           .eq('id', editingId);
         if (error) throw error;
+
+        // Update songs for edited event
+        await supabase.from('event_songs').delete().eq('event_id', editingId);
+        if (selectedSongIds.length > 0) {
+          const eventSongs = selectedSongIds.map((songId, i) => ({
+            event_id: editingId,
+            song_id: songId,
+            order_num: i + 1,
+          }));
+          await supabase.from('event_songs').insert(eventSongs);
+        }
         toast.success('Event updated!');
       } else {
-        const { error } = await supabase
+        const { data: newEvent, error } = await supabase
           .from('events')
           .insert([{
             ...form,
             is_global: true,
             church_id: user?.church_id,
             requires_rsvp: true,
-          }]);
+          }])
+          .select('id')
+          .single();
         if (error) throw error;
+
+        // Save selected songs
+        if (newEvent && selectedSongIds.length > 0) {
+          const eventSongs = selectedSongIds.map((songId, i) => ({
+            event_id: newEvent.id,
+            song_id: songId,
+            order_num: i + 1,
+          }));
+          await supabase.from('event_songs').insert(eventSongs);
+        }
         toast.success('Global event created!');
       }
 
@@ -101,16 +136,24 @@ export const GlobalEvents = () => {
     }
   };
 
-  const handleEdit = (event: GlobalEvent) => {
+  const handleEdit = async (event: GlobalEvent) => {
     setForm({
       title: event.title,
-      description: event.description || '',
+      description: event.description || '' ,
       date: event.date,
       time: event.time,
       location: event.location,
       type: event.type || 'concert',
     });
     setEditingId(event.id);
+
+    // Load existing songs for this event
+    try {
+      const supabase = getDbClient();
+      const { data } = await supabase.from('event_songs').select('song_id').eq('event_id', event.id);
+      setSelectedSongIds(data?.map(es => es.song_id) || []);
+    } catch (e) { setSelectedSongIds([]); }
+
     setShowForm(true);
   };
 
@@ -129,8 +172,10 @@ export const GlobalEvents = () => {
   };
 
   const resetForm = () => {
-    setForm({ title: '', description: '', date: '', time: '', location: '', type: 'concert' });
+    setForm({ title: '' , description: '' , date: '' , time: '' , location: '' , type: 'concert' });
     setEditingId(null);
+    setSelectedSongIds([]);
+    setSongSearch('' );
     setShowForm(false);
   };
 
@@ -204,6 +249,61 @@ export const GlobalEvents = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
               <textarea value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))}
                 rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500" />
+            </div>
+          </div>
+
+          {/* Song Selector */}
+          <div className="border-t pt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <Music className="w-4 h-4 inline mr-1" /> Songs for this event ({selectedSongIds.length} selected)
+            </label>
+            <div className="relative mb-2">
+              <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search songs..."
+                value={songSearch}
+                onChange={(e) => setSongSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+            {selectedSongIds.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {selectedSongIds.map(id => {
+                  const song = allSongs.find(s => s.id === id);
+                  return song ? (
+                    <span key={id} className="inline-flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-medium">
+                      {song.title}
+                      <button type="button" onClick={() => setSelectedSongIds(prev => prev.filter(s => s !== id))}
+                        className="text-amber-600 hover:text-amber-800 font-bold">×</button>
+                    </span>
+                  ) : null;
+                })}
+              </div>
+            )}
+            <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg">
+              {allSongs
+                .filter(s => s.title.toLowerCase().includes(songSearch.toLowerCase()))
+                .slice(0, 50)
+                .map(song => (
+                  <button type="button" key={song.id}
+                    onClick={() => {
+                      setSelectedSongIds(prev =>
+                        prev.includes(song.id) ? prev.filter(id => id !== song.id) : [...prev, song.id]
+                      );
+                    }}
+                    className={`w-full text-left px-3 py-2 text-sm border-b border-gray-100 last:border-0 flex items-center gap-2 hover:bg-gray-50 ${
+                      selectedSongIds.includes(song.id) ? 'bg-amber-50' : '' 
+                    }`}>
+                    <span className={`w-4 h-4 rounded border flex items-center justify-center text-xs ${
+                      selectedSongIds.includes(song.id) ? 'bg-amber-500 border-amber-500 text-white' : 'border-gray-300' 
+                    }`}>
+                      {selectedSongIds.includes(song.id) ? '✓' : '' }
+                    </span>
+                    <span className="truncate">{song.title}</span>
+                    {song.composer && <span className="text-gray-400 text-xs ml-auto">{song.composer}</span>}
+                  </button>
+                ))}
             </div>
           </div>
           <div className="flex gap-3">
