@@ -326,7 +326,7 @@ export const GlobalEvents = () => {
           </h2>
           <div className="space-y-2">
             {upcoming.map((event) => (
-              <div key={event.id} className="bg-white rounded-lg p-4 border border-gray-100 flex items-center justify-between">
+              <div key={event.id} className="bg-white rounded-lg p-4 border border-gray-100 flex items-center justify-between cursor-pointer hover:border-amber-200 transition" onClick={() => navigate(`/super-admin/events/${event.id}`)}>
                 <div className="flex items-center gap-3">
                   <div className="bg-amber-100 rounded-lg p-2 text-center flex-shrink-0 w-12">
                     <div className="text-lg font-bold text-amber-700">

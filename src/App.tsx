@@ -75,6 +75,7 @@ import { Churches } from "./pages/super-admin/Churches";
 import { ChurchForm } from "./pages/super-admin/ChurchForm";
 import { ChurchDetail } from "./pages/super-admin/ChurchDetail";
 import { GlobalEvents } from "./pages/super-admin/GlobalEvents";
+import { SuperAdminEventDetail } from "./pages/super-admin/EventDetail";
 
 // Super Admin
 
@@ -161,6 +162,7 @@ function AppRoutes() {
         <Route path="repertoire/:id/edit" element={<SongForm />} />
         <Route path="members" element={<AdminMembers />} />
         <Route path="events" element={<GlobalEvents />} />
+        <Route path="events/:id" element={<SuperAdminEventDetail />} />
         <Route path="members/new" element={<MemberForm />} />
         <Route path="members/:id/edit" element={<MemberForm />} />
         <Route path="events/new" element={<EventForm />} />
