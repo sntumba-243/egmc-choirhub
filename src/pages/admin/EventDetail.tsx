@@ -57,8 +57,8 @@ export const AdminEventDetail = () => {
       const [eventRes, rsvpsRes] = await Promise.all([
         supabase.from('events').select('*').eq('id', id).single(),
         supabase
-          .from('rsvps')
-          .select('id, status, members(first_name, last_name, voice_part)')
+          .from('event_rsvps')
+          .select('id, status, members:member_id(first_name, last_name, voice_part)')
           .eq('event_id', id)
       ]);
 

@@ -54,7 +54,7 @@ export const AdminEvents = () => {
         for (const event of data) {
           if (event.requires_rsvp) {
             const { count } = await supabase
-              .from('rsvps')
+              .from('event_rsvps')
               .select('*', { count: 'exact', head: true })
               .eq('event_id', event.id)
               .eq('status', 'yes');
@@ -99,7 +99,7 @@ export const AdminEvents = () => {
         const { data: event } = await supabase.from('events').select('date').eq('id', eventId).single();
         
         // Get current RSVPs before deleting
-        const { data: currentRsvps } = await supabase.from('rsvps').select('member_id, status').eq('event_id', eventId);
+        const { data: currentRsvps } = await supabase.from('event_rsvps').select('member_id, status').eq('event_id', eventId);
         
         // Archive RSVPs to attendance_history
         if (currentRsvps && currentRsvps.length > 0 && event) {
@@ -114,7 +114,7 @@ export const AdminEvents = () => {
         }
         
         // Now safe to delete
-        const { error } = await supabase.from('rsvps').delete().eq('event_id', eventId);
+        const { error } = await supabase.from('event_rsvps').delete().eq('event_id', eventId);
         if (error) throw error;
         toast.success('RSVPs archived & reset');
         fetchEvents();
