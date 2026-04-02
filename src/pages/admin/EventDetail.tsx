@@ -60,6 +60,8 @@ export const AdminEventDetail = () => {
           .eq('event_id', id)
       ]);
 
+      console.log('RSVP fetch result:', { data: rsvpsRes.data, error: rsvpsRes.error });
+
       if (eventRes.error) throw eventRes.error;
       setEvent(eventRes.data);
       setRsvps(rsvpsRes.data || []);
