@@ -15,12 +15,10 @@ interface Event {
 }
 
 interface RSVP {
-  id: string;
   status: string;
   members: {
     first_name: string;
     last_name: string;
-    voice_part: string;
   };
 }
 
@@ -58,7 +56,7 @@ export const AdminEventDetail = () => {
         supabase.from('events').select('*').eq('id', id).single(),
         supabase
           .from('event_rsvps')
-          .select('id, status, members:member_id(first_name, last_name, voice_part)')
+          .select('status, members(first_name, last_name)')
           .eq('event_id', id)
       ]);
 
@@ -345,7 +343,7 @@ export const AdminEventDetail = () => {
         <div className="grid grid-cols-3 gap-2 mb-4">
           <div className="text-center p-3 bg-green-100 rounded-lg border border-green-200">
             <div className="text-2xl font-bold text-green-700">{rsvpCounts.yes}</div>
-            <div className="text-xs font-medium text-green-700">Yes</div>
+            <div className="text-xs font-medium text-green-700">Attending</div>
           </div>
           <div className="text-center p-3 bg-yellow-100 rounded-lg border border-yellow-200">
             <div className="text-2xl font-bold text-yellow-700">{rsvpCounts.maybe}</div>
@@ -353,7 +351,7 @@ export const AdminEventDetail = () => {
           </div>
           <div className="text-center p-3 bg-red-100 rounded-lg border border-red-200">
             <div className="text-2xl font-bold text-red-700">{rsvpCounts.no}</div>
-            <div className="text-xs font-medium text-red-700">No</div>
+            <div className="text-xs font-medium text-red-700">Not Attending</div>
           </div>
         </div>
 
@@ -361,7 +359,7 @@ export const AdminEventDetail = () => {
           const statusRsvps = rsvps.filter(r => r.status === status);
           if (statusRsvps.length === 0) return null;
 
-          const labels = { yes: 'Yes', maybe: 'Maybe', no: 'No' };
+          const labels = { yes: 'Attending', maybe: 'Maybe', no: 'Not Attending' };
 
           return (
             <div key={status} className="mb-3 last:mb-0">
@@ -369,12 +367,11 @@ export const AdminEventDetail = () => {
                 {labels[status as keyof typeof labels]} ({statusRsvps.length})
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {statusRsvps.map(rsvp => (
-                  <div key={rsvp.id} className="p-2 bg-gray-100 rounded border border-gray-200 text-xs">
+                {statusRsvps.map((rsvp, idx) => (
+                  <div key={idx} className="p-2 bg-gray-100 rounded border border-gray-200 text-xs">
                     <div className="font-semibold text-gray-900 truncate">
                       {rsvp.members.first_name} {rsvp.members.last_name}
                     </div>
-                    <div className="text-gray-700">{rsvp.members.voice_part}</div>
                   </div>
                 ))}
               </div>
