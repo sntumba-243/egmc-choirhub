@@ -16,6 +16,7 @@ interface Event {
 
 interface RSVP {
   status: string;
+  member_id: string;
   members: {
     first_name: string;
     last_name: string;
@@ -56,15 +57,38 @@ export const AdminEventDetail = () => {
         supabase.from('events').select('*').eq('id', id).single(),
         supabase
           .from('event_rsvps')
-          .select('status, members(first_name, last_name)')
+          .select('member_id, status')
           .eq('event_id', id)
       ]);
 
-      console.log('RSVP fetch result:', { data: rsvpsRes.data, error: rsvpsRes.error });
-
       if (eventRes.error) throw eventRes.error;
       setEvent(eventRes.data);
-      setRsvps(rsvpsRes.data || []);
+
+      // member_id stores auth.uid(), which equals members.id
+      const rsvpData = rsvpsRes.data || [];
+      if (rsvpData.length > 0) {
+        const memberIds = rsvpData.map(r => r.member_id);
+        const { data: members } = await supabase
+          .from('members')
+          .select('id, first_name, last_name')
+          .in('id', memberIds);
+
+        const memberMap = new Map(
+          (members || []).map(m => [m.id, { first_name: m.first_name, last_name: m.last_name }])
+        );
+
+        setRsvps(
+          rsvpData
+            .filter(r => memberMap.has(r.member_id))
+            .map(r => ({
+              status: r.status,
+              member_id: r.member_id,
+              members: memberMap.get(r.member_id)!,
+            }))
+        );
+      } else {
+        setRsvps([]);
+      }
     } catch (error) {
       console.error('Error:', error);
       toast.error('Failed to load event details');
