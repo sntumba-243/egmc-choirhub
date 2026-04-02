@@ -30,6 +30,7 @@ export const MemberEvents = () => {
   const { user } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
   const [rsvps, setRsvps] = useState<Record<string, RSVP>>({});
+  const [rsvpCounts, setRsvpCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('cards');
   const [sortField, setSortField] = useState<SortField>('date');
@@ -38,6 +39,7 @@ export const MemberEvents = () => {
   useEffect(() => {
     fetchEvents();
     fetchRSVPs();
+    fetchRsvpCounts();
   }, [user?.church_id]);
 
   const fetchEvents = async () => {
@@ -60,7 +62,6 @@ export const MemberEvents = () => {
 
   const fetchRSVPs = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data, error } = await supabase
@@ -80,6 +81,26 @@ export const MemberEvents = () => {
     }
   };
 
+  const fetchRsvpCounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('event_rsvps')
+        .select('event_id, status');
+
+      if (error) throw error;
+
+      const counts: Record<string, number> = {};
+      data?.forEach((rsvp) => {
+        if (rsvp.status === 'yes') {
+          counts[rsvp.event_id] = (counts[rsvp.event_id] || 0) + 1;
+        }
+      });
+      setRsvpCounts(counts);
+    } catch (error) {
+      console.error('Error fetching RSVP counts:', error);
+    }
+  };
+
   const handleRSVP = async (eventId: string, status: 'yes' | 'no' | 'maybe') => {
     if (!user) {
       toast.error('You must be logged in to RSVP');
@@ -96,21 +117,19 @@ export const MemberEvents = () => {
 
       if (error) throw error;
 
+      const prevStatus = rsvps[eventId]?.status;
       setRsvps((prev) => ({
         ...prev,
         [eventId]: { event_id: eventId, status },
       }));
-
-      toast.success(`RSVP updated to "${status}"`);
-    } catch (error) {
-      console.error('Error updating RSVP:', error);
-      toast.error('Failed to update RSVP');
-    }
-  };
-      setRsvps((prev) => ({
-        ...prev,
-        [eventId]: { event_id: eventId, status },
-      }));
+      // Update count optimistically
+      setRsvpCounts((prev) => {
+        const count = prev[eventId] || 0;
+        let delta = 0;
+        if (status === 'yes' && prevStatus !== 'yes') delta = 1;
+        if (status !== 'yes' && prevStatus === 'yes') delta = -1;
+        return { ...prev, [eventId]: Math.max(0, count + delta) };
+      });
 
       toast.success(`RSVP updated to "${status}"`);
     } catch (error) {
@@ -280,6 +299,12 @@ export const MemberEvents = () => {
                       ) : (
                         <span className="text-xs text-gray-500 italic">No RSVP yet</span>
                       )}
+                      {rsvpCounts[event.id] ? (
+                        <div className="flex items-center gap-1 mt-1">
+                          <Users className="w-3 h-3 text-gray-400" />
+                          <span className="text-xs text-gray-500">{rsvpCounts[event.id]} attending</span>
+                        </div>
+                      ) : null}
                     </div>
                   )}
                 </div>

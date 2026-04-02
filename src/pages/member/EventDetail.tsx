@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { Calendar, Clock, MapPin, Music, Eye } from 'lucide-react';
+import { Calendar, Clock, MapPin, Music, Eye, Users } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -36,6 +36,7 @@ export const EventDetail = () => {
   const [event, setEvent] = useState<Event | null>(null);
   const [eventSongs, setEventSongs] = useState<EventSong[]>([]);
   const [rsvpStatus, setRsvpStatus] = useState<string | null>(null);
+  const [rsvpCount, setRsvpCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -43,6 +44,7 @@ export const EventDetail = () => {
       fetchEvent();
       fetchEventSongs();
       checkRsvpStatus();
+      fetchRsvpCount();
     }
   }, [eventId]);
 
@@ -108,39 +110,44 @@ export const EventDetail = () => {
     }
   };
 
-  const handleRsvp = async (status: string) => {
+  const fetchRsvpCount = async () => {
+    try {
+      const { count, error } = await supabase
+        .from('event_rsvps')
+        .select('*', { count: 'exact', head: true })
+        .eq('event_id', eventId)
+        .eq('status', 'yes');
+
+      if (!error && count !== null) {
+        setRsvpCount(count);
+      }
+    } catch (error) {
+      console.error('Error fetching RSVP count:', error);
+    }
+  };
+
+  const handleRsvp = async (status: 'yes' | 'no' | 'maybe') => {
     if (!user || !event) return;
 
-    const dbStatusMap: { [key: string]: string } = {
-      'attending': 'yes',
-      'not attending': 'no',
-      'maybe': 'maybe'
-    };
-    
-    const dbStatus = dbStatusMap[status] || status;
-
     try {
-      if (rsvpStatus) {
-        const { error } = await supabase
-          .from('event_rsvps')
-          .update({ status: dbStatus })
-          .eq('event_id', event.id)
-          .eq('member_id', user.id);
+      const { error } = await supabase
+        .from('event_rsvps')
+        .upsert({
+          event_id: event.id,
+          member_id: user.id,
+          status,
+        }, { onConflict: 'event_id,member_id' });
 
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('event_rsvps')
-          .insert([{
-            event_id: event.id,
-            member_id: user.id,
-            status: dbStatus
-          }]);
-
-        if (error) throw error;
-      }
+      if (error) throw error;
 
       setRsvpStatus(status);
+      // Update count optimistically
+      setRsvpCount((prev) => {
+        let delta = 0;
+        if (status === 'yes' && rsvpStatus !== 'yes') delta = 1;
+        if (status !== 'yes' && rsvpStatus === 'yes') delta = -1;
+        return Math.max(0, prev + delta);
+      });
       toast.success(`RSVP: ${status}`);
     } catch (error) {
       console.error('Error:', error);
@@ -266,12 +273,20 @@ export const EventDetail = () => {
           {/* Vibrant RSVP */}
           {event.requires_rsvp && (
             <div className="border-t pt-3">
-              <h3 className="text-xs font-bold text-gray-700 mb-2">Will you attend?</h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-bold text-gray-700">Will you attend?</h3>
+                {rsvpCount > 0 && (
+                  <div className="flex items-center gap-1">
+                    <Users className="w-3.5 h-3.5 text-gray-400" />
+                    <span className="text-xs text-gray-500">{rsvpCount} attending</span>
+                  </div>
+                )}
+              </div>
               <div className="flex gap-2">
                 <button
-                  onClick={() => handleRsvp('attending')}
+                  onClick={() => handleRsvp('yes')}
                   className={`flex-1 py-2.5 rounded text-sm font-bold transition ${
-                    rsvpStatus === 'attending'
+                    rsvpStatus === 'yes'
                       ? 'bg-green-600 text-white shadow-md'
                       : 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-200'
                   }`}
@@ -289,9 +304,9 @@ export const EventDetail = () => {
                   Maybe
                 </button>
                 <button
-                  onClick={() => handleRsvp('not attending')}
+                  onClick={() => handleRsvp('no')}
                   className={`flex-1 py-2.5 rounded text-sm font-bold transition ${
-                    rsvpStatus === 'not attending'
+                    rsvpStatus === 'no'
                       ? 'bg-red-600 text-white shadow-md'
                       : 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200'
                   }`}
