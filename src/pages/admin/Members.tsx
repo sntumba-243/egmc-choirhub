@@ -153,7 +153,7 @@ export const AdminMembers = () => {
       </div>
 
       {/* Compact Voice Part Stats */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {Object.entries(voicePartCounts).map(([voice, count]) => {
           const colors = {
             Soprano: 'bg-pink-50 border-pink-200 text-pink-700',
@@ -299,13 +299,13 @@ export const AdminMembers = () => {
                       e.stopPropagation();
                       navigate(isSuperAdmin ? `/super-admin/members/${member.id}/edit` : `/admin/members/${member.id}/edit`);
                     }}
-                    className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                    className="p-2 min-h-[44px] min-w-[44px] text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                   >
                     <Edit className="w-4 h-4" />
                   </button>
                   <button
                     onClick={(e) => handleDelete(e, member.id, `${member.first_name} ${member.last_name}`)}
-                    className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    className="p-2 min-h-[44px] min-w-[44px] text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

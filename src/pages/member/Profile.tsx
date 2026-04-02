@@ -133,7 +133,7 @@ export const MemberProfile: React.FC = () => {
     : { bg: 'bg-green-50 text-green-700 ring-green-200', label: 'Member' };
 
   return (
-    <div className="space-y-4 max-w-2xl mx-auto">
+    <div className="space-y-4 max-w-2xl mx-auto px-4 sm:px-0">
       {/* Profile Header */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <div className="flex items-center gap-4">
@@ -184,11 +184,11 @@ export const MemberProfile: React.FC = () => {
             <h1 className="text-lg font-bold text-gray-900 truncate">{user?.name}</h1>
             <p className="text-xs text-gray-500 truncate">{user?.email}</p>
             <div className="flex items-center gap-2 mt-1.5">
-              <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold ring-1 ${roleBadge.bg}`}>
+              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ring-1 ${roleBadge.bg}`}>
                 {roleBadge.label}
               </span>
               {user?.voice_part && (
-                <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-50 text-gray-600 ring-1 ring-gray-200">
+                <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-50 text-gray-600 ring-1 ring-gray-200">
                   {user.voice_part}
                 </span>
               )}
@@ -198,7 +198,7 @@ export const MemberProfile: React.FC = () => {
 
         {/* Phone */}
         <div className="mt-4 pt-4 border-t border-gray-100">
-          <label className="block text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-1.5">
+          <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1.5">
             Phone Number
           </label>
           <div className="flex gap-2">
@@ -239,7 +239,7 @@ export const MemberProfile: React.FC = () => {
                 <stat.icon className="w-3.5 h-3.5" />
               </div>
               <p className="text-sm font-bold text-gray-900 truncate">{stat.value}</p>
-              <p className="text-[10px] text-gray-400">{stat.label}</p>
+              <p className="text-xs text-gray-400">{stat.label}</p>
             </div>
           ))}
         </div>
@@ -257,7 +257,7 @@ export const MemberProfile: React.FC = () => {
             </div>
             <div>
               <p className="text-sm font-semibold text-gray-900">Offline Downloads</p>
-              <p className="text-[10px] text-gray-400">{offlineSongs.length} songs · {storageInfo.usedMB.toFixed(1)} MB</p>
+              <p className="text-xs text-gray-400">{offlineSongs.length} songs · {storageInfo.usedMB.toFixed(1)} MB</p>
             </div>
           </div>
           <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${showOffline ? 'rotate-90' : ''}`} />
@@ -273,7 +273,7 @@ export const MemberProfile: React.FC = () => {
                   style={{ width: `${Math.min(storageInfo.percentage, 100)}%` }}
                 />
               </div>
-              <p className="text-[10px] text-gray-400 mt-1">{storageInfo.percentage.toFixed(0)}% used</p>
+              <p className="text-xs text-gray-400 mt-1">{storageInfo.percentage.toFixed(0)}% used</p>
             </div>
 
             {offlineSongs.length === 0 ? (
@@ -288,16 +288,16 @@ export const MemberProfile: React.FC = () => {
                     <div key={song.id} className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-gray-50">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">{song.title}</p>
-                        <p className="text-[10px] text-gray-400">{formatDate(song.downloadedAt)}</p>
+                        <p className="text-xs text-gray-400">{formatDate(song.downloadedAt)}</p>
                       </div>
-                      <button onClick={() => handleRemoveSong(song.id)} className="p-1.5 text-gray-400 hover:text-red-500">
+                      <button onClick={() => handleRemoveSong(song.id)} className="p-2 min-h-[44px] min-w-[44px] text-gray-400 hover:text-red-500">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   ))}
                 </div>
                 {offlineSongs.length > 1 && (
-                  <button onClick={handleClearAll} className="mt-2 text-[11px] text-red-500 hover:text-red-600 font-medium">
+                  <button onClick={handleClearAll} className="mt-2 text-xs text-red-500 hover:text-red-600 font-medium">
                     Clear all downloads
                   </button>
                 )}

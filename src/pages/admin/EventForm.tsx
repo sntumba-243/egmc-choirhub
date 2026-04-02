@@ -507,7 +507,7 @@ export const EventForm: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => toggleMember(member.id)}
-                            className="p-0.5 text-red-600 hover:bg-red-50 rounded"
+                            className="p-2 min-h-[44px] min-w-[44px] text-red-600 hover:bg-red-50 rounded"
                           >
                             <X className="w-3 h-3" />
                           </button>
@@ -576,7 +576,7 @@ export const EventForm: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => removeSong(song.id)}
-                        className="p-1 text-red-600 hover:bg-red-100 rounded"
+                        className="p-2 min-h-[44px] min-w-[44px] text-red-600 hover:bg-red-100 rounded"
                       >
                         <X className="w-3 h-3" />
                       </button>

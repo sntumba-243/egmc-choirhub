@@ -151,7 +151,7 @@ export const MemberMessages = () => {
                 {selectedMessage.subject}
               </h1>
               {selectedMessage.is_important && (
-                <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-[10px] font-semibold rounded-md">Important</span>
+                <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-xs font-semibold rounded-md">Important</span>
               )}
             </div>
             <div className="flex items-center justify-between">

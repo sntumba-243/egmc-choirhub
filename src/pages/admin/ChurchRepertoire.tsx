@@ -254,13 +254,13 @@ export const ChurchRepertoire = () => {
           <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
             <button
               onClick={() => setViewMode('grid')}
-              className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'}`}
+              className={`p-2 min-h-[44px] min-w-[44px] rounded ${viewMode === 'grid' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'}`}
             >
               <Grid3x3 className="w-4 h-4" />
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'}`}
+              className={`p-2 min-h-[44px] min-w-[44px] rounded ${viewMode === 'list' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'}`}
             >
               <List className="w-4 h-4" />
             </button>
@@ -402,7 +402,7 @@ export const ChurchRepertoire = () => {
                       <Star className={`w-3.5 h-3.5 ${isFavorite ? 'fill-yellow-400 text-yellow-400' : 'text-gray-200'}`} />
                     </button>
                   </div>
-                  <p className="text-[11px] text-gray-400 truncate mb-2">{song.composer}</p>
+                  <p className="text-xs text-gray-400 truncate mb-2">{song.composer}</p>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${langTextColor}`}>{langCode}</span>

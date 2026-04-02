@@ -159,7 +159,7 @@ export function VocalCoach() {
       {/* Header */}
       <div>
         <h1 className="text-xl font-bold text-gray-900">Vocal Coach</h1>
-        <p className="text-[11px] text-gray-500">Practice assignments & vocal exercises</p>
+        <p className="text-xs text-gray-500">Practice assignments & vocal exercises</p>
       </div>
 
       {/* ==================== ASSIGNMENTS FROM DIRECTOR ==================== */}
@@ -192,7 +192,7 @@ export function VocalCoach() {
                           {isSong ? 'Song' : 'Exercise'}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 text-[11px] text-gray-400">
+                      <div className="flex items-center gap-2 text-xs text-gray-400">
                         {a.due_date && <span>Due {formatDate(a.due_date)}</span>}
                         {sub && <span className={`font-medium ${sub.status === 'approved' ? 'text-green-600' : sub.status === 'reviewed' ? 'text-blue-600' : 'text-orange-500'}`}>
                           {sub.status === 'approved' ? '✅ Approved' : sub.status === 'reviewed' ? '💬 Reviewed' : '⏳ Submitted'}
@@ -208,7 +208,7 @@ export function VocalCoach() {
                       {/* Director's notes */}
                       {a.notes && (
                         <div className="bg-yellow-50 rounded-xl p-3">
-                          <span className="text-[10px] font-bold text-yellow-700">📝 Director's notes:</span>
+                          <span className="text-xs font-bold text-yellow-700">📝 Director's notes:</span>
                           <p className="text-[12px] text-yellow-800 mt-0.5">{a.notes}</p>
                         </div>
                       )}
@@ -233,7 +233,7 @@ export function VocalCoach() {
                       {/* Exercise instructions */}
                       {!isSong && a.exercise?.instructions && (
                         <div className="bg-gray-50 rounded-xl p-3">
-                          <span className="text-[10px] font-bold text-gray-500">📋 How to do this exercise:</span>
+                          <span className="text-xs font-bold text-gray-500">📋 How to do this exercise:</span>
                           <div className="mt-1.5 text-[12px] text-gray-700 whitespace-pre-line leading-relaxed">
                             {a.exercise.instructions}
                           </div>
@@ -269,19 +269,19 @@ export function VocalCoach() {
                                   a.overall_score >= 80 ? 'bg-green-500' : a.overall_score >= 60 ? 'bg-yellow-500' : 'bg-red-500'
                                 }`}>{a.overall_score}</div>
                                 <div className="flex-1">
-                                  <span className="text-[10px] font-bold text-purple-600">🤖 AI Evaluation</span>
-                                  <p className="text-[11px] text-gray-700 mt-0.5">{a.summary}</p>
+                                  <span className="text-xs font-bold text-purple-600">🤖 AI Evaluation</span>
+                                  <p className="text-xs text-gray-700 mt-0.5">{a.summary}</p>
                                 </div>
                               </div>
                               {a.suggestions?.length > 0 && (
                                 <div className="bg-white/60 rounded-lg p-2">
-                                  <span className="text-[10px] font-bold text-blue-600">💡 Tips:</span>
+                                  <span className="text-xs font-bold text-blue-600">💡 Tips:</span>
                                   {a.suggestions.map((s: string, i: number) => (
-                                    <p key={i} className="text-[11px] text-gray-600 mt-0.5">• {s}</p>
+                                    <p key={i} className="text-xs text-gray-600 mt-0.5">• {s}</p>
                                   ))}
                                 </div>
                               )}
-                              <p className="text-[10px] text-gray-500 italic">{a.encouragement}</p>
+                              <p className="text-xs text-gray-500 italic">{a.encouragement}</p>
                             </div>
                           );
                         } catch { return null; }
@@ -331,7 +331,7 @@ export function VocalCoach() {
         <div className="flex bg-gray-100/80 rounded-xl p-0.5 mb-3">
           {([['all', 'All'], ['breathing', '💨 Breathing'], ['tone', '🎵 Tone'], ['rhythm', '🥁 Rhythm'], ['range', '🎤 Range']] as const).map(([key, label]) => (
             <button key={key} onClick={() => setExerciseTab(key)}
-              className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
+              className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${
                 exerciseTab === key ? 'bg-white shadow-sm text-gray-900 font-semibold' : 'text-gray-500'
               }`}>
               {label}
@@ -374,7 +374,7 @@ export function VocalCoach() {
                     <p className="text-[12px] text-gray-600">{ex.description}</p>
                     {ex.instructions && (
                       <div className="bg-gray-50 rounded-xl p-3">
-                        <span className="text-[10px] font-bold text-gray-500">📋 Instructions:</span>
+                        <span className="text-xs font-bold text-gray-500">📋 Instructions:</span>
                         <div className="mt-1.5 text-[12px] text-gray-700 whitespace-pre-line leading-relaxed">
                           {ex.instructions}
                         </div>
@@ -420,19 +420,19 @@ export function VocalCoach() {
                               r.overall_score >= 80 ? 'bg-green-500' : r.overall_score >= 60 ? 'bg-yellow-500' : 'bg-red-500'
                             }`}>{r.overall_score}</div>
                             <div className="flex-1">
-                              <span className="text-[10px] font-bold text-purple-600">🤖 AI Evaluation</span>
-                              <p className="text-[11px] text-gray-700 mt-0.5">{r.summary}</p>
+                              <span className="text-xs font-bold text-purple-600">🤖 AI Evaluation</span>
+                              <p className="text-xs text-gray-700 mt-0.5">{r.summary}</p>
                             </div>
                           </div>
                           {r.suggestions?.length > 0 && (
                             <div className="bg-white/60 rounded-lg p-2">
-                              <span className="text-[10px] font-bold text-blue-600">💡 Tips:</span>
+                              <span className="text-xs font-bold text-blue-600">💡 Tips:</span>
                               {r.suggestions.map((s: string, i: number) => (
-                                <p key={i} className="text-[11px] text-gray-600 mt-0.5">• {s}</p>
+                                <p key={i} className="text-xs text-gray-600 mt-0.5">• {s}</p>
                               ))}
                             </div>
                           )}
-                          <p className="text-[10px] text-gray-500 italic">{r.encouragement}</p>
+                          <p className="text-xs text-gray-500 italic">{r.encouragement}</p>
                         </div>
                       );
                     } catch { return null; }
@@ -449,7 +449,7 @@ export function VocalCoach() {
         <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-8 text-center">
           <Brain className="w-10 h-10 text-gray-300 mx-auto mb-2" />
           <p className="text-[13px] text-gray-500">No assignments or exercises yet</p>
-          <p className="text-[11px] text-gray-400 mt-1">Your director will assign songs and exercises for you to practice</p>
+          <p className="text-xs text-gray-400 mt-1">Your director will assign songs and exercises for you to practice</p>
         </div>
       )}
 

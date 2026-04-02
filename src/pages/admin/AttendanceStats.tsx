@@ -156,12 +156,12 @@ export default function AttendanceStats() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Attendance</h1>
-          <p className="text-[11px] text-gray-500">Based on RSVPs · {totalEvents} events in period</p>
+          <p className="text-xs text-gray-500">Based on RSVPs · {totalEvents} events in period</p>
         </div>
         <div className="flex bg-gray-100/80 rounded-xl p-0.5">
           {(['week', 'month', 'year', 'all'] as TimePeriod[]).map(p => (
             <button key={p} onClick={() => setTimePeriod(p)}
-              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all ${timePeriod === p ? 'bg-blue-500 text-white shadow-sm font-semibold' : 'text-gray-500'}`}>
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${timePeriod === p ? 'bg-blue-500 text-white shadow-sm font-semibold' : 'text-gray-500'}`}>
               {timePeriodLabels[p]}
             </button>
           ))}
@@ -171,19 +171,19 @@ export default function AttendanceStats() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-2.5">
-          <div className="text-[10px] text-gray-400">Members</div>
+          <div className="text-xs text-gray-400">Members</div>
           <div className="text-xl font-bold text-gray-900">{memberStats.length}</div>
         </div>
         <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-2.5">
-          <div className="text-[10px] text-gray-400">Events</div>
+          <div className="text-xs text-gray-400">Events</div>
           <div className="text-xl font-bold text-gray-900">{totalEvents}</div>
         </div>
         <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-2.5">
-          <div className="text-[10px] text-gray-400">Regulars 💪</div>
+          <div className="text-xs text-gray-400">Regulars 💪</div>
           <div className="text-xl font-bold text-green-600">{regularsCount}</div>
         </div>
         <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-2.5">
-          <div className="text-[10px] text-gray-400">Follow-up ⚠️</div>
+          <div className="text-xs text-gray-400">Follow-up ⚠️</div>
           <div className="text-xl font-bold text-red-500">{followupCount}</div>
         </div>
       </div>
@@ -191,14 +191,14 @@ export default function AttendanceStats() {
       {/* Sort + Filter */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-medium text-gray-400">Sort:</span>
+          <span className="text-xs font-medium text-gray-400">Sort:</span>
           <div className="flex bg-gray-100/80 rounded-lg p-0.5">
             <button onClick={() => toggleSort('name')}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${sortBy === 'name' ? 'bg-white shadow-sm text-gray-900 font-semibold' : 'text-gray-500'}`}>
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${sortBy === 'name' ? 'bg-white shadow-sm text-gray-900 font-semibold' : 'text-gray-500'}`}>
               Name {sortBy === 'name' && (sortDir === 'asc' ? '↑' : '↓')}
             </button>
             <button onClick={() => toggleSort('rate')}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${sortBy === 'rate' ? 'bg-white shadow-sm text-gray-900 font-semibold' : 'text-gray-500'}`}>
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${sortBy === 'rate' ? 'bg-white shadow-sm text-gray-900 font-semibold' : 'text-gray-500'}`}>
               Attendance {sortBy === 'rate' && (sortDir === 'asc' ? '↑' : '↓')}
             </button>
           </div>
@@ -207,13 +207,13 @@ export default function AttendanceStats() {
           <div className="flex bg-gray-100/80 rounded-lg p-0.5">
             {([['all', 'All'], ['regulars', '💪 Regulars'], ['followup', '⚠️ Follow-up']] as const).map(([key, label]) => (
               <button key={key} onClick={() => setStatusFilter(key as StatusFilter)}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${statusFilter === key ? 'bg-white shadow-sm text-gray-900 font-semibold' : 'text-gray-500'}`}>
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${statusFilter === key ? 'bg-white shadow-sm text-gray-900 font-semibold' : 'text-gray-500'}`}>
                 {label}
               </button>
             ))}
           </div>
           <select value={voiceFilter} onChange={e => setVoiceFilter(e.target.value)}
-            className="px-2 py-1 text-[11px] font-medium text-gray-600 bg-white rounded-lg border border-gray-200/60 shadow-sm">
+            className="px-2 py-1 text-xs font-medium text-gray-600 bg-white rounded-lg border border-gray-200/60 shadow-sm">
             <option value="all">All Voices</option>
             {voiceParts.map(vp => <option key={vp} value={vp}>{vp}</option>)}
           </select>
@@ -221,14 +221,14 @@ export default function AttendanceStats() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-100">
-              <th className="px-4 py-2 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Member</th>
-              <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Voice</th>
-              <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Attendance</th>
-              <th className="px-3 py-2 text-center text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Status</th>
+              <th className="px-4 py-2 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Member</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Voice</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Attendance</th>
+              <th className="px-3 py-2 text-center text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</th>
             </tr>
           </thead>
           <tbody>
@@ -240,10 +240,10 @@ export default function AttendanceStats() {
                 <tr key={m.id} className={`border-b border-gray-50 hover:bg-gray-50/50 ${s.rowBg}`}>
                   <td className="px-4 py-2.5">
                     <div className="text-[13px] font-semibold text-gray-900">{m.first_name} {m.last_name}</div>
-                    <div className="text-[10px] text-gray-400">{m.email}</div>
+                    <div className="text-xs text-gray-400">{m.email}</div>
                   </td>
                   <td className="px-3 py-2.5">
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${voicePartColors[m.voice_part] || 'text-gray-600 bg-gray-50'}`}>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-md ${voicePartColors[m.voice_part] || 'text-gray-600 bg-gray-50'}`}>
                       {m.voice_part || '—'}
                     </span>
                   </td>
@@ -258,7 +258,7 @@ export default function AttendanceStats() {
                     </div>
                   </td>
                   <td className="px-3 py-2.5 text-center">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${s.color}`}>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${s.color}`}>
                       {s.emoji} {s.label}
                     </span>
                   </td>
@@ -271,7 +271,7 @@ export default function AttendanceStats() {
 
       {/* Legend */}
       <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm px-4 py-2">
-        <div className="flex items-center gap-3 text-[10px] text-gray-400 flex-wrap">
+        <div className="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
           <span><span className="font-semibold text-green-600">💪 Always</span> 75%+</span>
           <span><span className="font-semibold text-green-600">👍 Often</span> 50-74%</span>
           <span><span className="font-semibold text-yellow-600">🤷 Sometimes</span> 25-49%</span>

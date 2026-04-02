@@ -66,7 +66,7 @@ export const MessageForm: React.FC = () => {
         <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-gray-200/60 shadow-sm overflow-hidden">
           {/* Recipients */}
           <div className="px-4 py-3 border-b border-gray-100">
-            <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">To *</label>
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">To *</label>
             <select
               value={recipientType}
               onChange={(e) => setRecipientType(e.target.value)}
@@ -83,7 +83,7 @@ export const MessageForm: React.FC = () => {
 
           {/* Subject */}
           <div className="px-4 py-3 border-b border-gray-100">
-            <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Subject *</label>
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Subject *</label>
             <input
               type="text"
               value={subject}
@@ -96,7 +96,7 @@ export const MessageForm: React.FC = () => {
 
           {/* Message body */}
           <div className="px-4 py-3">
-            <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Message *</label>
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Message *</label>
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
@@ -113,7 +113,7 @@ export const MessageForm: React.FC = () => {
           <label className="flex items-center justify-between px-4 py-3 cursor-pointer">
             <div>
               <span className="text-[14px] font-semibold text-gray-900">Mark as Important</span>
-              <p className="text-[11px] text-gray-400">Shows a red badge to recipients</p>
+              <p className="text-xs text-gray-400">Shows a red badge to recipients</p>
             </div>
             <div className={`relative w-12 h-7 rounded-full transition-colors ${isImportant ? 'bg-red-500' : 'bg-gray-300'}`}>
               <div className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${isImportant ? 'translate-x-5' : ''}`} />

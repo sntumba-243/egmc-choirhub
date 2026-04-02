@@ -258,14 +258,14 @@ export const AdminEvents = () => {
               <div className="flex gap-1.5 px-3 pb-3 pt-2 sm:px-2.5 sm:pb-2.5 sm:pt-2">
                 <button
                   onClick={(e) => { e.stopPropagation(); navigate(`/admin/events/${event.id}/edit`); }}
-                  className="p-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                  className="p-2 min-h-[44px] min-w-[44px] rounded-lg bg-gray-100 text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition-colors"
                   title="Edit"
                 >
                   <Edit className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={(e) => handleDelete(e, event.id, event.title)}
-                  className="p-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-700 transition-colors"
+                  className="p-2 min-h-[44px] min-w-[44px] rounded-lg bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-700 transition-colors"
                   title="Delete"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -304,7 +304,7 @@ export const AdminEvents = () => {
                     <td className="px-3 sm:px-4 py-3 whitespace-nowrap"><div className="flex items-center gap-2"><div className="w-6 h-6 rounded-lg bg-teal-500 flex items-center justify-center shadow-sm flex-shrink-0"><MapPin className="w-3 h-3 text-white" strokeWidth={2.5} /></div><span className="text-xs text-gray-700">{event.location}</span></div></td>
                     <td className="px-3 sm:px-4 py-3 whitespace-nowrap">{event.type && <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-700 shadow-sm">{event.type}</span>}</td>
                     <td className="px-3 sm:px-4 py-3 whitespace-nowrap">{event.requires_rsvp ? (<div className="flex items-center justify-center gap-1"><Users className="w-4 h-4 text-green-600" /><span className="text-xs font-semibold text-green-600">{rsvpCounts[event.id] || 0}</span>{(rsvpCounts[event.id] || 0) > 0 && <button onClick={(e) => { e.stopPropagation(); handleResetRsvps(event.id, event.title); }} className="ml-1 text-xs text-red-500 hover:text-red-600 font-medium">Reset</button>}</div>) : <span className="text-xs text-gray-400">-</span>}</td>
-                    <td className="px-3 sm:px-4 py-3 whitespace-nowrap text-right">{!event.is_global && (<div className="flex items-center justify-end gap-1"><button onClick={(e) => { e.stopPropagation(); navigate(`/admin/events/${event.id}/edit`); }} className="p-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition-colors"><Edit className="w-3.5 h-3.5" /></button><button onClick={(e) => handleDelete(e, event.id, event.title)} className="p-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-700 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button></div>)}</td>
+                    <td className="px-3 sm:px-4 py-3 whitespace-nowrap text-right">{!event.is_global && (<div className="flex items-center justify-end gap-1"><button onClick={(e) => { e.stopPropagation(); navigate(`/admin/events/${event.id}/edit`); }} className="p-2 min-h-[44px] min-w-[44px] rounded-lg bg-gray-100 text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition-colors"><Edit className="w-3.5 h-3.5" /></button><button onClick={(e) => handleDelete(e, event.id, event.title)} className="p-2 min-h-[44px] min-w-[44px] rounded-lg bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-700 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button></div>)}</td>
                   </tr>
                 ))}
               </tbody>

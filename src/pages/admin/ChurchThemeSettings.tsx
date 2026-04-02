@@ -254,7 +254,7 @@ export const ChurchThemeSettings = () => {
                 </div>
 
                 <p className="text-xs font-semibold text-gray-800">{theme.name}</p>
-                <p className="text-[10px] text-gray-400">{theme.desc}</p>
+                <p className="text-xs text-gray-400">{theme.desc}</p>
 
                 {active && (
                   <div className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center" style={{ background: theme.primary }}>

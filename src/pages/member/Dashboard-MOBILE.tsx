@@ -109,7 +109,7 @@ export const MemberDashboard = () => {
         </div>
         <div>
           <h1 className="text-lg font-extrabold text-gray-900">Hi {firstName}! 🎶</h1>
-          <p className="text-[11px] text-gray-400 font-semibold">
+          <p className="text-xs text-gray-400 font-semibold">
             {voicePart ? voicePart.charAt(0).toUpperCase() + voicePart.slice(1) : 'Member'} · EGMC Choir
           </p>
         </div>
@@ -144,7 +144,7 @@ export const MemberDashboard = () => {
       {/* Upcoming Events */}
       {upcomingEvents.length > 0 && (
         <div>
-          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Upcoming</p>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Upcoming</p>
           <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
             {upcomingEvents.map((event, i) => (
               <button key={event.id} onClick={() => navigate(`/member/events/${event.id}`)}
@@ -159,7 +159,7 @@ export const MemberDashboard = () => {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-semibold text-gray-900 truncate">{event.title}</p>
-                  <p className="text-[11px] text-gray-400">
+                  <p className="text-xs text-gray-400">
                     {formatEventDate(event.date)}{event.time ? ` · ${formatTime(event.time)}` : ''}{event.location ? ` · ${event.location}` : ''}
                   </p>
                 </div>
@@ -172,7 +172,7 @@ export const MemberDashboard = () => {
 
       {/* Menu */}
       <div>
-        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Menu</p>
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Menu</p>
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
           {menuItems.map((item, i) => {
             const Icon = item.icon;
@@ -184,10 +184,10 @@ export const MemberDashboard = () => {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[14px] font-medium text-gray-900">{item.label}</p>
-                  <p className="text-[11px] text-gray-400">{item.sub}</p>
+                  <p className="text-xs text-gray-400">{item.sub}</p>
                 </div>
                 {item.badge > 0 && (
-                  <span className="min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-[11px] font-bold rounded-full flex items-center justify-center">
+                  <span className="min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
                     {item.badge}
                   </span>
                 )}
@@ -203,14 +203,14 @@ export const MemberDashboard = () => {
         <div className="text-center py-6">
           <span className="text-3xl">✨</span>
           <p className="text-[13px] font-semibold text-gray-900 mt-2">You're all caught up!</p>
-          <p className="text-[11px] text-gray-400 mt-0.5">No tasks or events right now</p>
+          <p className="text-xs text-gray-400 mt-0.5">No tasks or events right now</p>
         </div>
       )}
 
       {/* Scripture */}
       <div className="text-center px-4 pt-2 pb-4">
         <p className="text-[12px] text-gray-400 italic leading-relaxed">"Enter into His gates with thanksgiving, and into His courts with praise. Be thankful to Him, and bless His name."</p>
-        <p className="text-[10px] text-gray-300 font-semibold mt-1">— Psalm 100:4</p>
+        <p className="text-xs text-gray-300 font-semibold mt-1">— Psalm 100:4</p>
       </div>
     </div>
   );

@@ -336,7 +336,7 @@ export const AdminEventDetail = () => {
                           e.stopPropagation();
                           viewPDF(song);
                         }}
-                        className="p-1 text-green-600 hover:bg-green-100 rounded"
+                        className="p-2 min-h-[44px] min-w-[44px] text-green-600 hover:bg-green-100 rounded"
                         title="View PDF"
                       >
                         <Eye className="w-4 h-4" />
@@ -347,7 +347,7 @@ export const AdminEventDetail = () => {
                         e.stopPropagation();
                         removeSongFromEvent(eventSong.id, song.title);
                       }}
-                      className="p-1 text-red-600 hover:bg-red-100 rounded"
+                      className="p-2 min-h-[44px] min-w-[44px] text-red-600 hover:bg-red-100 rounded"
                       title="Remove"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -418,7 +418,7 @@ export const AdminEventDetail = () => {
           <div className="bg-white rounded-lg max-w-lg w-full max-h-[80vh] flex flex-col">
             <div className="p-4 border-b flex items-center justify-between">
               <h2 className="text-lg font-bold">Add Songs to Setlist</h2>
-              <button onClick={() => setShowSongPicker(false)} className="p-1 hover:bg-gray-100 rounded">
+              <button onClick={() => setShowSongPicker(false)} className="p-2 min-h-[44px] min-w-[44px] hover:bg-gray-100 rounded">
                 <X className="w-5 h-5" />
               </button>
             </div>

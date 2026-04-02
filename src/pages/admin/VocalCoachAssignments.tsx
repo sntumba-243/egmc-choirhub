@@ -333,16 +333,16 @@ export default function VocalCoachAssignments() {
 
   const RatingBar = ({ label, emoji, value, field }: { label: string; emoji: string; value: number; field: keyof VocalRatings }) => (
     <div className="flex items-center gap-2">
-      <span className="text-[11px] w-20 text-gray-600">{emoji} {label}</span>
+      <span className="text-xs w-20 text-gray-600">{emoji} {label}</span>
       <div className="flex gap-1 flex-1">
         {[1, 2, 3, 4, 5].map(n => (
           <button key={n} onClick={() => setRatings(prev => ({ ...prev, [field]: n }))}
-            className={`flex-1 h-7 rounded-md text-[10px] font-bold transition-all ${
+            className={`flex-1 h-7 rounded-md text-xs font-bold transition-all ${
               n <= value ? n >= 4 ? 'bg-green-500 text-white' : n >= 3 ? 'bg-yellow-500 text-white' : 'bg-red-500 text-white' : 'bg-gray-100 text-gray-400'
             }`}>{n}</button>
         ))}
       </div>
-      <span className="text-[10px] text-gray-400 w-16">{['','Poor','Needs work','OK','Good','Great'][value]}</span>
+      <span className="text-xs text-gray-400 w-16">{['','Poor','Needs work','OK','Good','Great'][value]}</span>
     </div>
   );
 
@@ -358,7 +358,7 @@ export default function VocalCoachAssignments() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Vocal Coach</h1>
-          <p className="text-[11px] text-gray-500">Assign songs & exercises · Review submissions</p>
+          <p className="text-xs text-gray-500">Assign songs & exercises · Review submissions</p>
         </div>
         <button onClick={() => setShowAssignModal(true)} className="flex items-center justify-center gap-1 px-4 py-2 bg-blue-500 text-white rounded-xl text-[12px] font-semibold hover:bg-blue-600 shadow-sm transition-all active:scale-[0.98] whitespace-nowrap">
           <Plus className="w-4 h-4" />
@@ -369,15 +369,15 @@ export default function VocalCoachAssignments() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-2">
         <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-2.5">
-          <div className="text-[10px] text-gray-400">Assignments</div>
+          <div className="text-xs text-gray-400">Assignments</div>
           <div className="text-xl font-bold text-gray-900">{totalAssignments}</div>
         </div>
         <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-2.5">
-          <div className="text-[10px] text-gray-400">To Review 🔴</div>
+          <div className="text-xs text-gray-400">To Review 🔴</div>
           <div className="text-xl font-bold text-orange-500">{pendingReview}</div>
         </div>
         <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-2.5">
-          <div className="text-[10px] text-gray-400">Completed ✅</div>
+          <div className="text-xs text-gray-400">Completed ✅</div>
           <div className="text-xl font-bold text-green-600">{completedCount}</div>
         </div>
       </div>
@@ -404,19 +404,19 @@ export default function VocalCoachAssignments() {
             {/* Member row */}
             <button onClick={() => setExpandedMember(expandedMember === ma.member.id ? null : ma.member.id)}
               className={`w-full flex items-center gap-3 px-4 py-3 transition-colors ${ma.pendingSubmissions > 0 ? 'bg-orange-50/40' : 'hover:bg-gray-50/50'}`}>
-              <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${getAvatarColor(ma.member.id)} flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0`}>
+              <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${getAvatarColor(ma.member.id)} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
                 {getInitials(ma.member)}
               </div>
               <div className="flex-1 min-w-0 text-left">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[13px] font-semibold text-gray-900">{ma.member.first_name} {ma.member.last_name}</span>
                   {ma.member.voice_part && (
-                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${voiceColors[ma.member.voice_part] || 'text-gray-600 bg-gray-50'}`}>
+                    <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-md ${voiceColors[ma.member.voice_part] || 'text-gray-600 bg-gray-50'}`}>
                       {ma.member.voice_part}
                     </span>
                   )}
                 </div>
-                <span className="text-[11px] text-gray-400">
+                <span className="text-xs text-gray-400">
                   {ma.assignments.length} assignment{ma.assignments.length !== 1 ? 's' : ''}
                   {ma.pendingSubmissions > 0 && ` · ${ma.pendingSubmissions} pending`}
                   {ma.assignments.length > 0 && ma.assignments.every(a => a.completed) && ' · all completed ✅'}
@@ -435,11 +435,11 @@ export default function VocalCoachAssignments() {
                   <div key={a.id} className="bg-white rounded-xl border border-gray-200/60 p-3">
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${a.assignment_type === 'song' ? 'text-purple-600 bg-purple-50' : 'text-blue-600 bg-blue-50'}`}>
+                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${a.assignment_type === 'song' ? 'text-purple-600 bg-purple-50' : 'text-blue-600 bg-blue-50'}`}>
                           {a.assignment_type === 'song' ? '🎵 Song' : '🏋️ Exercise'}
                         </span>
                         {a.submission ? (
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                          <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${
                             a.submission.status === 'pending' ? 'text-orange-600 bg-orange-50' :
                             a.submission.status === 'approved' ? 'text-green-600 bg-green-50' :
                             'text-blue-600 bg-blue-50'
@@ -447,13 +447,13 @@ export default function VocalCoachAssignments() {
                             {a.submission.status === 'pending' ? 'Pending' : a.submission.status === 'approved' ? 'Approved' : 'Reviewed'}
                           </span>
                         ) : a.completed ? (
-                          <span className="text-[10px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded-md">Done</span>
+                          <span className="text-xs font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded-md">Done</span>
                         ) : (
-                          <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-md">Waiting</span>
+                          <span className="text-xs font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-md">Waiting</span>
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        {a.due_date && <span className="text-[10px] text-gray-400">Due: {formatDate(a.due_date)}</span>}
+                        {a.due_date && <span className="text-xs text-gray-400">Due: {formatDate(a.due_date)}</span>}
                         <button onClick={() => handleDelete(a.id)} className="text-gray-300 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
                     </div>
@@ -461,7 +461,7 @@ export default function VocalCoachAssignments() {
                     <p className="text-[13px] font-semibold text-gray-900 mb-0.5">
                       {a.assignment_type === 'song' ? a.song?.title || 'Unknown Song' : a.exercise?.title || 'Unknown Exercise'}
                     </p>
-                    {a.notes && <p className="text-[11px] text-gray-500 mb-2">{a.notes}</p>}
+                    {a.notes && <p className="text-xs text-gray-500 mb-2">{a.notes}</p>}
 
                     {/* Submission */}
                     {a.submission ? (
@@ -473,7 +473,7 @@ export default function VocalCoachAssignments() {
                           </button>
                           <div className="flex-1">
                             <span className="text-[12px] font-medium text-gray-700">Member's recording</span>
-                            <span className="text-[10px] text-gray-400 block">{formatDate(a.submission.created_at)}</span>
+                            <span className="text-xs text-gray-400 block">{formatDate(a.submission.created_at)}</span>
                           </div>
                         </div>
 
@@ -496,7 +496,7 @@ export default function VocalCoachAssignments() {
                                   {isRecording ? <Square className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
                                 </button>
                                 <span className="text-[12px] text-red-700">{isRecording ? 'Recording...' : 'Tap to record'}</span>
-                                <button onClick={cancelRecording} className="ml-auto text-[11px] text-gray-500">Cancel</button>
+                                <button onClick={cancelRecording} className="ml-auto text-xs text-gray-500">Cancel</button>
                               </div>
                             ) : (
                               <div className="flex items-center gap-2">
@@ -506,7 +506,7 @@ export default function VocalCoachAssignments() {
                                 <button onClick={cancelRecording} className="w-8 h-8 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center"><RotateCcw className="w-3.5 h-3.5" /></button>
                                 <button onClick={() => sendFeedback(a.submission!.id)} disabled={sending}
                                   className="w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center disabled:opacity-50"><Send className="w-3.5 h-3.5" /></button>
-                                <span className="text-[11px] text-gray-500">Send feedback</span>
+                                <span className="text-xs text-gray-500">Send feedback</span>
                               </div>
                             )}
                           </div>
@@ -514,16 +514,16 @@ export default function VocalCoachAssignments() {
                           <>
                           <div className="flex gap-2">
                             <button onClick={() => setRecordingFor(a.submission!.id)}
-                              className="flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 bg-red-50 text-red-600 rounded-lg text-[11px] font-semibold hover:bg-red-100">
+                              className="flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-semibold hover:bg-red-100">
                               🎤 Feedback
                             </button>
                             <button onClick={() => startEvaluation(a.submission!.id)}
-                              className="flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 bg-purple-50 text-purple-600 rounded-lg text-[11px] font-semibold hover:bg-purple-100">
+                              className="flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 bg-purple-50 text-purple-600 rounded-lg text-xs font-semibold hover:bg-purple-100">
                               🤖 AI Evaluate
                             </button>
                             {a.submission.status !== 'approved' && (
                               <button onClick={() => approveSubmission(a.submission!.id)}
-                                className="flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 bg-green-50 text-green-600 rounded-lg text-[11px] font-semibold hover:bg-green-100">
+                                className="flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 bg-green-50 text-green-600 rounded-lg text-xs font-semibold hover:bg-green-100">
                                 ✅ Approve
                               </button>
                             )}
@@ -536,7 +536,7 @@ export default function VocalCoachAssignments() {
                                 <>
                                   <div className="flex items-center justify-between">
                                     <span className="text-[12px] font-bold text-purple-800">🤖 AI Vocal Analysis</span>
-                                    <button onClick={cancelEvaluation} className="text-[11px] text-gray-500">Cancel</button>
+                                    <button onClick={cancelEvaluation} className="text-xs text-gray-500">Cancel</button>
                                   </div>
 
                                   {/* Auto-Analyze Button */}
@@ -547,7 +547,7 @@ export default function VocalCoachAssignments() {
                                     </button>
                                   ) : (
                                     <div className="w-full py-2 bg-purple-100 rounded-lg text-center">
-                                      <p className="text-[11px] font-semibold text-purple-700">{analysisProgress?.stage || 'Analyzing...'}</p>
+                                      <p className="text-xs font-semibold text-purple-700">{analysisProgress?.stage || 'Analyzing...'}</p>
                                       <div className="mx-4 mt-1.5 h-1.5 bg-purple-200 rounded-full overflow-hidden">
                                         <div className="h-full bg-purple-600 rounded-full transition-all duration-300" style={{ width: (analysisProgress?.percent || 0) + '%' }} />
                                       </div>
@@ -578,8 +578,8 @@ export default function VocalCoachAssignments() {
                                   <div className="flex items-center justify-between">
                                     <span className="text-[12px] font-bold text-purple-800">🤖 AI Analysis Results</span>
                                     <div className="flex gap-2">
-                                      <button onClick={() => setAiResult(null)} className="text-[11px] text-purple-500">Re-rate</button>
-                                      <button onClick={cancelEvaluation} className="text-[11px] text-gray-500">Close</button>
+                                      <button onClick={() => setAiResult(null)} className="text-xs text-purple-500">Re-rate</button>
+                                      <button onClick={cancelEvaluation} className="text-xs text-gray-500">Close</button>
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-3">
@@ -604,11 +604,11 @@ export default function VocalCoachAssignments() {
                                     ))}
                                   </div>
                                   <button onClick={() => setShowAiDetails(!showAiDetails)}
-                                    className="w-full text-left text-[11px] text-purple-600 font-medium">
+                                    className="w-full text-left text-xs text-purple-600 font-medium">
                                     {showAiDetails ? '▼ Hide details' : '▶ Show detailed feedback'}
                                   </button>
                                   {showAiDetails && (
-                                    <div className="space-y-2 text-[11px]">
+                                    <div className="space-y-2 text-xs">
                                       {Object.entries(aiResult.details).map(([area, text]) => (
                                         <div key={area} className="bg-white rounded-lg p-2">
                                           <span className="font-bold text-gray-700 capitalize">{area}:</span>
@@ -619,11 +619,11 @@ export default function VocalCoachAssignments() {
                                   )}
                                   {aiResult.suggestions.length > 0 && (
                                     <div className="bg-blue-50 rounded-lg p-2">
-                                      <span className="text-[10px] font-bold text-blue-700">💡 Suggestions:</span>
-                                      {aiResult.suggestions.map((s: string, i: number) => <p key={i} className="text-[11px] text-blue-600 mt-0.5">• {s}</p>)}
+                                      <span className="text-xs font-bold text-blue-700">💡 Suggestions:</span>
+                                      {aiResult.suggestions.map((s: string, i: number) => <p key={i} className="text-xs text-blue-600 mt-0.5">• {s}</p>)}
                                     </div>
                                   )}
-                                  <p className="text-[11px] text-gray-500 italic">{aiResult.encouragement}</p>
+                                  <p className="text-xs text-gray-500 italic">{aiResult.encouragement}</p>
                                   <button onClick={() => handleSaveAiFeedback(a.submission!.id)}
                                     className="w-full py-2 bg-green-600 text-white rounded-lg text-[12px] font-semibold hover:bg-green-700">
                                     💾 Save & Send to Member
@@ -636,7 +636,7 @@ export default function VocalCoachAssignments() {
                         )}
                       </div>
                     ) : !a.completed && (
-                      <p className="text-[11px] text-gray-400 italic mt-2">No submission yet</p>
+                      <p className="text-xs text-gray-400 italic mt-2">No submission yet</p>
                     )}
                   </div>
                 ))}
@@ -673,11 +673,11 @@ export default function VocalCoachAssignments() {
 
             {/* Assign to */}
             <div className="px-4 py-3 border-b border-gray-100">
-              <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Assign to</label>
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Assign to</label>
               <div className="flex bg-gray-100/80 rounded-lg p-0.5 mt-1.5">
                 {([['single', 'Single'], ['voice', 'By Voice'], ['all', 'All']] as const).map(([key, label]) => (
                   <button key={key} onClick={() => setSelectionMode(key)}
-                    className={`flex-1 px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-all ${selectionMode === key ? 'bg-white shadow-sm text-gray-900 font-semibold' : 'text-gray-500'}`}>
+                    className={`flex-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${selectionMode === key ? 'bg-white shadow-sm text-gray-900 font-semibold' : 'text-gray-500'}`}>
                     {label}
                   </button>
                 ))}
@@ -705,7 +705,7 @@ export default function VocalCoachAssignments() {
 
             {/* Song/Exercise selection */}
             <div className="px-4 py-3 border-b border-gray-100">
-              <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
                 {assignmentType === 'song' ? 'Song' : 'Exercise'}
               </label>
               {assignmentType === 'song' ? (
@@ -726,8 +726,8 @@ export default function VocalCoachAssignments() {
             {/* Reference audio (songs only) */}
             {assignmentType === 'song' && (
               <div className="px-4 py-3 border-b border-gray-100">
-                <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Melody Reference</label>
-                <p className="text-[10px] text-gray-400 mt-0.5">Record a melody for the member to follow</p>
+                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Melody Reference</label>
+                <p className="text-xs text-gray-400 mt-0.5">Record a melody for the member to follow</p>
                 {!referenceAudioUrl ? (
                   <button onClick={isRecordingReference ? stopReferenceRecording : startReferenceRecording}
                     className={`mt-2 w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl border border-dashed text-[13px] transition-all ${
@@ -748,14 +748,14 @@ export default function VocalCoachAssignments() {
 
             {/* Due date */}
             <div className="px-4 py-3 border-b border-gray-100">
-              <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Due Date</label>
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Due Date</label>
               <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
                 className="w-full mt-1.5 text-[14px] text-gray-900 bg-gray-50 border-0 rounded-lg p-2.5 focus:ring-0" />
             </div>
 
             {/* Notes */}
             <div className="px-4 py-3">
-              <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Notes</label>
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Notes</label>
               <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Add instructions..."
                 className="w-full mt-1.5 text-[14px] text-gray-900 bg-gray-50 border-0 rounded-lg p-2.5 focus:ring-0 placeholder-gray-300 resize-none" />
             </div>

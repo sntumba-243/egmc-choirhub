@@ -66,12 +66,12 @@ export const MessageCompose = () => {
 
       <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100">
-          <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">To</label>
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">To</label>
           <p className="text-[14px] text-gray-900 mt-0.5">Admin Team</p>
         </div>
 
         <div className="px-4 py-3 border-b border-gray-100">
-          <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Subject *</label>
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Subject *</label>
           <input
             type="text"
             value={subject}
@@ -83,7 +83,7 @@ export const MessageCompose = () => {
         </div>
 
         <div className="px-4 py-3">
-          <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Message *</label>
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Message *</label>
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}

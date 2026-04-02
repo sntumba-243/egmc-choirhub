@@ -382,7 +382,7 @@ export const AdminRepertoire = () => {
           <div className="bg-white rounded-lg max-w-sm w-full max-h-[70vh] flex flex-col">
             <div className="p-3 border-b flex items-center justify-between">
               <h2 className="text-sm font-bold">Add to Event ({selectedSongs.size})</h2>
-              <button onClick={() => setShowEventModal(false)} className="p-1 hover:bg-gray-100 rounded"><X className="w-4 h-4" /></button>
+              <button onClick={() => setShowEventModal(false)} className="p-2 min-h-[44px] min-w-[44px] hover:bg-gray-100 rounded"><X className="w-4 h-4" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-3">
               {events.length === 0 ? (
