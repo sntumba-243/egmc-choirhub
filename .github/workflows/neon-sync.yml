@@ -2,22 +2,33 @@ name: Sync Supabase → Neon
 
 on:
   schedule:
-    - cron: '0 */6 * * *'  # Every 6 hours
-  workflow_dispatch:  # Manual trigger
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Sync data to Neon
-        run: |
-          pip install requests psycopg2-binary
-          python3 << 'PYEOF'
-          import json, urllib.request, subprocess, os
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
 
-          ANON_KEY = "${{ secrets.SUPABASE_ANON_KEY }}"
+      - name: Install dependencies
+        run: pip install requests psycopg2-binary
+
+      - name: Sync data to Neon
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          NEON_CONNECTION_STRING: ${{ secrets.NEON_CONNECTION_STRING }}
+        run: |
+          python3 << 'PYEOF'
+          import json, urllib.request, os
+          import psycopg2
+
+          ANON_KEY = os.environ["SUPABASE_ANON_KEY"]
           BASE = "https://lpcepycxqfqzwwszmpks.supabase.co/rest/v1"
-          NEON = "${{ secrets.NEON_CONNECTION_STRING }}"
+          NEON = os.environ["NEON_CONNECTION_STRING"]
 
           TABLES = [
               "churches", "songs", "members", "users", "church_song_status",
@@ -41,15 +52,8 @@ jobs:
                   print(f"  Error fetching {table}: {e}")
                   return []
 
-          def escape_val(v):
-              if v is None: return "NULL"
-              if isinstance(v, bool): return "true" if v else "false"
-              if isinstance(v, (int, float)): return str(v)
-              s = str(v).replace("'", "''")
-              return f"'{s}'"
-
-          import psycopg2
           conn = psycopg2.connect(NEON)
+          conn.autocommit = False
           cur = conn.cursor()
 
           for table in TABLES:
@@ -62,26 +66,28 @@ jobs:
               keys = list(data[0].keys())
               col_str = ", ".join(f'"{k}"' for k in keys)
 
-              # Disable triggers, clear, re-insert
-              cur.execute(f'ALTER TABLE "{table}" DISABLE TRIGGER ALL')
-              cur.execute(f'DELETE FROM "{table}"')
+              try:
+                  cur.execute(f'ALTER TABLE "{table}" DISABLE TRIGGER ALL')
+                  cur.execute(f'DELETE FROM "{table}"')
 
-              for row in data:
-                  vals = [row.get(k) for k in keys]
-                  placeholders = ", ".join(["%s"] * len(vals))
-                  try:
-                      cur.execute(f'INSERT INTO "{table}" ({col_str}) VALUES ({placeholders}) ON CONFLICT DO NOTHING', vals)
-                  except Exception as e:
-                      conn.rollback()
-                      cur.execute(f'ALTER TABLE "{table}" DISABLE TRIGGER ALL')
-                      print(f"  Skip row: {e}")
+                  for row in data:
+                      vals = [row.get(k) for k in keys]
+                      placeholders = ", ".join(["%s"] * len(vals))
+                      cur.execute(
+                          f'INSERT INTO "{table}" ({col_str}) VALUES ({placeholders}) ON CONFLICT DO NOTHING',
+                          vals
+                      )
 
-              cur.execute(f'ALTER TABLE "{table}" ENABLE TRIGGER ALL')
-              conn.commit()
+                  cur.execute(f'ALTER TABLE "{table}" ENABLE TRIGGER ALL')
+                  conn.commit()
 
-              cur.execute(f'SELECT COUNT(*) FROM "{table}"')
-              count = cur.fetchone()[0]
-              print(f"  ✅ {len(data)} → {count} rows")
+                  cur.execute(f'SELECT COUNT(*) FROM "{table}"')
+                  count = cur.fetchone()[0]
+                  print(f"  ✅ {len(data)} rows synced → {count} in Neon")
+
+              except Exception as e:
+                  conn.rollback()
+                  print(f"  ❌ Failed {table}: {e}")
 
           cur.close()
           conn.close()
