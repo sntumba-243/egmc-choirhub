@@ -15,7 +15,7 @@ export const MemberDashboard = () => {
   const [eventsCount, setEventsCount] = useState(0);
   const [messagesCount, setMessagesCount] = useState(0);
   const [assignmentsCount, setAssignmentsCount] = useState(0);
-  const [nextEvent, setNextEvent] = useState<{ title: string; date: string; time?: string; location?: string } | null>(null);
+  const [nextEvent, setNextEvent] = useState<{ id: string; title: string; date: string; time?: string; location?: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { if (user) fetchCounts(); }, [user?.church_id]);
@@ -51,7 +51,7 @@ export const MemberDashboard = () => {
       const today = new Date().toISOString().split('T')[0];
       const { data: events, count: evCount } = await supabase
         .from('events')
-        .select('title, date, time, location', { count: 'exact' })
+        .select('id, title, date, time, location', { count: 'exact' })
         .or(`church_id.eq.${user?.church_id},is_global.eq.true`)
         .gte('date', today)
         .order('date', { ascending: true })
@@ -146,7 +146,7 @@ export const MemberDashboard = () => {
 
         {/* Hero Event Card */}
         {nextEvent && (
-          <button onClick={() => navigate('/member/calendar')}
+          <button onClick={() => navigate('/member/events/' + nextEvent.id)}
             className="w-full text-left active:scale-[0.98] transition-all relative overflow-hidden"
             style={{
               background: 'linear-gradient(135deg, #FF8C42 0%, #FF6B35 50%, #E85D26 100%)',
