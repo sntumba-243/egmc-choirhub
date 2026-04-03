@@ -65,7 +65,7 @@ export const MemberDashboard = () => {
 
   const firstName = (user?.name || 'Member').split(' ')[0];
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : hour < 21 ? 'Good evening' : 'Good night';
 
   const parseDate = (d: string) => {
     if (!d) return new Date();
