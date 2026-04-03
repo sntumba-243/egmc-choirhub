@@ -202,7 +202,7 @@ export const MemberEvents = () => {
               onClick={() => setViewMode('cards')}
               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md transition-colors ${
                 viewMode === 'cards'
-                  ? 'bg-white text-blue-600 shadow-sm'
+                  ? 'bg-white text-orange-600 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
@@ -213,7 +213,7 @@ export const MemberEvents = () => {
               onClick={() => setViewMode('list')}
               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md transition-colors ${
                 viewMode === 'list'
-                  ? 'bg-white text-blue-600 shadow-sm'
+                  ? 'bg-white text-orange-600 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
@@ -233,16 +233,16 @@ export const MemberEvents = () => {
               <div
                 key={event.id}
                 onClick={() => navigate(`/member/events/${event.id}`)}
-                className="group bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 border border-gray-200 hover:border-blue-300 cursor-pointer overflow-hidden"
+                className="group bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 border border-gray-200 hover:border-orange-300 cursor-pointer overflow-hidden"
               >
                 {/* Header with iOS gradient */}
-                <div className="relative p-3 pb-2 sm:p-2.5 sm:pb-2 bg-gradient-to-br from-blue-50/40 via-cyan-50/30 to-teal-50/30">
+                <div className="relative p-3 pb-2 sm:p-2.5 sm:pb-2 bg-gradient-to-br from-orange-50/40 via-amber-50/30 to-yellow-50/30">
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-sm font-bold text-gray-900 line-clamp-2 leading-tight group-hover:text-blue-600 transition-colors">
+                    <h3 className="text-sm font-bold text-gray-900 line-clamp-2 leading-tight group-hover:text-orange-600 transition-colors">
                       {event.title}
                     </h3>
                     {event.type && (
-                      <span className="inline-flex items-center px-2 py-0.5 bg-white/90 backdrop-blur-sm text-blue-600 text-xs font-semibold rounded-full shadow-sm border border-blue-200/50 whitespace-nowrap">
+                      <span className="inline-flex items-center px-2 py-0.5 bg-white/90 backdrop-blur-sm text-orange-600 text-xs font-semibold rounded-full shadow-sm border border-orange-200/50 whitespace-nowrap">
                         {event.type}
                       </span>
                     )}
@@ -426,10 +426,10 @@ export const MemberEvents = () => {
                     <tr 
                       key={event.id}
                       onClick={() => navigate(`/member/events/${event.id}`)}
-                      className="hover:bg-blue-50/30 cursor-pointer transition-all group"
+                      className="hover:bg-orange-50/30 cursor-pointer transition-all group"
                     >
                       <td className="px-3 sm:px-4 py-3">
-                        <div className="font-semibold text-sm text-gray-900 group-hover:text-blue-600 transition-colors">
+                        <div className="font-semibold text-sm text-gray-900 group-hover:text-orange-600 transition-colors">
                           {event.title}
                         </div>
                         {event.description && (
@@ -462,7 +462,7 @@ export const MemberEvents = () => {
                       </td>
                       <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
                         {event.type && (
-                          <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-700 shadow-sm">
+                          <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-orange-100 text-orange-700 shadow-sm">
                             {event.type}
                           </span>
                         )}
@@ -512,8 +512,8 @@ export const MemberEvents = () => {
       {/* Empty State - Mobile Responsive */}
       {events.length === 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 sm:p-16 text-center">
-          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4 sm:mb-6">
-            <Calendar className="w-8 h-8 sm:w-10 sm:h-10 text-blue-600" />
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-orange-100 flex items-center justify-center mx-auto mb-4 sm:mb-6">
+            <Calendar className="w-8 h-8 sm:w-10 sm:h-10 text-orange-600" />
           </div>
           <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">No upcoming events</h3>
           <p className="text-sm sm:text-base text-gray-600">Check back later for new events</p>

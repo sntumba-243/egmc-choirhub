@@ -118,7 +118,7 @@ export const MemberMessages = () => {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mb-3"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mb-3"></div>
         <p className="text-gray-600 text-sm">Loading messages...</p>
       </div>
     );
@@ -136,7 +136,7 @@ export const MemberMessages = () => {
               markAsRead(selectedMessage.id);
             }
           }}
-          className="flex items-center gap-2 text-purple-600 hover:text-purple-700 font-medium text-sm"
+          className="flex items-center gap-2 text-orange-600 hover:text-orange-700 font-medium text-sm"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Messages
@@ -174,7 +174,7 @@ export const MemberMessages = () => {
           {!selectedMessage.is_read && (
             <button
               onClick={() => markAsRead(selectedMessage.id)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 transition-colors"
             >
               <CheckCheck className="w-4 h-4" />
               Mark as Read
@@ -193,7 +193,7 @@ export const MemberMessages = () => {
         <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
         <button
           onClick={() => navigate('/member/messages/compose')}
-          className="flex items-center gap-1 px-3 py-1.5 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors"
+          className="flex items-center gap-1 px-3 py-1.5 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 transition-colors"
         >
           <Plus className="w-4 h-4" />
           <span className="hidden sm:inline">New</span>
@@ -206,7 +206,7 @@ export const MemberMessages = () => {
           onClick={() => setFilter('all')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
             filter === 'all'
-              ? 'bg-purple-600 text-white'
+              ? 'bg-orange-500 text-white'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
@@ -216,7 +216,7 @@ export const MemberMessages = () => {
           onClick={() => setFilter('unread')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-all relative ${
             filter === 'unread'
-              ? 'bg-purple-600 text-white'
+              ? 'bg-orange-500 text-white'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
@@ -251,14 +251,14 @@ export const MemberMessages = () => {
               className={`w-full text-left rounded-lg border transition-all ${
                 message.is_read
                   ? 'bg-white border-gray-200 hover:border-gray-300'
-                  : 'bg-blue-50/60 border-blue-200 border-l-4 border-l-blue-500 hover:border-blue-300'
+                  : 'bg-orange-50/60 border-orange-200 border-l-4 border-l-orange-500 hover:border-orange-300'
               }`}
             >
               <div className="p-3 sm:p-4">
                 <div className="flex items-start gap-3">
                   {/* Unread Indicator */}
                   {!message.is_read && (
-                    <div className="flex-shrink-0 w-2 h-2 bg-blue-600 rounded-full mt-2" />
+                    <div className="flex-shrink-0 w-2 h-2 bg-orange-500 rounded-full mt-2" />
                   )}
                   
                   <div className="flex-1 min-w-0">

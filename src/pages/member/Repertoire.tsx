@@ -147,7 +147,7 @@ export const MemberRepertoire = () => {
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-screen">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500" />
     </div>
   );
 
@@ -168,13 +168,13 @@ export const MemberRepertoire = () => {
           { key: 'not_started' as const, label: '⏳', value: stats.notStarted, cls: 'bg-gray-50' },
         ].map(s => (
           <button key={s.key} onClick={() => setStatusFilter(s.key)}
-            className={`flex-1 rounded-lg border p-1.5 text-center transition ${s.cls} ${statusFilter === s.key ? 'ring-2 ring-indigo-500' : 'border-gray-200'}`}>
+            className={`flex-1 rounded-lg border p-1.5 text-center transition ${s.cls} ${statusFilter === s.key ? 'ring-2 ring-orange-500' : 'border-gray-200'}`}>
             <div className="text-base font-bold">{s.value}</div>
             <div className="text-xs text-gray-500">{s.label}</div>
           </button>
         ))}
-        <div className="flex-1 rounded-lg border border-indigo-200 bg-indigo-50 p-1.5 text-center">
-          <div className="text-sm font-bold text-indigo-700">{masteryRate}%</div>
+        <div className="flex-1 rounded-lg border border-orange-200 bg-orange-50 p-1.5 text-center">
+          <div className="text-sm font-bold text-orange-700">{masteryRate}%</div>
           <div className="text-xs text-gray-500">Rate</div>
         </div>
       </div>
@@ -184,7 +184,7 @@ export const MemberRepertoire = () => {
         <div className="flex-1 relative">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-300 w-3.5 h-3.5" />
           <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-8 pr-3 py-2.5 text-base border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+            className="w-full pl-8 pr-3 py-2.5 text-base border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
         </div>
         <button onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
           className={`w-10 h-10 flex items-center justify-center rounded-lg border text-sm ${showFavoritesOnly ? 'bg-yellow-500 border-yellow-500 text-white' : 'bg-white border-gray-200'}`}>
@@ -216,11 +216,11 @@ export const MemberRepertoire = () => {
 
       {/* Active filters */}
       {statusFilter !== 'all' && (
-        <div className="flex items-center justify-between bg-indigo-50 rounded-lg px-2 py-1.5">
-          <span className="text-sm font-medium text-indigo-800">
+        <div className="flex items-center justify-between bg-orange-50 rounded-lg px-2 py-1.5">
+          <span className="text-sm font-medium text-orange-800">
             {statusFilter === 'learned' ? '✅ Learned' : statusFilter === 'learning' ? '📚 Learning' : '⏳ Not Started'}
           </span>
-          <button onClick={() => setStatusFilter('all')} className="text-sm text-indigo-600">Clear</button>
+          <button onClick={() => setStatusFilter('all')} className="text-sm text-orange-600">Clear</button>
         </div>
       )}
 
@@ -250,7 +250,7 @@ export const MemberRepertoire = () => {
               </button>
               {/* Info — tap to open PDF */}
               <div className="flex-1 min-w-0 cursor-pointer" onClick={() => song.sheet_music_url && handleViewPDF(song)}>
-                <div className={`text-sm font-semibold truncate ${song.sheet_music_url ? 'text-gray-900 active:text-indigo-600' : 'text-gray-900'}`}>{song.title}</div>
+                <div className={`text-sm font-semibold truncate ${song.sheet_music_url ? 'text-gray-900 active:text-orange-600' : 'text-gray-900'}`}>{song.title}</div>
                 <div className="text-sm text-gray-400 truncate">{song.composer}</div>
               </div>
               {/* Language */}
