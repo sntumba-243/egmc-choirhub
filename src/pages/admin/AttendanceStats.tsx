@@ -96,29 +96,44 @@ export default function AttendanceStats() {
         }
       });
 
-      const memberIds = new Set((members || []).map(m => m.id));
-      const stats: MemberAttendance[] = (members || []).map(m => {
-        const att = attendanceMap.get(m.id)?.size || 0;
+      // Build auth_uid -> member map for resolving attendance_history rows stored with auth.uid()
+      const membersList = members || [];
+      const memberIds = new Set(membersList.map(m => m.id));
+      const emailToMember = new Map(membersList.map(m => [m.email, m]));
+      const authUidToMember = new Map<string, typeof membersList[0]>();
+
+      const orphanedIds = [...attendanceMap.keys()].filter(id => !memberIds.has(id));
+      if (orphanedIds.length > 0) {
+        const { data: authUsers } = await supabase
+          .from('users').select('id, email');
+        (authUsers || []).forEach(u => {
+          const member = emailToMember.get(u.email);
+          if (member) authUidToMember.set(u.id, member);
+        });
+      }
+
+      // Merge auth_uid attendance into matching member's count
+      const mergedAttendance = new Map<string, Set<string>>();
+      for (const [memberId, eventSet] of attendanceMap.entries()) {
+        const resolved = authUidToMember.get(memberId);
+        const targetId = resolved ? resolved.id : memberId;
+        if (!mergedAttendance.has(targetId)) mergedAttendance.set(targetId, new Set());
+        for (const eid of eventSet) mergedAttendance.get(targetId)!.add(eid);
+      }
+
+      const stats: MemberAttendance[] = membersList.map(m => {
+        const att = mergedAttendance.get(m.id)?.size || 0;
         return { ...m, attended: att, total_events: totalEvents, attendance_rate: totalEvents > 0 ? Math.round((att / totalEvents) * 100) : 0 };
       });
 
-      // Add orphaned attendance entries (member_id not in members table)
-      // Look up member info from a separate query if needed
-      const orphanedIds = [...attendanceMap.keys()].filter(id => !memberIds.has(id));
-      let orphanedMembers: Record<string, { first_name: string; last_name: string; email: string }> = {};
-      if (orphanedIds.length > 0) {
-        const { data: orphaned } = await supabase
-          .from('members').select('id, first_name, last_name, email').in('id', orphanedIds);
-        (orphaned || []).forEach(m => { orphanedMembers[m.id] = m; });
-      }
-      for (const [memberId, eventSet] of attendanceMap.entries()) {
+      // Add truly orphaned entries (not resolvable via auth email fallback)
+      for (const [memberId, eventSet] of mergedAttendance.entries()) {
         if (!memberIds.has(memberId)) {
-          const info = orphanedMembers[memberId];
           stats.push({
             id: memberId,
-            first_name: info?.first_name || memberId.substring(0, 8),
-            last_name: info?.last_name || '',
-            email: info?.email || '',
+            first_name: 'Unknown',
+            last_name: `(${memberId.substring(0, 8)}...)`,
+            email: '',
             voice_part: '',
             role: '',
             attended: eventSet.size,
