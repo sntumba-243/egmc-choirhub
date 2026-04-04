@@ -59,19 +59,19 @@ export default function AttendanceStats() {
         .neq('role', 'inactive').order('first_name', { ascending: true });
 
       // All attendance data comes from attendance_history only (past archived events)
-      // Query: SELECT ... FROM attendance_history WHERE church_id = church.id AND event_date <= today [AND event_date >= startDate]
       let query = supabase
-        .from('attendance_history').select('member_id, event_id, event_date, status, members!left(first_name, last_name, email)')
+        .from('attendance_history').select('member_id, event_id, event_date, status')
         .eq('church_id', church?.id)
         .lte('event_date', today);
       if (startDate) query = query.gte('event_date', startDate);
       const { data: archived, error: archiveError } = await query;
 
+      console.log('[AttendanceStats] church.timezone:', church?.timezone);
+      console.log('[AttendanceStats] period:', timePeriod, '| startDate:', startDate, '| endDate (today):', today);
       console.log('[AttendanceStats] query error:', archiveError);
       console.log('[AttendanceStats] raw archived rows:', archived?.length, archived);
       console.log('[AttendanceStats] event_dates in data:', [...new Set((archived || []).map(r => r.event_date))]);
       console.log('[AttendanceStats] statuses in data:', [...new Set((archived || []).map(r => r.status))]);
-      console.log('[AttendanceStats] filter check — startDate <= event_date <= today:', startDate, '<=', (archived || [])[0]?.event_date, '<=', today);
 
       // Count distinct events from archived history
       const distinctEvents = new Set<string>();
@@ -100,15 +100,22 @@ export default function AttendanceStats() {
       });
 
       // Add orphaned attendance entries (member_id not in members table)
+      // Look up member info from a separate query if needed
+      const orphanedIds = [...attendanceMap.keys()].filter(id => !memberIds.has(id));
+      let orphanedMembers: Record<string, { first_name: string; last_name: string; email: string }> = {};
+      if (orphanedIds.length > 0) {
+        const { data: orphaned } = await supabase
+          .from('members').select('id, first_name, last_name, email').in('id', orphanedIds);
+        (orphaned || []).forEach(m => { orphanedMembers[m.id] = m; });
+      }
       for (const [memberId, eventSet] of attendanceMap.entries()) {
         if (!memberIds.has(memberId)) {
-          const archivedEntry = (archived || []).find(r => r.member_id === memberId);
-          const memberInfo = (archivedEntry as any)?.members;
+          const info = orphanedMembers[memberId];
           stats.push({
             id: memberId,
-            first_name: memberInfo?.first_name || memberId.substring(0, 8),
-            last_name: memberInfo?.last_name || '',
-            email: memberInfo?.email || '',
+            first_name: info?.first_name || memberId.substring(0, 8),
+            last_name: info?.last_name || '',
+            email: info?.email || '',
             voice_part: '',
             role: '',
             attended: eventSet.size,
