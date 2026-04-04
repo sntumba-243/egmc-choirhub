@@ -181,7 +181,7 @@ export const EventForm: React.FC = () => {
               status: r.status || 'yes',
               church_id: user?.church_id,
             }));
-            await supabase.from('attendance_history').upsert(archiveData, { onConflict: 'event_id,member_id' });
+            await supabase.from('attendance_history').upsert(archiveData, { onConflict: 'event_id,member_id', ignoreDuplicates: true });
           }
         }
         

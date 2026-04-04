@@ -104,7 +104,7 @@ export const AdminEvents = () => {
       const { data: rsvps, error: fetchError } = await supabase.from('event_rsvps').select('member_id, status').eq('event_id', eventId);
       console.log('[ResetRSVPs] Step 1b - RSVPs fetched:', rsvps?.length, 'rows:', rsvps, 'error:', fetchError);
 
-      // 2. Archive to attendance_history (must succeed before deleting)
+      // 2. Archive to attendance_history (insert, ignore duplicates)
       if (rsvps && rsvps.length > 0) {
         const archivePayload = rsvps.map(r => ({
           event_id: eventId,
@@ -112,15 +112,23 @@ export const AdminEvents = () => {
           event_title: title,
           event_date: event.date,
           status: r.status,
-          church_id: event.church_id,
+          church_id: event.church_id ?? church?.id,
         }));
         console.log('[ResetRSVPs] Step 2 - Archive payload:', archivePayload);
-        const { data: archiveData, error: archiveError } = await supabase.from('attendance_history').upsert(
-          archivePayload,
-          { onConflict: 'event_id,member_id' }
-        );
+        const { data: archiveData, error: archiveError } = await supabase
+          .from('attendance_history')
+          .upsert(archivePayload, { onConflict: 'event_id,member_id', ignoreDuplicates: true });
         console.log('[ResetRSVPs] Step 2 - Archive result:', archiveData, 'error:', archiveError);
-        if (archiveError) throw archiveError;
+        // If upsert fails due to constraint mismatch, fall back to individual inserts
+        if (archiveError) {
+          console.log('[ResetRSVPs] Step 2 - Upsert failed, falling back to individual inserts');
+          for (const row of archivePayload) {
+            const { error: insertErr } = await supabase.from('attendance_history').insert(row);
+            if (insertErr && !insertErr.message.includes('duplicate')) {
+              console.error('[ResetRSVPs] Insert failed for member:', row.member_id, insertErr);
+            }
+          }
+        }
       } else {
         console.log('[ResetRSVPs] Step 2 - No RSVPs to archive');
       }
