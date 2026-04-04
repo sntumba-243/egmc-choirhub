@@ -1,7 +1,6 @@
 import { useChurch } from '../../contexts/ChurchContext';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { getPeriodRange } from '../../lib/dateUtils';
 
 interface MemberAttendance {
   id: string;
@@ -44,15 +43,26 @@ export default function AttendanceStats() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [voiceFilter, setVoiceFilter] = useState('all');
 
-  useEffect(() => { loadStats(); }, [timePeriod, church?.timezone]);
+  useEffect(() => { loadStats(); }, [timePeriod]);
 
   const loadStats = async () => {
     try {
       setLoading(true);
-      const { start: startDate, end: today } = getPeriodRange(timePeriod, church?.timezone);
 
-      console.log('[AttendanceStats] church.timezone:', church?.timezone);
-      console.log('[AttendanceStats] period:', timePeriod, '| startDate:', startDate, '| endDate (today):', today);
+      const today = new Date();
+      const todayStr = today.getFullYear() + '-' +
+        String(today.getMonth() + 1).padStart(2, '0') + '-' +
+        String(today.getDate()).padStart(2, '0');
+
+      const sd = new Date();
+      if (timePeriod === 'week') sd.setDate(sd.getDate() - 7);
+      else if (timePeriod === 'month') sd.setDate(sd.getDate() - 30);
+      else if (timePeriod === 'year') sd.setDate(sd.getDate() - 365);
+
+      const startStr = timePeriod === 'all' ? null :
+        sd.getFullYear() + '-' +
+        String(sd.getMonth() + 1).padStart(2, '0') + '-' +
+        String(sd.getDate()).padStart(2, '0');
 
       const { data: members } = await supabase
         .from('members').select('id, first_name, last_name, email, voice_part, role').eq('church_id', church?.id)
@@ -62,16 +72,9 @@ export default function AttendanceStats() {
       let query = supabase
         .from('attendance_history').select('member_id, event_id, event_date, status')
         .eq('church_id', church?.id)
-        .lte('event_date', today);
-      if (startDate) query = query.gte('event_date', startDate);
-      const { data: archived, error: archiveError } = await query;
-
-      console.log('[AttendanceStats] church.timezone:', church?.timezone);
-      console.log('[AttendanceStats] period:', timePeriod, '| startDate:', startDate, '| endDate (today):', today);
-      console.log('[AttendanceStats] query error:', archiveError);
-      console.log('[AttendanceStats] raw archived rows:', archived?.length, archived);
-      console.log('[AttendanceStats] event_dates in data:', [...new Set((archived || []).map(r => r.event_date))]);
-      console.log('[AttendanceStats] statuses in data:', [...new Set((archived || []).map(r => r.status))]);
+        .lte('event_date', todayStr);
+      if (startStr) query = query.gte('event_date', startStr);
+      const { data: archived } = await query;
 
       // Count distinct events from archived history
       const distinctEvents = new Set<string>();
