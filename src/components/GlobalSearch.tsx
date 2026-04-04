@@ -72,7 +72,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ onNavigate }) => {
               type: 'event',
               id: event.id,
               title: event.title,
-              subtitle: new Date(event.date).toLocaleDateString('en-US', {
+              subtitle: new Date(event.date + 'T00:00:00').toLocaleDateString('en-US', {
                 month: 'short',
                 day: 'numeric',
                 year: 'numeric',

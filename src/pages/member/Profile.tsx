@@ -124,7 +124,7 @@ export const MemberProfile: React.FC = () => {
   };
 
   const formatDate = (dateString: string): string =>
-    new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    new Date(dateString.includes('T') ? dateString : dateString + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
   const roleBadge = user?.role === 'guest'
     ? { bg: 'bg-blue-50 text-blue-700 ring-blue-200', label: 'Guest' }

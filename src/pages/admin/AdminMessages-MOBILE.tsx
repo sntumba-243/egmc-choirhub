@@ -167,7 +167,7 @@ export function AdminMessages() {
   }
 
   function formatDate(dateString: string) {
-    const date = new Date(dateString);
+    const date = new Date(dateString.includes('T') ? dateString : dateString + 'T00:00:00');
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);

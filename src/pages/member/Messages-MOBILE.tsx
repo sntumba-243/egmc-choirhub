@@ -88,7 +88,7 @@ export const MemberMessages = () => {
   };
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const date = new Date(dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00');
     const now = new Date();
     const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
     

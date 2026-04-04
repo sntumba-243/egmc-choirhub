@@ -329,7 +329,7 @@ export default function VocalCoachAssignments() {
     return true;
   });
 
-  const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const formatDate = (d: string) => new Date(d.includes('T') ? d : d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
   const RatingBar = ({ label, emoji, value, field }: { label: string; emoji: string; value: number; field: keyof VocalRatings }) => (
     <div className="flex items-center gap-2">

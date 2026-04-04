@@ -142,7 +142,7 @@ export function VocalCoach() {
     } catch { toast.error('Failed to update'); }
   };
 
-  const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const formatDate = (d: string) => new Date(d.includes('T') ? d : d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
   const pending = assignments.filter(a => !a.completed);
   const completed = assignments.filter(a => a.completed);

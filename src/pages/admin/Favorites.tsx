@@ -302,7 +302,7 @@ export const AdminFavorites = () => {
                   >
                     <div className="font-medium text-gray-900">{event.title}</div>
                     <div className="text-sm text-gray-600">
-                      {new Date(event.date).toLocaleDateString()}
+                      {new Date(event.date + 'T00:00:00').toLocaleDateString()}
                     </div>
                   </button>
                 ))}

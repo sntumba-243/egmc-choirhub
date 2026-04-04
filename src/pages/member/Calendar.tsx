@@ -149,7 +149,7 @@ export const MemberCalendar = () => {
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+    const date = new Date(dateString + 'T00:00:00');
     return date.toLocaleDateString('en-US', {
       weekday: 'short',
       month: 'short',
@@ -167,7 +167,7 @@ export const MemberCalendar = () => {
   };
 
   const isToday = (dateString: string) => {
-    const eventDate = new Date(dateString);
+    const eventDate = new Date(dateString + 'T00:00:00');
     const today = new Date();
     return eventDate.toDateString() === today.toDateString();
   };

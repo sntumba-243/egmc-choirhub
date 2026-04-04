@@ -1,5 +1,13 @@
 const DEFAULT_TZ = 'UTC';
 
+/** Parses a date string as local time, preventing UTC timezone shift.
+ *  '2026-04-04' → Apr 4 (not Apr 3 in US timezones) */
+export function parseLocalDate(d: string): Date {
+  if (!d) return new Date();
+  if (d.includes('T')) return new Date(d);
+  return new Date(d + 'T00:00:00');
+}
+
 /** Returns current Date adjusted to church timezone */
 export function getChurchNow(timezone?: string): Date {
   const tz = timezone || DEFAULT_TZ;

@@ -184,7 +184,7 @@ export default function Submissions() {
   };
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('en-US', {
+    return new Date(date.includes('T') ? date : date + 'T00:00:00').toLocaleDateString('en-US', {
       month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
   };

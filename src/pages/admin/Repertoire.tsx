@@ -396,7 +396,7 @@ export const AdminRepertoire = () => {
                   {events.map((event) => (
                     <button key={event.id} onClick={() => addSongsToEvent(event.id)} className="w-full text-left p-2 rounded-lg border-2 border-gray-200 hover:border-indigo-500 hover:bg-indigo-50 transition">
                       <div className="font-semibold text-xs">{event.title}</div>
-                      <div className="text-sm text-gray-500">{new Date(event.date).toLocaleDateString()}</div>
+                      <div className="text-sm text-gray-500">{new Date(event.date + 'T00:00:00').toLocaleDateString()}</div>
                     </button>
                   ))}
                 </div>
