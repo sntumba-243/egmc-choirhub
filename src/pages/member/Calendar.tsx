@@ -61,7 +61,6 @@ export const MemberCalendar = () => {
 
   const fetchRSVPs = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data, error } = await supabase
@@ -83,7 +82,6 @@ export const MemberCalendar = () => {
 
   const handleRSVP = async (eventId: string, status: 'yes' | 'no' | 'maybe') => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         toast.error('You must be logged in to RSVP');
         return;

@@ -166,10 +166,10 @@ export const EventForm: React.FC = () => {
         // If date changed, archive existing RSVPs before updating
         if (originalDate && date !== originalDate) {
           const { data: currentRsvps } = await supabase
-            .from('rsvps')
+            .from('event_rsvps')
             .select('member_id, status')
             .eq('event_id', eventId);
-          
+
           if (currentRsvps && currentRsvps.length > 0) {
             const archiveData = currentRsvps.map(r => ({
               event_id: eventId,
@@ -177,8 +177,9 @@ export const EventForm: React.FC = () => {
               event_title: title,
               event_date: originalDate,
               status: r.status || 'attending',
+              church_id: user?.church_id,
             }));
-            await supabase.from('attendance_history').upsert(archiveData, { onConflict: 'event_id,member_id,event_date' });
+            await supabase.from('attendance_history').upsert(archiveData, { onConflict: 'event_id,member_id' });
           }
         }
         

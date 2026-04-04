@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Music, Calendar, MessageSquare, Heart, Mic, ChevronRight, Settings } from 'lucide-react';
+import { Music, Calendar, MessageSquare, Heart, Mic, ChevronRight, Settings, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useChurch } from '../../contexts/ChurchContext';
 import { supabase } from '../../lib/supabase';
@@ -15,6 +15,7 @@ export const MemberDashboard = () => {
   const [eventsCount, setEventsCount] = useState(0);
   const [messagesCount, setMessagesCount] = useState(0);
   const [assignmentsCount, setAssignmentsCount] = useState(0);
+  const [attendanceCount, setAttendanceCount] = useState(0);
   const [nextEvent, setNextEvent] = useState<{ id: string; title: string; date: string; time?: string; location?: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -47,6 +48,16 @@ export const MemberDashboard = () => {
         // Assignments use members.id
         const { count: assigns } = await supabase.from('exercise_assignments').select('*', { count: 'exact', head: true }).eq('member_id', user.id);
         setAssignmentsCount(assigns || 0);
+
+        // Attendance from attendance_history
+        const todayStr = new Date().toISOString().split('T')[0];
+        const { count: attended } = await supabase
+          .from('attendance_history')
+          .select('*', { count: 'exact', head: true })
+          .eq('member_id', user.id)
+          .eq('status', 'yes')
+          .lt('event_date', todayStr);
+        setAttendanceCount(attended || 0);
       }
       const today = new Date().toISOString().split('T')[0];
       const { data: events, count: evCount } = await supabase
@@ -163,6 +174,24 @@ export const MemberDashboard = () => {
             </div>
           </button>
         )}
+
+        {/* Attendance */}
+        <div style={{
+          background: 'white', borderRadius: '18px', padding: '14px 16px',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.04)', border: '1px solid rgba(0,0,0,0.03)',
+        }}>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center" style={{ width: '36px', height: '36px', borderRadius: '12px', background: '#DCFCE7' }}>
+              <CheckCircle className="w-4 h-4" style={{ color: '#22c55e' }} />
+            </div>
+            <div>
+              <p style={{ fontSize: '22px', fontWeight: 800, color: '#1a1a1a' }}>{v(attendanceCount)}</p>
+              <p style={{ fontSize: '10px', color: '#999', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '1px' }}>
+                {loading ? '' : attendanceCount > 0 ? `event${attendanceCount !== 1 ? 's' : ''} attended` : 'No attendance recorded yet'}
+              </p>
+            </div>
+          </div>
+        </div>
 
         {/* Stats Row */}
         <div className="grid grid-cols-3 gap-2.5">

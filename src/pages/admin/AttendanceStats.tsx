@@ -78,10 +78,11 @@ export default function AttendanceStats() {
       }
 
       const { data: currentRsvps } = await supabase
-        .from('rsvps').select('member_id, event_id, status').in('event_id', eventIds);
+        .from('event_rsvps').select('member_id, event_id, status').in('event_id', eventIds);
 
       const { data: archivedRsvps } = await supabase
-        .from('attendance_history').select('member_id, event_id, event_date, status')
+        .from('attendance_history').select('member_id, event_id, event_date, status, members!left(first_name, last_name, email)')
+        .eq('church_id', church?.id)
         .gte('event_date', startDate).lte('event_date', new Date().toISOString().split('T')[0]);
 
       const attendanceMap = new Map<string, Set<string>>();
@@ -106,10 +107,32 @@ export default function AttendanceStats() {
       });
       const combinedTotal = totalEvents + extraArchived;
 
-      setMemberStats((members || []).map(m => {
+      const memberIds = new Set((members || []).map(m => m.id));
+      const stats: MemberAttendance[] = (members || []).map(m => {
         const att = attendanceMap.get(m.id)?.size || 0;
         return { ...m, attended: att, total_events: combinedTotal, attendance_rate: combinedTotal > 0 ? Math.round((att / combinedTotal) * 100) : 0 };
-      }));
+      });
+
+      // Add orphaned attendance entries (member_id not in members table)
+      for (const [memberId, eventSet] of attendanceMap.entries()) {
+        if (!memberIds.has(memberId)) {
+          const archived = (archivedRsvps || []).find(r => r.member_id === memberId);
+          const memberInfo = (archived as any)?.members;
+          stats.push({
+            id: memberId,
+            first_name: memberInfo?.first_name || memberId.substring(0, 8),
+            last_name: memberInfo?.last_name || '',
+            email: memberInfo?.email || '',
+            voice_part: '',
+            role: '',
+            attended: eventSet.size,
+            total_events: combinedTotal,
+            attendance_rate: combinedTotal > 0 ? Math.round((eventSet.size / combinedTotal) * 100) : 0,
+          });
+        }
+      }
+
+      setMemberStats(stats);
     } catch (error) {
       console.error('Error:', error);
     } finally {

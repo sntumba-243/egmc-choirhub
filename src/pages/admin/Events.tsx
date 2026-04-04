@@ -95,12 +95,12 @@ export const AdminEvents = () => {
   const handleResetRsvps = async (eventId: string, title: string) => {
     if (window.confirm(`Reset all RSVPs for "${title}"? (Data will be archived for attendance tracking)`)) {
       try {
-        // Get event date for archive
-        const { data: event } = await supabase.from('events').select('date').eq('id', eventId).single();
-        
+        // Get event details for archive
+        const { data: event } = await supabase.from('events').select('date, church_id').eq('id', eventId).single();
+
         // Get current RSVPs before deleting
         const { data: currentRsvps } = await supabase.from('event_rsvps').select('member_id, status').eq('event_id', eventId);
-        
+
         // Archive RSVPs to attendance_history
         if (currentRsvps && currentRsvps.length > 0 && event) {
           const archiveData = currentRsvps.map(r => ({
@@ -109,8 +109,9 @@ export const AdminEvents = () => {
             event_title: title,
             event_date: event.date,
             status: r.status || 'attending',
+            church_id: event.church_id,
           }));
-          await supabase.from('attendance_history').upsert(archiveData, { onConflict: 'event_id,member_id,event_date' });
+          await supabase.from('attendance_history').upsert(archiveData, { onConflict: 'event_id,member_id' });
         }
         
         // Now safe to delete
