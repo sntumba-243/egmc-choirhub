@@ -176,7 +176,7 @@ export const EventForm: React.FC = () => {
               member_id: r.member_id,
               event_title: title,
               event_date: originalDate,
-              status: r.status || 'attending',
+              status: r.status || 'yes',
               church_id: user?.church_id,
             }));
             await supabase.from('attendance_history').upsert(archiveData, { onConflict: 'event_id,member_id' });

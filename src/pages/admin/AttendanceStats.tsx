@@ -87,13 +87,13 @@ export default function AttendanceStats() {
 
       const attendanceMap = new Map<string, Set<string>>();
       (currentRsvps || []).forEach(r => {
-        if (r.status === 'attending') {
+        if (r.status === 'yes') {
           if (!attendanceMap.has(r.member_id)) attendanceMap.set(r.member_id, new Set());
           attendanceMap.get(r.member_id)!.add(r.event_id);
         }
       });
       (archivedRsvps || []).forEach(r => {
-        if (r.status === 'attending') {
+        if (r.status === 'yes') {
           if (!attendanceMap.has(r.member_id)) attendanceMap.set(r.member_id, new Set());
           attendanceMap.get(r.member_id)!.add(r.event_id + '_' + r.event_date);
         }

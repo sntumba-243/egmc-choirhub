@@ -108,7 +108,7 @@ export const AdminEvents = () => {
             member_id: r.member_id,
             event_title: title,
             event_date: event.date,
-            status: r.status || 'attending',
+            status: r.status || 'yes',
             church_id: event.church_id,
           }));
           await supabase.from('attendance_history').upsert(archiveData, { onConflict: 'event_id,member_id' });
