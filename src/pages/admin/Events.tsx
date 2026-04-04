@@ -117,6 +117,7 @@ export const AdminEvents = () => {
         // Now safe to delete
         const { error } = await supabase.from('event_rsvps').delete().eq('event_id', eventId);
         if (error) throw error;
+        setRsvpCounts(prev => ({ ...prev, [eventId]: 0 }));
         toast.success('RSVPs archived & reset');
         fetchEvents();
       } catch (error) {
