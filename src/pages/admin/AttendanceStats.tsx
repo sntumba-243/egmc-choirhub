@@ -1,7 +1,7 @@
 import { useChurch } from '../../contexts/ChurchContext';
-import { useAuth } from '../../contexts/AuthContext';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { getPeriodRange } from '../../lib/dateUtils';
 
 interface MemberAttendance {
   id: string;
@@ -38,39 +38,30 @@ export default function AttendanceStats() {
   const [memberStats, setMemberStats] = useState<MemberAttendance[]>([]);
   const [loading, setLoading] = useState(true);
   const { church } = useChurch();
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>('month');
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>('week');
   const [sortBy, setSortBy] = useState<'name' | 'rate'>('rate');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [voiceFilter, setVoiceFilter] = useState('all');
 
-  useEffect(() => { loadStats(); }, [timePeriod]);
-
-  const getDateRange = () => {
-    const now = new Date();
-    switch (timePeriod) {
-      case 'week': { const d = new Date(now); d.setDate(now.getDate() - now.getDay()); return d.toISOString().split('T')[0]; }
-      case 'month': return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      case 'year': return new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
-      case 'all': return '2000-01-01';
-    }
-  };
+  useEffect(() => { loadStats(); }, [timePeriod, church?.timezone]);
 
   const loadStats = async () => {
     try {
       setLoading(true);
-      const today = new Date().toISOString().split('T')[0];
-      const startDate = getDateRange();
+      const { start: startDate, end: today } = getPeriodRange(timePeriod, church?.timezone);
 
       const { data: members } = await supabase
         .from('members').select('id, first_name, last_name, email, voice_part, role').eq('church_id', church?.id)
         .neq('role', 'inactive').order('first_name', { ascending: true });
 
       // All attendance data comes from attendance_history only (past archived events)
-      const { data: archived } = await supabase
+      let query = supabase
         .from('attendance_history').select('member_id, event_id, event_date, status, members!left(first_name, last_name, email)')
         .eq('church_id', church?.id)
-        .gte('event_date', startDate).lt('event_date', today);
+        .lte('event_date', today);
+      if (startDate) query = query.gte('event_date', startDate);
+      const { data: archived } = await query;
 
       // Count distinct events from archived history
       const distinctEvents = new Set<string>();

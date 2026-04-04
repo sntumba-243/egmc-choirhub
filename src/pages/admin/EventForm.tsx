@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { useChurch } from '../../contexts/ChurchContext';
+import { getChurchToday } from '../../lib/dateUtils';
 
 interface Song {
   id: string;
@@ -164,7 +165,7 @@ export const EventForm: React.FC = () => {
 
       if (eventId) {
         // If date changed and old date is in the past, snapshot RSVPs to attendance_history
-        const today = new Date().toISOString().split('T')[0];
+        const today = getChurchToday(church?.timezone);
         if (originalDate && date !== originalDate && originalDate < today) {
           const { data: currentRsvps } = await supabase
             .from('event_rsvps')
@@ -369,7 +370,7 @@ export const EventForm: React.FC = () => {
             </select>
           </div>
 
-          {eventId && originalDate && date !== originalDate && originalDate < new Date().toISOString().split('T')[0] && (
+          {eventId && originalDate && date !== originalDate && originalDate < getChurchToday(church?.timezone) && (
             <div className="flex items-start gap-2 px-3 py-2 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
               <span className="mt-0.5">&#9888;&#65039;</span>
               <span>Changing the date will archive current RSVPs as attendance for <strong>{originalDate}</strong> before updating.</span>

@@ -4,6 +4,7 @@ import { Music, Calendar, MessageSquare, Heart, Mic, ChevronRight, Settings, Che
 import { useAuth } from '../../contexts/AuthContext';
 import { useChurch } from '../../contexts/ChurchContext';
 import { supabase } from '../../lib/supabase';
+import { getChurchNow, getChurchToday } from '../../lib/dateUtils';
 
 export const MemberDashboard = () => {
   const { user } = useAuth();
@@ -50,7 +51,7 @@ export const MemberDashboard = () => {
         setAssignmentsCount(assigns || 0);
 
         // Attendance from attendance_history
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = getChurchToday(church?.timezone);
         const { count: attended } = await supabase
           .from('attendance_history')
           .select('*', { count: 'exact', head: true })
@@ -59,7 +60,7 @@ export const MemberDashboard = () => {
           .lt('event_date', todayStr);
         setAttendanceCount(attended || 0);
       }
-      const today = new Date().toISOString().split('T')[0];
+      const today = getChurchToday(church?.timezone);
       const { data: events, count: evCount } = await supabase
         .from('events')
         .select('id, title, date, time, location', { count: 'exact' })
@@ -75,7 +76,7 @@ export const MemberDashboard = () => {
   };
 
   const firstName = (user?.name || 'Member').split(' ')[0];
-  const hour = new Date().getHours();
+  const hour = getChurchNow(church?.timezone).getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : hour < 21 ? 'Good evening' : 'Good night';
 
   const parseDate = (d: string) => {
@@ -87,11 +88,11 @@ export const MemberDashboard = () => {
 
   const formatEventDate = (d: string) => {
     const date = parseDate(d);
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    if (date.toDateString() === today.toDateString()) return 'Today';
-    if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
+    const now = getChurchNow(church?.timezone);
+    const tomorrowNow = new Date(now);
+    tomorrowNow.setDate(tomorrowNow.getDate() + 1);
+    if (date.toDateString() === now.toDateString()) return 'Today';
+    if (date.toDateString() === tomorrowNow.toDateString()) return 'Tomorrow';
     return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   };
 
