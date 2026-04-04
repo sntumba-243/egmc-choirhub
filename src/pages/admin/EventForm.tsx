@@ -369,6 +369,13 @@ export const EventForm: React.FC = () => {
             </select>
           </div>
 
+          {eventId && originalDate && date !== originalDate && originalDate < new Date().toISOString().split('T')[0] && (
+            <div className="flex items-start gap-2 px-3 py-2 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+              <span className="mt-0.5">&#9888;&#65039;</span>
+              <span>Changing the date will archive current RSVPs as attendance for <strong>{originalDate}</strong> before updating.</span>
+            </div>
+          )}
+
           <div className="relative">
             <MapPin className="absolute left-2.5 top-2.5 text-gray-400 w-4 h-4" />
             <input
