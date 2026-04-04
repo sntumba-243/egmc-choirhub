@@ -59,17 +59,23 @@ export default function AttendanceStats() {
   const loadStats = async () => {
     try {
       setLoading(true);
+      const today = new Date().toISOString().split('T')[0];
+      const startDate = getDateRange();
+
       const { data: members } = await supabase
         .from('members').select('id, first_name, last_name, email, voice_part, role').eq('church_id', church?.id)
         .neq('role', 'inactive').order('first_name', { ascending: true });
 
-      const startDate = getDateRange();
-      const { data: events } = await supabase
-        .from('events').select('id').eq('church_id', church?.id)
-        .gte('date', startDate).lte('date', new Date().toISOString().split('T')[0]);
+      // All attendance data comes from attendance_history only (past archived events)
+      const { data: archived } = await supabase
+        .from('attendance_history').select('member_id, event_id, event_date, status, members!left(first_name, last_name, email)')
+        .eq('church_id', church?.id)
+        .gte('event_date', startDate).lt('event_date', today);
 
-      const eventIds = events?.map(e => e.id) || [];
-      const totalEvents = eventIds.length;
+      // Count distinct events from archived history
+      const distinctEvents = new Set<string>();
+      (archived || []).forEach(r => distinctEvents.add(r.event_id));
+      const totalEvents = distinctEvents.size;
 
       if (totalEvents === 0) {
         setMemberStats((members || []).map(m => ({ ...m, attended: 0, total_events: 0, attendance_rate: 0 })));
@@ -77,47 +83,26 @@ export default function AttendanceStats() {
         return;
       }
 
-      const { data: currentRsvps } = await supabase
-        .from('event_rsvps').select('member_id, event_id, status').in('event_id', eventIds);
-
-      const { data: archivedRsvps } = await supabase
-        .from('attendance_history').select('member_id, event_id, event_date, status, members!left(first_name, last_name, email)')
-        .eq('church_id', church?.id)
-        .gte('event_date', startDate).lte('event_date', new Date().toISOString().split('T')[0]);
-
+      // Count attendance per member (status = 'yes' means they attended)
       const attendanceMap = new Map<string, Set<string>>();
-      (currentRsvps || []).forEach(r => {
+      (archived || []).forEach(r => {
         if (r.status === 'yes') {
           if (!attendanceMap.has(r.member_id)) attendanceMap.set(r.member_id, new Set());
           attendanceMap.get(r.member_id)!.add(r.event_id);
         }
       });
-      (archivedRsvps || []).forEach(r => {
-        if (r.status === 'yes') {
-          if (!attendanceMap.has(r.member_id)) attendanceMap.set(r.member_id, new Set());
-          attendanceMap.get(r.member_id)!.add(r.event_id + '_' + r.event_date);
-        }
-      });
-
-      const seenArchive = new Set<string>();
-      let extraArchived = 0;
-      (archivedRsvps || []).forEach(r => {
-        const k = r.event_id + '_' + r.event_date;
-        if (!seenArchive.has(k)) { seenArchive.add(k); if (!eventIds.includes(r.event_id)) extraArchived++; }
-      });
-      const combinedTotal = totalEvents + extraArchived;
 
       const memberIds = new Set((members || []).map(m => m.id));
       const stats: MemberAttendance[] = (members || []).map(m => {
         const att = attendanceMap.get(m.id)?.size || 0;
-        return { ...m, attended: att, total_events: combinedTotal, attendance_rate: combinedTotal > 0 ? Math.round((att / combinedTotal) * 100) : 0 };
+        return { ...m, attended: att, total_events: totalEvents, attendance_rate: totalEvents > 0 ? Math.round((att / totalEvents) * 100) : 0 };
       });
 
       // Add orphaned attendance entries (member_id not in members table)
       for (const [memberId, eventSet] of attendanceMap.entries()) {
         if (!memberIds.has(memberId)) {
-          const archived = (archivedRsvps || []).find(r => r.member_id === memberId);
-          const memberInfo = (archived as any)?.members;
+          const archivedEntry = (archived || []).find(r => r.member_id === memberId);
+          const memberInfo = (archivedEntry as any)?.members;
           stats.push({
             id: memberId,
             first_name: memberInfo?.first_name || memberId.substring(0, 8),
@@ -126,8 +111,8 @@ export default function AttendanceStats() {
             voice_part: '',
             role: '',
             attended: eventSet.size,
-            total_events: combinedTotal,
-            attendance_rate: combinedTotal > 0 ? Math.round((eventSet.size / combinedTotal) * 100) : 0,
+            total_events: totalEvents,
+            attendance_rate: totalEvents > 0 ? Math.round((eventSet.size / totalEvents) * 100) : 0,
           });
         }
       }
@@ -179,7 +164,7 @@ export default function AttendanceStats() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Attendance</h1>
-          <p className="text-xs text-gray-500">Based on RSVPs · {totalEvents} events in period</p>
+          <p className="text-xs text-gray-500">Based on archived attendance · {totalEvents} past events in period</p>
         </div>
         <div className="flex bg-gray-100/80 rounded-xl p-0.5">
           {(['week', 'month', 'year', 'all'] as TimePeriod[]).map(p => (
