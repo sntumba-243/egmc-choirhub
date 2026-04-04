@@ -163,8 +163,9 @@ export const EventForm: React.FC = () => {
       };
 
       if (eventId) {
-        // If date changed, archive existing RSVPs before updating
-        if (originalDate && date !== originalDate) {
+        // If date changed and old date is in the past, snapshot RSVPs to attendance_history
+        const today = new Date().toISOString().split('T')[0];
+        if (originalDate && date !== originalDate && originalDate < today) {
           const { data: currentRsvps } = await supabase
             .from('event_rsvps')
             .select('member_id, status')
