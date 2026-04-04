@@ -45,6 +45,12 @@ export default function AttendanceStats() {
 
   useEffect(() => { loadStats(); }, [timePeriod]);
 
+  useEffect(() => {
+    const handleFocus = () => loadStats();
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [timePeriod]);
+
   const loadStats = async () => {
     try {
       setLoading(true);
@@ -188,9 +194,17 @@ export default function AttendanceStats() {
     <div className="space-y-3 pb-8">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Attendance</h1>
-          <p className="text-xs text-gray-500">Based on archived attendance · {totalEvents} past events in period</p>
+        <div className="flex items-center gap-2">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">Attendance</h1>
+            <p className="text-xs text-gray-500">Based on archived attendance · {totalEvents} past events in period</p>
+          </div>
+          <button onClick={() => loadStats()} title="Refresh"
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all">
+            <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
         </div>
         <div className="flex bg-gray-100/80 rounded-xl p-0.5">
           {(['week', 'month', 'year', 'all'] as TimePeriod[]).map(p => (
