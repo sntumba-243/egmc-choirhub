@@ -51,17 +51,27 @@ export default function AttendanceStats() {
       setLoading(true);
       const { start: startDate, end: today } = getPeriodRange(timePeriod, church?.timezone);
 
+      console.log('[AttendanceStats] church.timezone:', church?.timezone);
+      console.log('[AttendanceStats] period:', timePeriod, '| startDate:', startDate, '| endDate (today):', today);
+
       const { data: members } = await supabase
         .from('members').select('id, first_name, last_name, email, voice_part, role').eq('church_id', church?.id)
         .neq('role', 'inactive').order('first_name', { ascending: true });
 
       // All attendance data comes from attendance_history only (past archived events)
+      // Query: SELECT ... FROM attendance_history WHERE church_id = church.id AND event_date <= today [AND event_date >= startDate]
       let query = supabase
         .from('attendance_history').select('member_id, event_id, event_date, status, members!left(first_name, last_name, email)')
         .eq('church_id', church?.id)
         .lte('event_date', today);
       if (startDate) query = query.gte('event_date', startDate);
-      const { data: archived } = await query;
+      const { data: archived, error: archiveError } = await query;
+
+      console.log('[AttendanceStats] query error:', archiveError);
+      console.log('[AttendanceStats] raw archived rows:', archived?.length, archived);
+      console.log('[AttendanceStats] event_dates in data:', [...new Set((archived || []).map(r => r.event_date))]);
+      console.log('[AttendanceStats] statuses in data:', [...new Set((archived || []).map(r => r.status))]);
+      console.log('[AttendanceStats] filter check — startDate <= event_date <= today:', startDate, '<=', (archived || [])[0]?.event_date, '<=', today);
 
       // Count distinct events from archived history
       const distinctEvents = new Set<string>();
