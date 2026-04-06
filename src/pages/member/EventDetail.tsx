@@ -130,7 +130,7 @@ export const EventDetail = () => {
     if (!user || !event) return;
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('event_rsvps')
         .upsert({
           event_id: event.id,
@@ -138,7 +138,13 @@ export const EventDetail = () => {
           status,
         }, { onConflict: 'event_id,member_id' });
 
-      if (error) throw error;
+      console.log('RSVP result:', { data, error, userId: user?.id, eventId: event?.id });
+
+      if (error) {
+        console.error('RSVP full error:', JSON.stringify(error, null, 2));
+        toast.error('Failed: ' + error.message + ' | code: ' + (error as any).code);
+        return;
+      }
 
       setRsvpStatus(status);
       // Update count optimistically
@@ -149,9 +155,10 @@ export const EventDetail = () => {
         return Math.max(0, prev + delta);
       });
       toast.success(`RSVP: ${status}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error:', error);
-      toast.error('Failed to update RSVP');
+      console.error('RSVP catch error:', JSON.stringify(error, null, 2));
+      toast.error('Failed: ' + (error?.message || 'unknown') + ' | code: ' + (error?.code || 'n/a'));
     }
   };
 
