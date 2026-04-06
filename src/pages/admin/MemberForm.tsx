@@ -228,7 +228,22 @@ export const MemberForm: React.FC = () => {
           .from('members')
           .insert([memberData]);
         if (error) throw error;
-        
+
+        // Sync to public.users table so the auth user has a corresponding row
+        if (authUserId) {
+          const { error: usersError } = await supabase.from('users').upsert({
+            id: authUserId,
+            email,
+            name: `${firstName} ${lastName}`.trim(),
+            role,
+            church_id: churchIdParam || church?.id,
+          }, { onConflict: 'id' });
+          if (usersError) {
+            console.error('Failed to sync user to users table:', usersError);
+            toast.error(`User sync failed: ${usersError.message}`);
+          }
+        }
+
         setShowPasswordModal(true);
       }
     } catch (error: any) {
