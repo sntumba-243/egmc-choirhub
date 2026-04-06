@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Lock, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Lock, AlertCircle, Eye, EyeOff, Copy, KeyRound, Send } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
@@ -27,6 +27,10 @@ export const MemberForm: React.FC = () => {
   const [createAuthAccount, setCreateAuthAccount] = useState(true);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [generatedPassword, setGeneratedPassword] = useState<string>("");
+  const [inlinePassword, setInlinePassword] = useState<string>('');
+  const [showInlinePassword, setShowInlinePassword] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [sendingResetEmail, setSendingResetEmail] = useState(false);
 
   useEffect(() => {
     if (memberId) {
@@ -103,6 +107,66 @@ export const MemberForm: React.FC = () => {
     } catch (error) {
       console.error('Auth creation error:', error);
       throw error;
+    }
+  };
+
+  const handleSendResetEmail = async () => {
+    if (!email) return;
+    setSendingResetEmail(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      if (error) throw error;
+      toast.success('Reset email sent to ' + email);
+    } catch (error: any) {
+      console.error('Reset email error:', error);
+      toast.error(error.message || 'Failed to send reset email');
+    } finally {
+      setSendingResetEmail(false);
+    }
+  };
+
+  const handleGeneratePassword = async () => {
+    setResettingPassword(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error('Not authenticated');
+
+      // Look up the auth user_id from the users table by email
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', email)
+        .single();
+      if (userError || !userData) throw new Error('No auth account found for this member');
+
+      const newPassword = generateMemorablePassword();
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reset-password`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ user_id: userData.id, new_password: newPassword }),
+        }
+      );
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Failed to reset password');
+      }
+
+      setInlinePassword(newPassword);
+      setShowInlinePassword(true);
+      toast.success('New password generated');
+    } catch (error: any) {
+      console.error('Generate password error:', error);
+      toast.error(error.message || 'Failed to generate password');
+    } finally {
+      setResettingPassword(false);
     }
   };
 
@@ -299,6 +363,59 @@ export const MemberForm: React.FC = () => {
             </select>
           </div>
         </div>
+
+        {memberId && (
+          <div className="border-t pt-6">
+            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Password</label>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleSendResetEmail}
+                disabled={sendingResetEmail}
+                className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
+                <Send className="w-4 h-4" />
+                {sendingResetEmail ? 'Sending...' : 'Send reset email'}
+              </button>
+              <button
+                type="button"
+                onClick={handleGeneratePassword}
+                disabled={resettingPassword}
+                className="inline-flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-800 disabled:opacity-50"
+              >
+                <KeyRound className="w-4 h-4" />
+                {resettingPassword ? 'Generating...' : 'Generate new password'}
+              </button>
+            </div>
+
+            {inlinePassword && (
+              <div className="mt-3 bg-gray-50 border border-gray-200 rounded-lg p-3 flex items-center gap-3">
+                <code className="flex-1 text-sm font-mono">
+                  {showInlinePassword ? inlinePassword : '••••••••••••'}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => setShowInlinePassword(!showInlinePassword)}
+                  className="p-1.5 text-gray-500 hover:text-gray-700 rounded"
+                  title={showInlinePassword ? 'Hide password' : 'Show password'}
+                >
+                  {showInlinePassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(inlinePassword);
+                    toast.success('Password copied');
+                  }}
+                  className="p-1.5 text-gray-500 hover:text-gray-700 rounded"
+                  title="Copy password"
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {!memberId && (
           <div className="border-t pt-6">
