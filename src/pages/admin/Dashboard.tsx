@@ -368,7 +368,6 @@ export const AdminDashboard = () => {
   ];
 
   const quickActions = [
-    { label: 'New Song', icon: Music, color: 'indigo', route: '/admin/repertoire/new' },
     { label: 'New Event', icon: Calendar, color: 'green', route: '/admin/events/new' },
     { label: 'Message', icon: Mail, color: 'orange', route: '/admin/messages/new' },
     { label: 'New Member', icon: Plus, color: 'purple', route: '/admin/members/new' },
