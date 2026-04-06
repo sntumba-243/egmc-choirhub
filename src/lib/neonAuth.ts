@@ -2,6 +2,7 @@ export interface NeonUser {
   id: string;
   email: string;
   name: string;
+  first_name?: string | null;
   role: string;
   voice_part: string | null;
   church_id: string;

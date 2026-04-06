@@ -58,7 +58,9 @@ export const AdminDashboard = () => {
   const [allRsvpAlerts, setAllRsvpAlerts] = useState<Alert[]>([]); // Store all RSVP alerts
   const [alertsExpanded, setAlertsExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [adminName, setAdminName] = useState('Admin');
+  const [adminName, setAdminName] = useState<string>(
+    user?.first_name || user?.name?.split(' ')[0] || user?.email?.split('@')[0] || 'there'
+  );
 
   useEffect(() => {
     fetchAllData();
@@ -87,9 +89,8 @@ export const AdminDashboard = () => {
           .eq('id', user.id)
           .single();
 
-        if (data?.first_name) {
-          setAdminName(data.first_name);
-        }
+        const fallback = user?.first_name || user?.name?.split(' ')[0] || user?.email?.split('@')[0] || 'there';
+        setAdminName(data?.first_name || fallback);
       }
     } catch (error) {
       console.error('Error:', error);

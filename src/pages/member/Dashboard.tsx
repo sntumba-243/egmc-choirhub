@@ -75,7 +75,7 @@ export const MemberDashboard = () => {
     finally { setLoading(false); }
   };
 
-  const firstName = (user?.name || 'Member').split(' ')[0];
+  const firstName = user?.first_name || user?.name?.split(' ')[0] || user?.email?.split('@')[0] || 'there';
   const hour = getChurchNow(church?.timezone).getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : hour < 21 ? 'Good evening' : 'Good night';
 
