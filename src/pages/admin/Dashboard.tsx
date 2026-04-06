@@ -367,12 +367,6 @@ export const AdminDashboard = () => {
     },
   ];
 
-  const quickActions = [
-    { label: 'New Event', icon: Calendar, color: 'green', route: '/admin/events/new' },
-    { label: 'Message', icon: Mail, color: 'orange', route: '/admin/messages/new' },
-    { label: 'New Member', icon: Plus, color: 'purple', route: '/admin/members/new' },
-  ];
-
   return (
     <div className="space-y-4 pb-8">
       {/* Compact Header */}
@@ -435,27 +429,36 @@ export const AdminDashboard = () => {
           <span>🎯</span> 
           <span>Quick Actions</span>
         </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-          {quickActions.map((action) => {
-            const Icon = action.icon;
-            const colorMap = {
-              indigo: 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border-indigo-200',
-              green: 'bg-green-50 text-green-600 hover:bg-green-100 border-green-200',
-              orange: 'bg-orange-50 text-orange-600 hover:bg-orange-100 border-orange-200',
-              purple: 'bg-purple-50 text-purple-600 hover:bg-purple-100 border-purple-200',
-            };
-            
-            return (
-              <button
-                key={action.label}
-                onClick={() => navigate(action.route)}
-                className={`${colorMap[action.color as keyof typeof colorMap]} rounded-lg p-3 border-2 transition-all flex flex-col items-center gap-1.5 font-medium text-sm`}
-              >
-                <Icon className="w-4 h-4" />
-                <span className="text-center text-xs">{action.label}</span>
-              </button>
-            );
-          })}
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => navigate('/admin/events/new')}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-full text-sm font-medium text-gray-800 hover:bg-gray-50 transition-colors"
+          >
+            <span className="w-7 h-7 rounded-lg bg-green-100 flex items-center justify-center text-green-700">
+              <Calendar className="w-4 h-4" />
+            </span>
+            New event
+          </button>
+
+          <button
+            onClick={() => navigate('/admin/messages/new')}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-full text-sm font-medium text-gray-800 hover:bg-gray-50 transition-colors"
+          >
+            <span className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700">
+              <Mail className="w-4 h-4" />
+            </span>
+            Message
+          </button>
+
+          <button
+            onClick={() => navigate('/admin/members/new')}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-full text-sm font-medium text-gray-800 hover:bg-gray-50 transition-colors"
+          >
+            <span className="w-7 h-7 rounded-lg bg-purple-100 flex items-center justify-center text-purple-700">
+              <Plus className="w-4 h-4" />
+            </span>
+            New member
+          </button>
         </div>
       </div>
 
