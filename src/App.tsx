@@ -12,6 +12,7 @@ import PWAInstallPrompt from './components/PWAInstallPrompt';
 import IOSInstallPrompt from './components/IOSInstallPrompt';
 import PWAUpdateNotification from './components/PWAUpdateNotification';
 import EnhancedOfflineIndicator from './components/EnhancedOfflineIndicator';
+import { NativeUpdateBanner } from './components/NativeUpdateBanner';
 
 // Firebase Notifications
 import { requestNotificationPermission, setupMessageListener, storeDeviceToken } from './lib/firebase';
@@ -113,6 +114,7 @@ function App() {
       <IOSInstallPrompt />
       <PWAUpdateNotification />
       <EnhancedOfflineIndicator />
+      <NativeUpdateBanner />
     </ChurchProvider>
     </AuthProvider>
   );

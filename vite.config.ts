@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import { writeFileSync } from 'fs';
+import { writeFileSync, readFileSync } from 'fs';
 
 // Auto-generate version.json with timestamp on each build
 const versionPlugin = {
@@ -13,7 +13,20 @@ const versionPlugin = {
   }
 };
 
+// Read current version.json to bake into the build
+function getBuildVersion(): string {
+  try {
+    const data = JSON.parse(readFileSync('public/version.json', 'utf-8'));
+    return data.version || '0';
+  } catch {
+    return '0';
+  }
+}
+
 export default defineConfig({
+  define: {
+    __APP_BUILD_VERSION__: JSON.stringify(getBuildVersion()),
+  },
   plugins: [react(), versionPlugin],
   server: {
     host: '0.0.0.0',
