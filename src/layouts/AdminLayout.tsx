@@ -60,7 +60,7 @@ export default function AdminLayout() {
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {logoUrl ? (
-              <img src={logoUrl} alt={churchName} className="w-8 h-8 rounded-lg object-cover" />
+              <img src={logoUrl} alt={churchName} className="h-8 max-h-[32px] rounded-lg object-contain" />
             ) : (
               <div className="w-8 h-8 rounded-lg theme-gradient flex items-center justify-center">
                 <Music className="w-4 h-4 text-white" />
@@ -91,7 +91,7 @@ export default function AdminLayout() {
         <div className="hidden lg:block p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
             {logoUrl ? (
-              <img src={logoUrl} alt={churchName} className="w-10 h-10 rounded-lg object-cover" />
+              <img src={logoUrl} alt={churchName} className="h-10 max-h-[40px] rounded-lg object-contain" />
             ) : (
               <div className="w-10 h-10 rounded-lg theme-gradient flex items-center justify-center flex-shrink-0">
                 <Music className="w-5 h-5 text-white" />

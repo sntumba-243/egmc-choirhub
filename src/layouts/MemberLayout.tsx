@@ -60,7 +60,7 @@ export default function MemberLayout() {
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {logoUrl ? (
-              <img src={logoUrl} alt={churchName} className="w-8 h-8 rounded-lg object-cover" />
+              <img src={logoUrl} alt={churchName} className="h-8 max-h-[32px] rounded-lg object-contain" />
             ) : (
               <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #FF8C42, #E85D26)' }}>
                 <Music className="w-4 h-4 text-white" />
@@ -91,7 +91,7 @@ export default function MemberLayout() {
         <div className="hidden lg:block p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
             {logoUrl ? (
-              <img src={logoUrl} alt={churchName} className="w-10 h-10 rounded-lg object-cover" />
+              <img src={logoUrl} alt={churchName} className="h-10 max-h-[40px] rounded-lg object-contain" />
             ) : (
               <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, #FF8C42, #E85D26)' }}>
                 <Music className="w-5 h-5 text-white" />
@@ -106,7 +106,7 @@ export default function MemberLayout() {
 
         {/* Mobile User Info */}
         <div className="lg:hidden p-4 border-b border-gray-200 bg-gray-50">
-          <p className="text-sm font-medium text-gray-900">{user?.email}</p>
+          <p className="text-sm font-medium text-gray-900">{user?.first_name || user?.name?.split(' ')[0] || user?.email}</p>
           <div className="mt-2">
             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold shadow-sm ${
               user?.role === 'guest' ? 'bg-blue-100 text-blue-800 ring-1 ring-blue-200' : 'bg-green-100 text-green-800 ring-1 ring-green-200'
@@ -119,7 +119,7 @@ export default function MemberLayout() {
 
         {/* Desktop User Info */}
         <div className="hidden lg:block p-4 border-b border-gray-200 bg-gray-50">
-          <p className="text-sm font-medium text-gray-900 mb-2">{user?.email}</p>
+          <p className="text-sm font-medium text-gray-900 mb-2">{user?.first_name || user?.name?.split(' ')[0] || user?.email}</p>
           <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm ${
             user?.role === 'guest' ? 'bg-blue-100 text-blue-800 ring-1 ring-blue-200' : 'bg-green-100 text-green-800 ring-1 ring-green-200'
           }`}>

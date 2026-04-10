@@ -35,6 +35,20 @@ const applyTheme = (church: Church) => {
   root.style.setProperty('--church-primary', church.primary_color);
   root.style.setProperty('--church-secondary', church.secondary_color);
   root.style.setProperty('--church-accent', church.accent_color);
+
+  // Dynamic favicon
+  if (church.logo_url) {
+    const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]') || document.createElement('link');
+    link.rel = 'icon';
+    link.href = church.logo_url;
+    document.head.appendChild(link);
+  }
+
+  // Dynamic PWA theme color
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', church.primary_color || '#185FA5');
+
+  // Dynamic document title
+  document.title = (church.short_name || church.name) + ' · ChoirHub';
 };
 
 // Apply cached theme immediately on load (before React renders)
