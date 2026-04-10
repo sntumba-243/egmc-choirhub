@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight, Mic } from 'lucide-react';
 import { SongRecorder } from './SongRecorder';
+import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
 
 interface PDFViewerProps {
   url: string;
@@ -18,36 +20,67 @@ export function PDFViewer({ url: googleDriveUrl, title: songTitle, songId, assig
   const [showRecorder, setShowRecorder] = useState(false);
   const [hasError, setHasError] = useState(false);
 
+  const isNative = Capacitor.isNativePlatform();
+
   console.log('🎵 PDF Viewer - Google Drive Iframe');
   console.log('📄 URL:', googleDriveUrl);
 
-  // Convert Google Drive URL to iframe embed URL
+  // Extract file ID from Google Drive URL
+  function extractFileId(inputUrl: string): string {
+    const viewPattern = inputUrl.match(/\/d\/([^/]+)/);
+    if (viewPattern && viewPattern[1]) return viewPattern[1];
+    const openPattern = inputUrl.match(/[?&]id=([^&]+)/);
+    if (openPattern && openPattern[1]) return openPattern[1];
+    return '';
+  }
+
+  // On native, open PDF in Capacitor Browser and navigate back
   useEffect(() => {
+    if (!isNative) return;
+
+    const fileId = extractFileId(googleDriveUrl);
+    if (!fileId) {
+      setHasError(true);
+      setIsLoading(false);
+      return;
+    }
+
+    const pdfUrl = `https://drive.google.com/file/d/${fileId}/preview?rm=minimal`;
+
+    Browser.open({
+      url: pdfUrl,
+      windowName: '_blank',
+      toolbarColor: '#1a2744',
+      presentationStyle: 'fullscreen' as any,
+    }).then(() => {
+      // Listen for browser closed event to navigate back
+      Browser.addListener('browserFinished', () => {
+        navigate(-1);
+        Browser.removeAllListeners();
+      });
+    });
+
+    setIsLoading(false);
+  }, [googleDriveUrl, isNative]);
+
+  // Convert Google Drive URL to iframe embed URL (web only)
+  useEffect(() => {
+    if (isNative) return;
+
     function convertToIframeUrl(inputUrl: string): string {
-      let extractedFileId = '';
-      
-      // Try to extract file ID from various Google Drive URL formats
-      const viewPattern = inputUrl.match(/\/d\/([^/]+)/);
-      if (viewPattern && viewPattern[1]) {
-        extractedFileId = viewPattern[1];
-      } else {
-        const openPattern = inputUrl.match(/[?&]id=([^&]+)/);
-        if (openPattern && openPattern[1]) {
-          extractedFileId = openPattern[1];
-        }
-      }
-      
+      const extractedFileId = extractFileId(inputUrl);
+
       if (!extractedFileId) {
         console.error('❌ Could not extract Google Drive file ID from:', inputUrl);
         return '';
       }
-      
+
       // Create embed URL with rm=minimal for minimal controls
       const finalUrl = `https://drive.google.com/file/d/${extractedFileId}/preview?rm=minimal`;
       console.log('✅ Embed URL:', finalUrl);
       return finalUrl;
     }
-    
+
     const converted = convertToIframeUrl(googleDriveUrl);
     if (converted) {
       setIframeUrl(converted);
@@ -56,7 +89,7 @@ export function PDFViewer({ url: googleDriveUrl, title: songTitle, songId, assig
       setHasError(true);
     }
     setIsLoading(false);
-  }, [googleDriveUrl]);
+  }, [googleDriveUrl, isNative]);
 
   // Auto-hide controls after 2.5 seconds
   useEffect(() => {
@@ -92,6 +125,24 @@ export function PDFViewer({ url: googleDriveUrl, title: songTitle, songId, assig
         <div className="text-center text-gray-600">
           <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-400 border-t-transparent mx-auto mb-4"></div>
           <div className="text-sm opacity-75">Loading PDF...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // On native, the PDF opens in Capacitor Browser — show a minimal waiting screen
+  if (isNative) {
+    return (
+      <div className="fixed inset-0 bg-white z-[9999] flex items-center justify-center">
+        <div className="text-center text-gray-600">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-400 border-t-transparent mx-auto mb-4"></div>
+          <div className="text-sm opacity-75">Opening PDF...</div>
+          <button
+            onClick={() => navigate(-1)}
+            className="mt-6 px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors"
+          >
+            Go Back
+          </button>
         </div>
       </div>
     );
