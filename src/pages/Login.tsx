@@ -58,9 +58,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister }) => {
     setLoading(true);
 
     try {
-      console.log('Login attempt:', { identifier: email, hasPassword: !!password });
       await login(email.trim(), password);
-      console.log('Login successful');
     } catch (error: any) {
       console.error('Login error:', error);
       let errorMessage = 'Login failed. Please try again.';

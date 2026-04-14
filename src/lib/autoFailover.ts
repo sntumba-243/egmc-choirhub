@@ -50,10 +50,8 @@ export class AutoFailover {
   }
 
   async initialize(): Promise<boolean> {
-    console.log('🔍 Checking database health...');
-    
     const isHealthy = await this.checkSupabaseHealth();
-    
+
     this.status = {
       usingNeon: !isHealthy,
       lastCheck: Date.now(),
@@ -63,11 +61,8 @@ export class AutoFailover {
     this.saveStatus();
 
     if (!isHealthy) {
-      console.log('🔄 Supabase unreachable - failing over to Neon');
       this.showFailoverNotification();
       this.startPeriodicCheck();
-    } else {
-      console.log('✅ Using Supabase (primary database)');
     }
 
     return !isHealthy; // Return true if using Neon
@@ -117,7 +112,6 @@ export class AutoFailover {
       const isHealthy = await this.checkSupabaseHealth();
       
       if (isHealthy && this.status.usingNeon) {
-        console.log('✅ Supabase recovered! Reloading to switch back...');
         this.status.usingNeon = false;
         this.status.supabaseHealthy = true;
         this.saveStatus();

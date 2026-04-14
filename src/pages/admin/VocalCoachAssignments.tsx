@@ -159,7 +159,7 @@ export default function VocalCoachAssignments() {
         memberName: a.member ? `${a.member.first_name} ${a.member.last_name}` : undefined,
         directorNotes: a.notes || undefined,
       });
-      console.log("RESULT:", result); setAiResult(result);
+      setAiResult(result);
     } catch (err) { console.error("AI ERROR:", err); toast.error('Failed to generate feedback'); }
     finally { setAiLoading(false); }
   };

@@ -98,11 +98,9 @@ export const AdminEvents = () => {
     try {
       // 1. Fetch event details and current RSVPs
       const { data: event, error: eventError } = await supabase.from('events').select('date, church_id').eq('id', eventId).single();
-      console.log('[ResetRSVPs] Step 1a - Event fetched:', event, 'error:', eventError);
       if (!event) throw new Error('Event not found');
 
       const { data: rsvps, error: fetchError } = await supabase.from('event_rsvps').select('member_id, status').eq('event_id', eventId);
-      console.log('[ResetRSVPs] Step 1b - RSVPs fetched:', rsvps?.length, 'rows:', rsvps, 'error:', fetchError);
 
       // 2. Archive to attendance_history (insert, ignore duplicates)
       if (rsvps && rsvps.length > 0) {
@@ -114,14 +112,11 @@ export const AdminEvents = () => {
           status: r.status,
           church_id: event.church_id ?? church?.id,
         }));
-        console.log('[ResetRSVPs] Step 2 - Archive payload:', archivePayload);
         const { data: archiveData, error: archiveError } = await supabase
           .from('attendance_history')
           .upsert(archivePayload, { onConflict: 'event_id,member_id', ignoreDuplicates: true });
-        console.log('[ResetRSVPs] Step 2 - Archive result:', archiveData, 'error:', archiveError);
         // If upsert fails due to constraint mismatch, fall back to individual inserts
         if (archiveError) {
-          console.log('[ResetRSVPs] Step 2 - Upsert failed, falling back to individual inserts');
           for (const row of archivePayload) {
             const { error: insertErr } = await supabase.from('attendance_history').insert(row);
             if (insertErr && !insertErr.message.includes('duplicate')) {
@@ -129,18 +124,14 @@ export const AdminEvents = () => {
             }
           }
         }
-      } else {
-        console.log('[ResetRSVPs] Step 2 - No RSVPs to archive');
       }
 
       // 3. Delete RSVPs (only after archive succeeds)
       const { error: deleteError } = await supabase.from('event_rsvps').delete().eq('event_id', eventId);
-      console.log('[ResetRSVPs] Step 3 - Delete result, error:', deleteError);
       if (deleteError) throw deleteError;
 
       // 4. Update local state
       setRsvpCounts(prev => ({ ...prev, [eventId]: 0 }));
-      console.log('[ResetRSVPs] Step 4 - Success, local state updated');
       toast.success('RSVPs archived and reset');
       fetchEvents();
     } catch (e: any) {

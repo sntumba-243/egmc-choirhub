@@ -88,7 +88,6 @@ export function SongRecorder({ songId, songTitle, assignmentId, onClose, onSucce
 
   const sendRecording = async () => {
     const userId = user?.id || (user as any)?.user?.id;
-    console.log('Send clicked', { audioBlob: !!audioBlob, userId, songId, user });
     if (!audioBlob) {
       toast.error('No recording to send');
       return;

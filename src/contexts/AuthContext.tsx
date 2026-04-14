@@ -27,7 +27,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     checkUser();
 
     const handleFailover = () => {
-      console.log('Failover detected, rechecking user...');
       checkUser();
     };
 

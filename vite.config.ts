@@ -39,6 +39,16 @@ export default defineConfig({
   ],
   build: {
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-supabase': ['@supabase/supabase-js'],
+          'vendor-ui': ['lucide-react'],
+          'vendor-sentry': ['@sentry/react'],
+        },
+      },
+    },
   },
   server: {
     host: '0.0.0.0',

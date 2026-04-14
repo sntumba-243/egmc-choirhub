@@ -259,15 +259,12 @@ async function initializeNotifications(userId: string) {
     if (token) {
       // Store device token in database
       await storeDeviceToken(userId, token);
-      console.log('✅ Notifications enabled');
-      
+
       // Set up listener for foreground messages
       setupMessageListener((payload) => {
-        console.log('📨 Notification received:', payload);
       });
-    } else {
-      console.log('⚠️ Notifications not enabled');
     }
+
   } catch (error) {
     console.error('❌ Error initializing notifications:', error);
   }

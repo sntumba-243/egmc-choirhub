@@ -16,7 +16,7 @@ interface Session {
 
 const SESSION_KEY = 'neon_session';
 const SESSION_DURATION = 24 * 60 * 60 * 1000;
-const API_URL = 'http://localhost:3001/api';
+const API_URL = import.meta.env.VITE_API_URL || `${window.location.origin}/api`;
 
 export const neonAuth = {
   async login(email: string, password: string): Promise<{ user: NeonUser | null; error: string | null }> {

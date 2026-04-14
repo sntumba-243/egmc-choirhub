@@ -81,8 +81,7 @@ const PracticeSession: React.FC = () => {
       const fileName = `${user!.id}/${Date.now()}.webm`;
       // Get current session to ensure we're authenticated
       const { data: session } = await supabase.auth.getSession();
-      console.log('Auth session exists:', !!session?.session);
-      
+
       const { data, error } = await supabase.storage
         .from('vocal-recordings')
         .upload(fileName, audioBlob, {
@@ -130,7 +129,6 @@ const PracticeSession: React.FC = () => {
       // Upload audio to Supabase storage
       // TEMPORARY: Skip actual upload for testing
       const audioPath = `test-uploads/${user!.id}/${Date.now()}.webm`;
-      console.log('⚠️ Using mock upload path for testing:', audioPath);
       
       // Uncomment this when CORS is fixed:
       // const audioPath = await uploadAudioToSupabase(recording);

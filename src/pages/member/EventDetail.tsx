@@ -106,7 +106,7 @@ export const EventDetail = () => {
         setRsvpStatus(data.status);
       }
     } catch (error) {
-      console.log('No RSVP found yet');
+      // No RSVP found yet
     }
   };
 
@@ -137,8 +137,6 @@ export const EventDetail = () => {
           member_id: user.id,
           status,
         }, { onConflict: 'event_id,member_id' });
-
-      console.log('RSVP result:', { data, error, userId: user?.id, eventId: event?.id });
 
       if (error) {
         console.error('RSVP full error:', JSON.stringify(error, null, 2));

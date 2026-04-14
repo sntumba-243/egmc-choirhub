@@ -55,7 +55,6 @@ export const MemberMessages = () => {
         console.error('Error fetching messages:', error);
         return;
       }
-      console.log("All messages send_to:", data?.map(m => m.send_to));
       const filteredData = data?.filter(msg => msg.send_to === 'all' || msg.send_to === user?.id) || [];
 
       const messagesWithNames = filteredData.map(msg => ({

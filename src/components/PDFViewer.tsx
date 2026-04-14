@@ -22,9 +22,6 @@ export function PDFViewer({ url: googleDriveUrl, title: songTitle, songId, assig
 
   const isNative = Capacitor.isNativePlatform();
 
-  console.log('🎵 PDF Viewer - Google Drive Iframe');
-  console.log('📄 URL:', googleDriveUrl);
-
   // Extract file ID from Google Drive URL
   function extractFileId(inputUrl: string): string {
     const viewPattern = inputUrl.match(/\/d\/([^/]+)/);
@@ -77,7 +74,6 @@ export function PDFViewer({ url: googleDriveUrl, title: songTitle, songId, assig
 
       // Create embed URL with rm=minimal for minimal controls
       const finalUrl = `https://drive.google.com/file/d/${extractedFileId}/preview?rm=minimal`;
-      console.log('✅ Embed URL:', finalUrl);
       return finalUrl;
     }
 
@@ -104,7 +100,6 @@ export function PDFViewer({ url: googleDriveUrl, title: songTitle, songId, assig
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      console.log("🧹 PDF Viewer unmounting - cleaning up");
       setIframeUrl("");
       setIsLoading(true);
     };
@@ -199,7 +194,7 @@ export function PDFViewer({ url: googleDriveUrl, title: songTitle, songId, assig
           transform: 'scale(0.909)',
           transformOrigin: 'top left',
         }}
-        onLoad={() => console.log('✅ PDF iframe loaded')}
+        onLoad={() => {}}
       />
 
       {/* Thin top-edge tap zone to show controls - invisible, doesn't block PDF scrolling */}
@@ -241,8 +236,6 @@ export function PDFViewerPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const state = location.state as { url?: string; title?: string; songId?: string; assignmentId?: string } | null;
-
-  console.log('🎬 PDFViewerPage mounted');
 
   if (!state || !state.url) {
     return (

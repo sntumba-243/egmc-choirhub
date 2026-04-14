@@ -101,7 +101,6 @@ export const smartCoachService = {
 
       // If member has recent exercises, return without generating
       if (existingExercises && existingExercises.length >= 3) {
-        console.log('Member already has recent exercises, skipping generation');
         return;
       }
 
@@ -239,8 +238,6 @@ export const smartCoachService = {
     exerciseDetails?: { title: string; type: string; difficulty: string; duration: number }
   ): Promise<string> {
     try {
-      console.log('🤖 Generating AI feedback with Claude...');
-
       // Use real AI if we have exercise details
       if (exerciseDetails) {
         const feedback = await aiCoachService.generatePersonalizedFeedback({
@@ -257,12 +254,10 @@ export const smartCoachService = {
           .update({ ai_feedback: feedback })
           .eq('id', attemptId);
 
-        console.log('✅ AI feedback generated successfully!');
         return feedback;
       }
 
       // Fallback to template-based feedback
-      console.log('⚠️ No exercise details - using fallback feedback');
       const feedback: string[] = [];
       const avgScore =
         (scores.pitch_accuracy + scores.timing_accuracy + scores.tone_quality + scores.breathing_control) / 4;

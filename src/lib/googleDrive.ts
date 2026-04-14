@@ -37,8 +37,6 @@ export const googleDriveService = {
           url.searchParams.append(key, value);
         });
         
-        console.log('Fetching page from Google Drive...', pageToken ? `(page token: ${pageToken.substring(0, 20)}...)` : '(first page)');
-        
         const response = await fetch(url.toString());
 
         if (!response.ok) {
@@ -52,7 +50,6 @@ export const googleDriveService = {
         // Add files from this page to our collection
         if (data.files && data.files.length > 0) {
           allFiles = allFiles.concat(data.files);
-          console.log(`Fetched ${data.files.length} files (total so far: ${allFiles.length})`);
         }
         
         // Get the next page token (null if no more pages)
@@ -60,7 +57,6 @@ export const googleDriveService = {
         
       } while (pageToken); // Continue while there are more pages
       
-      console.log(`✅ Finished! Total files fetched: ${allFiles.length}`);
       return allFiles;
       
     } catch (error) {

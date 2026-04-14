@@ -25,8 +25,6 @@ export const aiCoachService = {
    */
   async generatePersonalizedFeedback(analysis: VocalAnalysis): Promise<string> {
     try {
-      console.log('📊 Analysis:', analysis);
-
       const avgScore = (
         analysis.scores.pitch_accuracy +
         analysis.scores.timing_accuracy +
@@ -57,8 +55,6 @@ Please provide:
 
 Keep the tone warm, supportive, and motivating. Use emojis where appropriate. Be concise but specific.`;
 
-      console.log('🤖 Calling AI Coach API...');
-
       const token = await getAuthToken();
       if (!token) {
         throw new Error('Not authenticated');
@@ -83,13 +79,10 @@ Keep the tone warm, supportive, and motivating. Use emojis where appropriate. Be
 
       const message = await res.json();
 
-      console.log('✅ AI Coach API response received!');
-
       const feedback = message.content[0].type === 'text'
         ? message.content[0].text
         : 'Great practice session! Keep up the good work!';
 
-      console.log('📝 Generated feedback:', feedback);
       return feedback;
 
     } catch (error) {

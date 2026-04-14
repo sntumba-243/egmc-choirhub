@@ -9,14 +9,12 @@ export async function preCacheUserData(supabase, churchId) {
   const CACHE_KEY = 'choirhub_offline_data';
   
   try {
-    console.log('[Offline] Pre-caching data for offline use...');
-    
     // Fetch essential data
     const [songsRes, churchSongsRes, eventsRes, membersRes, messagesRes, churchRes] = await Promise.all([
-      supabase.from('songs').select('*'),
-      supabase.from('church_song_status').select('*').eq('church_id', churchId),
-      supabase.from('events').select('*').eq('church_id', churchId),
-      supabase.from('members').select('*').eq('church_id', churchId),
+      supabase.from('songs').select('*').limit(500),
+      supabase.from('church_song_status').select('*').eq('church_id', churchId).limit(500),
+      supabase.from('events').select('*').eq('church_id', churchId).limit(500),
+      supabase.from('members').select('*').eq('church_id', churchId).limit(500),
       supabase.from('messages').select('*').eq('church_id', churchId).order('created_at', { ascending: false }).limit(50),
       supabase.from('churches').select('*').eq('id', churchId).single(),
     ]);
@@ -37,8 +35,6 @@ export async function preCacheUserData(supabase, churchId) {
     
     // Also cache PDF sheet music URLs
     await preCachePDFs(offlineData.songs);
-    
-    console.log(`[Offline] Cached: ${offlineData.songs.length} songs, ${offlineData.events.length} events, ${offlineData.members.length} members`);
   } catch (err) {
     console.warn('[Offline] Pre-cache failed:', err);
   }
@@ -122,7 +118,4 @@ async function preCachePDFs(songs) {
     }
   }
   
-  if (cached > 0) {
-    console.log(`[Offline] Pre-cached ${cached} new PDFs`);
-  }
 }

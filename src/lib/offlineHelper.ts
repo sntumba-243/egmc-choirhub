@@ -13,7 +13,6 @@ export async function fetchWithOfflineFallback(
     // Try offline cache
     const cached = await getOfflineData(offlineKey);
     if (cached) {
-      console.log(`[Offline] Using cached ${offlineKey}`);
       return { data: cached, error: null, isOffline: true };
     }
     return { data: null, error: err, isOffline: true };

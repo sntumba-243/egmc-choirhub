@@ -7,13 +7,11 @@ export function useOfflineStatus() {
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      console.log('[Network] Back online');
     };
-    
+
     const handleOffline = () => {
       setIsOnline(false);
       setWasOffline(true);
-      console.log('[Network] Gone offline');
     };
 
     window.addEventListener('online', handleOnline);

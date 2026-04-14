@@ -93,7 +93,8 @@ export const songsService = {
     const { data, error } = await supabase
       .from('songs')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(500);
 
     if (error) throw error;
     return data || [];
@@ -155,7 +156,8 @@ export const membersService = {
     const { data, error } = await supabase
       .from('users')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(500);
 
     if (error) throw error;
     return data || [];
@@ -236,7 +238,8 @@ export const eventsService = {
     const { data, error } = await supabase
       .from('events')
       .select('*')
-      .order('date', { ascending: true });
+      .order('date', { ascending: true })
+      .limit(500);
 
     if (error) throw error;
     return data || [];
@@ -288,7 +291,8 @@ export const messagesService = {
     const { data, error } = await supabase
       .from('messages')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(500);
 
     if (error) throw error;
     return data || [];
@@ -374,7 +378,8 @@ export const directMessagesService = {
       .from('direct_messages')
       .select('*')
       .or(`sender_id.eq.${currentUserId},recipient_id.eq.${currentUserId}`)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(500);
 
     if (error) throw error;
     return data || [];
@@ -473,7 +478,8 @@ export const practiceLogsService = {
       .from('practice_logs')
       .select('*')
       .eq('user_id', userId)
-      .order('date', { ascending: false });
+      .order('date', { ascending: false })
+      .limit(500);
 
     if (error) throw error;
     return data || [];

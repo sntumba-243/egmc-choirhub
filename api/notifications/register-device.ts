@@ -10,6 +10,13 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Auth: verify Supabase JWT
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  const jwt = authHeader.split(' ')[1];
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(jwt);
+  if (authError || !authUser) return res.status(401).json({ error: 'Unauthorized' });
+
   try {
     const { userId, token } = req.body;
 

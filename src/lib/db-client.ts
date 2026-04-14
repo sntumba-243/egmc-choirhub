@@ -12,9 +12,6 @@ if (useNeon && neonUrl) {
     connectionString: neonUrl,
     ssl: { rejectUnauthorized: false }
   });
-  console.log('✅ Using Neon for database queries');
-} else {
-  console.log('✅ Using Supabase for database queries');
 }
 
 // Export the appropriate client

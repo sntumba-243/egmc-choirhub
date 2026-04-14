@@ -22,13 +22,11 @@ export async function requestNotificationPermission() {
   try {
     // Check if notifications are supported
     if (!('Notification' in window)) {
-      console.log('This browser does not support notifications');
       return null;
     }
 
     // If already denied, don't ask again
     if (Notification.permission === 'denied') {
-      console.log('Notifications denied by user');
       return null;
     }
 
@@ -58,7 +56,6 @@ export async function requestNotificationPermission() {
 // Listen for incoming messages
 export function setupMessageListener(callback: (payload: any) => void) {
   onMessage(messaging, (payload) => {
-    console.log('Message received:', payload);
     callback(payload);
     
     // Show notification if in foreground

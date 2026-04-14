@@ -67,7 +67,6 @@ const VocalCoach: React.FC = () => {
         .order('assigned_at', { ascending: false });
 
       if (assignmentsError) {
-        console.log('No member_repertoire table found - skipping song assignments');
         setAssignments([]);
       } else {
 
