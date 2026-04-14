@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { Music, Search, Edit, Trash2, Star, Calendar, X } from 'lucide-react';
+import { Music, Search, Edit, Trash2, Star, Calendar, X, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { useChurch } from '../../contexts/ChurchContext';
+
+const PAGE_SIZE = 20;
 
 interface Song {
   id: string;
@@ -32,7 +34,9 @@ export const AdminRepertoire = () => {
   const { church } = useChurch();
   const [songs, setSongs] = useState<SongWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pageLoading, setPageLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [selectedSongs, setSelectedSongs] = useState<Set<string>>(new Set());
@@ -43,50 +47,127 @@ export const AdminRepertoire = () => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'learned' | 'learning' | 'not_started'>('all');
   const [showFilters, setShowFilters] = useState(false);
   const [viewingSong, setViewingSong] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [songStats, setSongStats] = useState({ total: 0, learned: 0, learning: 0, notStarted: 0 });
+  const [statusMap, setStatusMap] = useState<Map<string, 'learned' | 'learning' | 'not_started'>>(new Map());
+  const [loadAll, setLoadAll] = useState(false);
 
   const isSuperAdmin = user?.is_super_admin === true;
 
+  const isPaginated = !loadAll && !debouncedSearch.trim() && statusFilter === 'all' && !showFavoritesOnly;
+  const totalPages = isPaginated ? Math.ceil(totalCount / PAGE_SIZE) : 1;
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Initial data load
   useEffect(() => {
     if (church?.id) {
-      fetchSongs();
+      initData();
       fetchFavorites();
       fetchUpcomingEvents();
     }
   }, [church?.id]);
 
-  const getAuthUid = async (): Promise<string | null> => {
-    const { data: { session } } = await supabase.auth.getSession();
-    return session?.user?.id || null;
+  // Refetch when page or filters change
+  useEffect(() => {
+    if (!church?.id || loading) return;
+    fetchSongs(currentPage);
+  }, [currentPage, debouncedSearch, languageFilter, sortBy, statusFilter, showFavoritesOnly, loadAll]);
+
+  const initData = async () => {
+    const sm = await fetchStatsAndStatuses();
+    await fetchSongs(1, sm);
   };
 
-  const fetchSongs = async () => {
-    if (!church?.id) return;
+  const fetchStatsAndStatuses = async () => {
+    if (!church?.id) return new Map<string, 'learned' | 'learning' | 'not_started'>();
     try {
-      const { data: songsData, error: songsError } = await supabase
+      const [countResult, statusResult] = await Promise.all([
+        supabase.from('songs').select('*', { count: 'exact', head: true }),
+        supabase.from('church_song_status').select('song_id, status').eq('church_id', church.id),
+      ]);
+      const total = countResult.count || 0;
+      const statuses = statusResult.data || [];
+      const map = new Map<string, 'learned' | 'learning' | 'not_started'>();
+      statuses.forEach((s: any) => map.set(s.song_id, s.status));
+      setStatusMap(map);
+      const learned = statuses.filter(s => s.status === 'learned').length;
+      const learning = statuses.filter(s => s.status === 'learning').length;
+      setSongStats({ total, learned, learning, notStarted: total - learned - learning });
+      return map;
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+      return new Map<string, 'learned' | 'learning' | 'not_started'>();
+    }
+  };
+
+  const fetchSongs = async (page: number, statuses?: Map<string, 'learned' | 'learning' | 'not_started'>) => {
+    if (!church?.id) return;
+    setPageLoading(true);
+    try {
+      const orderCol = sortBy === 'recent' ? 'created_at' : 'title';
+      const ascending = sortBy === 'recent' ? false : sortBy !== 'z-a';
+
+      let query = supabase
         .from('songs')
-        .select('*')
-        .order('title', { ascending: true });
-      if (songsError) throw songsError;
+        .select('*', { count: 'exact' })
+        .order(orderCol, { ascending });
 
-      const { data: statusData, error: statusError } = await supabase
-        .from('church_song_status')
-        .select('song_id, status')
-        .eq('church_id', church.id);
-      if (statusError) throw statusError;
+      if (languageFilter !== 'all') {
+        query = query.ilike('language', languageFilter);
+      }
 
-      const statusMap = new Map<string, 'learned' | 'learning' | 'not_started'>();
-      (statusData || []).forEach((s: any) => statusMap.set(s.song_id, s.status));
+      const search = debouncedSearch.trim();
+      if (search) {
+        query = query.or(`title.ilike.%${search}%,composer.ilike.%${search}%`);
+      }
 
-      setSongs((songsData || []).map((song: Song) => ({
+      const shouldPaginate = !loadAll && !search && statusFilter === 'all' && !showFavoritesOnly;
+      if (shouldPaginate) {
+        const from = (page - 1) * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+        query = query.range(from, to);
+      }
+
+      const { data: songsData, error, count } = await query;
+      if (error) throw error;
+
+      const sm = statuses || statusMap;
+      setTotalCount(count || 0);
+
+      let result: SongWithStatus[] = (songsData || []).map((song: Song) => ({
         ...song,
-        learning_status: statusMap.get(song.id) || 'not_started',
-      })));
+        learning_status: sm.get(song.id) || 'not_started',
+      }));
+
+      if (statusFilter !== 'all') {
+        result = result.filter(s => s.learning_status === statusFilter);
+      }
+      if (showFavoritesOnly) {
+        result = result.filter(s => favorites.has(s.id));
+      }
+
+      setSongs(result);
     } catch (error) {
       console.error('Error:', error);
       toast.error('Failed to load songs');
     } finally {
+      setPageLoading(false);
       setLoading(false);
     }
+  };
+
+  const getAuthUid = async (): Promise<string | null> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.user?.id || null;
   };
 
   const fetchFavorites = async () => {
@@ -153,7 +234,23 @@ export const AdminRepertoire = () => {
         .upsert({ church_id: church.id, song_id: songId, status: nextStatus, updated_at: new Date().toISOString() }, { onConflict: 'church_id,song_id' });
       if (error) throw error;
       setSongs(songs.map(s => s.id === songId ? { ...s, learning_status: nextStatus } : s));
-      toast.success(`→ ${nextStatus === 'learned' ? 'Learned' : nextStatus === 'learning' ? 'Learning' : 'Not Started'}`);
+
+      const oldStatus = (statusMap.get(songId) || 'not_started') as string;
+      const newMap = new Map(statusMap);
+      newMap.set(songId, nextStatus);
+      setStatusMap(newMap);
+      setSongStats(prev => {
+        const s = { ...prev };
+        if (oldStatus === 'learned') s.learned--;
+        else if (oldStatus === 'learning') s.learning--;
+        else s.notStarted--;
+        if (nextStatus === 'learned') s.learned++;
+        else if (nextStatus === 'learning') s.learning++;
+        else s.notStarted++;
+        return s;
+      });
+
+      toast.success(`\u2192 ${nextStatus === 'learned' ? 'Learned' : nextStatus === 'learning' ? 'Learning' : 'Not Started'}`);
     } catch (error) {
       toast.error('Failed to update status');
     }
@@ -190,7 +287,8 @@ export const AdminRepertoire = () => {
       if (error) throw error;
       toast.success(`${selectedSongs.size} song(s) updated`);
       setSelectedSongs(new Set());
-      fetchSongs();
+      await fetchStatsAndStatuses();
+      await fetchSongs(currentPage);
     } catch (error) {
       toast.error('Failed to update');
     }
@@ -202,6 +300,15 @@ export const AdminRepertoire = () => {
     try {
       await supabase.from('songs').delete().eq('id', id);
       setSongs(songs.filter(s => s.id !== id));
+      setTotalCount(prev => prev - 1);
+      const oldStatus = (statusMap.get(id) || 'not_started') as string;
+      setSongStats(prev => {
+        const s = { ...prev, total: prev.total - 1 };
+        if (oldStatus === 'learned') s.learned--;
+        else if (oldStatus === 'learning') s.learning--;
+        else s.notStarted--;
+        return s;
+      });
       toast.success('Song deleted');
     } catch { toast.error('Failed to delete'); }
   };
@@ -215,25 +322,12 @@ export const AdminRepertoire = () => {
     return c[lang] || 'bg-gray-400';
   };
 
-  const filteredSongs = songs.filter(song => {
-    if (languageFilter !== 'all' && song.language?.toLowerCase() !== languageFilter) return false;
-    if (statusFilter !== 'all' && song.learning_status !== statusFilter) return false;
-    const s = searchTerm.toLowerCase();
-    const m = song.title.toLowerCase().includes(s) || song.composer?.toLowerCase().includes(s);
-    return showFavoritesOnly ? m && favorites.has(song.id) : m;
-  }).sort((a, b) => {
-    if (sortBy === 'z-a') return b.title.localeCompare(a.title);
-    if (sortBy === 'recent') return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-    return a.title.localeCompare(b.title);
-  });
-
-  const stats = {
-    total: songs.length,
-    learned: songs.filter(s => s.learning_status === 'learned').length,
-    learning: songs.filter(s => s.learning_status === 'learning').length,
-    notStarted: songs.filter(s => s.learning_status === 'not_started').length,
+  const goToPage = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-  const masteryRate = stats.total > 0 ? Math.round((stats.learned / stats.total) * 100) : 0;
+
+  const masteryRate = songStats.total > 0 ? Math.round((songStats.learned / songStats.total) * 100) : 0;
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-screen">
@@ -248,7 +342,9 @@ export const AdminRepertoire = () => {
       <div className="flex justify-between items-baseline">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Repertoire</h1>
-          <p className="text-sm text-gray-500">{filteredSongs.length} of {songs.length}</p>
+          <p className="text-sm text-gray-500">
+            {isPaginated ? `${totalCount} songs` : `${songs.length} of ${totalCount}`}
+          </p>
         </div>
         {isSuperAdmin && (
           <button onClick={() => navigate('new')} className="text-sm text-indigo-600 font-semibold">+ Add</button>
@@ -258,12 +354,12 @@ export const AdminRepertoire = () => {
       {/* Stats */}
       <div className="flex gap-2 flex-wrap">
         {[
-          { key: 'all' as const, label: 'Total', value: stats.total, cls: '' },
-          { key: 'learned' as const, label: '✅', value: stats.learned, cls: 'bg-green-50 border-green-200' },
-          { key: 'learning' as const, label: '📚', value: stats.learning, cls: 'bg-yellow-50 border-yellow-200' },
-          { key: 'not_started' as const, label: '⏳', value: stats.notStarted, cls: 'bg-gray-50' },
+          { key: 'all' as const, label: 'Total', value: songStats.total, cls: '' },
+          { key: 'learned' as const, label: '\u2705', value: songStats.learned, cls: 'bg-green-50 border-green-200' },
+          { key: 'learning' as const, label: '\uD83D\uDCDA', value: songStats.learning, cls: 'bg-yellow-50 border-yellow-200' },
+          { key: 'not_started' as const, label: '\u23F3', value: songStats.notStarted, cls: 'bg-gray-50' },
         ].map(s => (
-          <button key={s.key} onClick={() => setStatusFilter(s.key)}
+          <button key={s.key} onClick={() => { setStatusFilter(s.key); setCurrentPage(1); }}
             className={`flex-1 rounded-lg border p-1.5 text-center transition ${s.cls} ${statusFilter === s.key ? 'ring-2 ring-indigo-500' : 'border-gray-200'}`}>
             <div className="text-sm font-bold">{s.value}</div>
             <div className="text-sm text-gray-500">{s.label}</div>
@@ -282,13 +378,13 @@ export const AdminRepertoire = () => {
           <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
         </div>
-        <button onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+        <button onClick={() => { setShowFavoritesOnly(!showFavoritesOnly); setCurrentPage(1); }}
           className={`w-8 h-8 flex items-center justify-center rounded-lg border text-sm ${showFavoritesOnly ? 'bg-yellow-500 border-yellow-500 text-white' : 'bg-white border-gray-200'}`}>
           <Star className={`w-3.5 h-3.5 ${showFavoritesOnly ? 'fill-white' : 'text-gray-400'}`} />
         </button>
         <button onClick={() => setShowFilters(!showFilters)}
           className={`w-10 h-10 flex items-center justify-center rounded-lg border text-sm font-bold ${showFilters ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-gray-200 text-gray-400'}`}>
-          ⚙
+          {'\u2699'}
         </button>
       </div>
 
@@ -297,13 +393,13 @@ export const AdminRepertoire = () => {
         <div className="bg-white rounded-lg border border-gray-200 p-2 flex gap-2">
           <div className="flex-1">
             <label className="text-sm font-medium text-gray-400 uppercase">Sort</label>
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)} className="w-full mt-0.5 px-3 py-2 text-sm border border-gray-200 rounded bg-white">
-              <option value="a-z">A → Z</option><option value="z-a">Z → A</option><option value="recent">Recent</option>
+            <select value={sortBy} onChange={(e) => { setSortBy(e.target.value as any); setCurrentPage(1); }} className="w-full mt-0.5 px-3 py-2 text-sm border border-gray-200 rounded bg-white">
+              <option value="a-z">A &rarr; Z</option><option value="z-a">Z &rarr; A</option><option value="recent">Recent</option>
             </select>
           </div>
           <div className="flex-1">
             <label className="text-sm font-medium text-gray-400 uppercase">Language</label>
-            <select value={languageFilter} onChange={(e) => setLanguageFilter(e.target.value)} className="w-full mt-0.5 px-3 py-2 text-sm border border-gray-200 rounded bg-white">
+            <select value={languageFilter} onChange={(e) => { setLanguageFilter(e.target.value); setCurrentPage(1); }} className="w-full mt-0.5 px-3 py-2 text-sm border border-gray-200 rounded bg-white">
               <option value="all">All</option><option value="english">English</option><option value="french">French</option><option value="portuguese">Portuguese</option><option value="lingala">Lingala</option><option value="tshiluba">Tshiluba</option><option value="kikongo">Kikongo</option><option value="swahili">Swahili</option>
             </select>
           </div>
@@ -320,30 +416,49 @@ export const AdminRepertoire = () => {
             </button>
             <select value="" onChange={(e) => { if (e.target.value) handleBulkStatusUpdate(e.target.value as any); }}
               className="px-3 py-2 text-sm border border-indigo-300 rounded bg-white font-medium">
-              <option value="">Mark as...</option><option value="learned">✅ Learned</option><option value="learning">📚 Learning</option><option value="not_started">⏳ Not Started</option>
+              <option value="">Mark as...</option><option value="learned">{'\u2705'} Learned</option><option value="learning">{'\uD83D\uDCDA'} Learning</option><option value="not_started">{'\u23F3'} Not Started</option>
             </select>
-            <button onClick={() => setSelectedSongs(new Set())} className="text-sm text-gray-500 px-1">✕</button>
+            <button onClick={() => setSelectedSongs(new Set())} className="text-sm text-gray-500 px-1">{'\u2715'}</button>
           </div>
         </div>
       )}
 
-      {/* Select all */}
-      <div className="flex justify-end">
-        <button onClick={selectedSongs.size > 0 ? () => setSelectedSongs(new Set()) : () => { setSelectedSongs(new Set(filteredSongs.map(s => s.id))); toast.success(`Selected ${filteredSongs.length}`); }}
+      {/* Select all + Load all */}
+      <div className="flex justify-between items-center">
+        <div className="flex gap-2">
+          {!loadAll && isPaginated && totalPages > 1 && (
+            <button onClick={() => { setLoadAll(true); setCurrentPage(1); }}
+              className="px-3 py-2 text-sm rounded font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200">
+              Load all songs
+            </button>
+          )}
+          {loadAll && (
+            <button onClick={() => { setLoadAll(false); setCurrentPage(1); }}
+              className="px-3 py-2 text-sm rounded font-semibold bg-indigo-100 text-indigo-700 hover:bg-indigo-200">
+              Back to pages
+            </button>
+          )}
+        </div>
+        <button onClick={selectedSongs.size > 0 ? () => setSelectedSongs(new Set()) : () => { setSelectedSongs(new Set(songs.map(s => s.id))); toast.success(`Selected ${songs.length}`); }}
           className={`px-3 py-2 text-sm rounded font-semibold ${selectedSongs.size > 0 ? 'bg-red-100 text-red-700' : 'bg-indigo-100 text-indigo-700'}`}>
           {selectedSongs.size > 0 ? `Deselect (${selectedSongs.size})` : 'Select All'}
         </button>
       </div>
 
       {/* Songs */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        {filteredSongs.length === 0 ? (
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden relative">
+        {pageLoading && (
+          <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-10">
+            <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+          </div>
+        )}
+        {songs.length === 0 && !pageLoading ? (
           <div className="text-center py-10">
             <Music className="w-10 h-10 text-gray-200 mx-auto mb-2" />
             <h3 className="text-sm font-medium text-gray-900">No songs found</h3>
             <p className="text-sm text-gray-400">Try adjusting your filters</p>
           </div>
-        ) : filteredSongs.map((song) => {
+        ) : songs.map((song) => {
           const isFav = favorites.has(song.id);
           const isSel = selectedSongs.has(song.id);
           return (
@@ -351,11 +466,11 @@ export const AdminRepertoire = () => {
               className={`flex items-center gap-3 px-3 py-3 border-b border-gray-100 last:border-b-0 transition ${isSel ? 'bg-indigo-50' : ''}`}>
               <input type="checkbox" checked={isSel} onChange={() => toggleSongSelection(song.id)} className="w-3.5 h-3.5 flex-shrink-0 accent-indigo-600" />
               <button onClick={(e) => toggleFavorite(song.id, e)} className="flex-shrink-0 text-base leading-none">
-                <span className={isFav ? 'text-yellow-500' : 'text-gray-300'}>{isFav ? '★' : '☆'}</span>
+                <span className={isFav ? 'text-yellow-500' : 'text-gray-300'}>{isFav ? '\u2605' : '\u2606'}</span>
               </button>
               <div className="flex-1 min-w-0 cursor-pointer" onClick={() => song.sheet_music_url && handleViewPDF(song)}>
-                <div className={`text-base font-semibold truncate ${song.sheet_music_url ? 'text-gray-900 hover:text-indigo-600' : 'text-gray-900'}`}>{song.title}</div>
-                <div className="text-sm text-gray-400 truncate">{song.composer}</div>
+                <div className={`text-base font-semibold ${song.sheet_music_url ? 'text-gray-900 hover:text-indigo-600' : 'text-gray-900'}`} style={{ whiteSpace: 'normal', overflow: 'visible' }}>{song.title}</div>
+                <div className="text-sm text-gray-400" style={{ whiteSpace: 'normal', overflow: 'visible' }}>{song.composer}</div>
               </div>
               <span className={`w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold text-white flex-shrink-0 ${getLangColor(song.language)}`}>
                 {(song.language || '?').slice(0, 1)}
@@ -363,7 +478,7 @@ export const AdminRepertoire = () => {
               <button onClick={(e) => handleStatusCycle(song.id, song.learning_status, e)}
                 className="flex-shrink-0 text-base leading-none hover:scale-125 active:scale-90 transition-transform"
                 title="Tap to change status">
-                {song.learning_status === 'learned' ? '✅' : song.learning_status === 'learning' ? '📚' : '⏳'}
+                {song.learning_status === 'learned' ? '\u2705' : song.learning_status === 'learning' ? '\uD83D\uDCDA' : '\u23F3'}
               </button>
               {isSuperAdmin && (
                 <div className="flex flex-shrink-0">
@@ -375,6 +490,26 @@ export const AdminRepertoire = () => {
           );
         })}
       </div>
+
+      {/* Pagination */}
+      {isPaginated && totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 bg-white rounded-lg border border-gray-200 px-4 py-3">
+          <p className="text-sm text-gray-500">
+            Showing {(currentPage - 1) * PAGE_SIZE + 1}&ndash;{Math.min(currentPage * PAGE_SIZE, totalCount)} of {totalCount} songs
+          </p>
+          <div className="flex items-center gap-2">
+            <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1}
+              className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50">
+              Previous
+            </button>
+            <span className="text-sm text-gray-600">Page {currentPage} of {totalPages}</span>
+            <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages}
+              className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50">
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Event Modal */}
       {showEventModal && (
@@ -415,7 +550,7 @@ export const AdminRepertoire = () => {
       <div className="fixed inset-0 z-[9999] bg-white">
         <button onClick={() => setViewingSong(null)}
           className="fixed top-3 left-3 z-[10000] px-4 py-2 text-sm font-semibold text-gray-700 bg-white/90 backdrop-blur border border-gray-200 rounded-full shadow-sm hover:bg-gray-100 transition">
-          ← Back
+          &larr; Back
         </button>
         <iframe
           src={(() => {
