@@ -186,7 +186,7 @@ export const GlobalEvents = () => {
   if (loading) {
     return (
       <div className="flex justify-center p-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-600"></div>
       </div>
     );
   }
@@ -195,8 +195,8 @@ export const GlobalEvents = () => {
     <div className="space-y-4 pb-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="bg-amber-100 p-2 rounded-lg">
-            <Globe className="w-6 h-6 text-amber-600" />
+          <div className="bg-slate-100 p-2 rounded-lg">
+            <Globe className="w-6 h-6 text-slate-600" />
           </div>
           <div>
             <h1 className="text-2xl font-bold">Global Events</h1>
@@ -205,7 +205,7 @@ export const GlobalEvents = () => {
         </div>
         <button
           onClick={() => { resetForm(); setShowForm(!showForm); }}
-          className="flex items-center justify-center gap-1 px-4 py-2.5 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700"
+          className="flex items-center justify-center gap-1 px-4 py-2.5 bg-slate-800 text-white rounded-lg text-sm font-medium hover:bg-slate-700"
         >
           <Plus className="w-4 h-4" /> New Global Event
         </button>
@@ -218,27 +218,27 @@ export const GlobalEvents = () => {
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Event Title *</label>
               <input type="text" value={form.title} onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500" required />
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500" required />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Date *</label>
               <input type="date" value={form.date} onChange={(e) => setForm(f => ({ ...f, date: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500" required />
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500" required />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Time *</label>
               <input type="time" value={form.time} onChange={(e) => setForm(f => ({ ...f, time: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500" required />
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500" required />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Location *</label>
               <input type="text" value={form.location} onChange={(e) => setForm(f => ({ ...f, location: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500" required />
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500" required />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
               <select value={form.type} onChange={(e) => setForm(f => ({ ...f, type: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500">
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500">
                 <option value="concert">Concert</option>
                 <option value="rehearsal">Rehearsal</option>
                 <option value="social">Social / Gathering</option>
@@ -248,7 +248,7 @@ export const GlobalEvents = () => {
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
               <textarea value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))}
-                rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500" />
+                rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500" />
             </div>
           </div>
 
@@ -264,7 +264,7 @@ export const GlobalEvents = () => {
                 placeholder="Search songs..."
                 value={songSearch}
                 onChange={(e) => setSongSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500"
+                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500"
               />
             </div>
             {selectedSongIds.length > 0 && (
@@ -272,10 +272,10 @@ export const GlobalEvents = () => {
                 {selectedSongIds.map(id => {
                   const song = allSongs.find(s => s.id === id);
                   return song ? (
-                    <span key={id} className="inline-flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-medium">
+                    <span key={id} className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-800 rounded-full text-xs font-medium">
                       {song.title}
                       <button type="button" onClick={() => setSelectedSongIds(prev => prev.filter(s => s !== id))}
-                        className="text-amber-600 hover:text-amber-800 font-bold">×</button>
+                        className="text-slate-600 hover:text-slate-800 font-bold">×</button>
                     </span>
                   ) : null;
                 })}
@@ -293,10 +293,10 @@ export const GlobalEvents = () => {
                       );
                     }}
                     className={`w-full text-left px-3 py-2 text-sm border-b border-gray-100 last:border-0 flex items-center gap-2 hover:bg-gray-50 ${
-                      selectedSongIds.includes(song.id) ? 'bg-amber-50' : '' 
+                      selectedSongIds.includes(song.id) ? 'bg-slate-50' : '' 
                     }`}>
                     <span className={`w-4 h-4 rounded border flex items-center justify-center text-xs ${
-                      selectedSongIds.includes(song.id) ? 'bg-amber-500 border-amber-500 text-white' : 'border-gray-300' 
+                      selectedSongIds.includes(song.id) ? 'bg-slate-500 border-slate-800 text-white' : 'border-gray-300' 
                     }`}>
                       {selectedSongIds.includes(song.id) ? '✓' : '' }
                     </span>
@@ -308,7 +308,7 @@ export const GlobalEvents = () => {
           </div>
           <div className="flex gap-3">
             <button type="submit" disabled={saving}
-              className="px-6 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 disabled:bg-gray-400">
+              className="px-6 py-2 bg-slate-800 text-white rounded-lg text-sm font-medium hover:bg-slate-700 disabled:bg-gray-400">
               {saving ? 'Saving...' : editingId ? 'Update Event' : 'Create Event'}
             </button>
             <button type="button" onClick={resetForm}
@@ -326,20 +326,20 @@ export const GlobalEvents = () => {
           </h2>
           <div className="space-y-2">
             {upcoming.map((event) => (
-              <div key={event.id} className="bg-white rounded-lg p-4 border border-gray-100 flex items-center justify-between cursor-pointer hover:border-amber-200 transition" onClick={() => navigate(`/super-admin/events/${event.id}`)}>
+              <div key={event.id} className="bg-white rounded-lg p-4 border border-gray-100 flex items-center justify-between cursor-pointer hover:border-slate-200 transition" onClick={() => navigate(`/super-admin/events/${event.id}`)}>
                 <div className="flex items-center gap-3">
-                  <div className="bg-amber-100 rounded-lg p-2 text-center flex-shrink-0 w-12">
-                    <div className="text-lg font-bold text-amber-700">
+                  <div className="bg-slate-100 rounded-lg p-2 text-center flex-shrink-0 w-12">
+                    <div className="text-lg font-bold text-slate-700">
                       {new Date(event.date + 'T00:00:00').getDate()}
                     </div>
-                    <div className="text-xs text-amber-600 uppercase">
+                    <div className="text-xs text-slate-600 uppercase">
                       {new Date(event.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' })}
                     </div>
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900 text-sm flex items-center gap-1">
                       {event.title}
-                      <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Global</span>
+                      <span className="text-xs bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded-full">Global</span>
                     </h3>
                     <p className="text-xs text-gray-500 flex items-center gap-2">
                       <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {event.time}</span>

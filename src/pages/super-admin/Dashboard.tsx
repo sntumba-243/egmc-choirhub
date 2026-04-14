@@ -70,20 +70,20 @@ export const SuperAdminDashboard = () => {
   if (loading) {
     return (
       <div className="flex justify-center p-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-600"></div>
       </div>
     );
   }
 
   const statCards = [
-    { label: 'Churches', value: churches.length, icon: Church, color: 'amber', route: '/super-admin/churches' },
+    { label: 'Churches', value: churches.length, icon: Church, color: 'slate', route: '/super-admin/churches' },
     { label: 'Total Members', value: totalMembers, icon: Users, color: 'blue', route: '/super-admin/members' },
     { label: 'Songs', value: totalSongs, icon: Music, color: 'purple', route: '/super-admin/repertoire' },
     { label: 'Upcoming Events', value: totalEvents, icon: Calendar, color: 'green', route: '/super-admin/events' },
   ];
 
   const colorMap: Record<string, string> = {
-    amber: 'bg-amber-100',
+    slate: 'bg-slate-100',
     blue: 'bg-blue-100',
     purple: 'bg-purple-100',
     green: 'bg-green-100',
@@ -92,8 +92,8 @@ export const SuperAdminDashboard = () => {
   return (
     <div className="space-y-6 pb-8">
       <div className="flex items-center gap-3">
-        <div className="bg-amber-100 p-2 rounded-lg">
-          <Shield className="w-6 h-6 text-amber-600" />
+        <div className="bg-slate-100 p-2 rounded-lg">
+          <Shield className="w-6 h-6 text-slate-600" />
         </div>
         <div>
           <h1 className="text-2xl font-bold">Super Admin Dashboard</h1>
@@ -127,7 +127,7 @@ export const SuperAdminDashboard = () => {
           </h2>
           <button
             onClick={() => navigate('/super-admin/churches/new')}
-            className="flex items-center gap-1 px-3 py-1.5 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700"
+            className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 text-white rounded-lg text-sm font-medium hover:bg-slate-700"
           >
             <Plus className="w-4 h-4" /> Add Church
           </button>

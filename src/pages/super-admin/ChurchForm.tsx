@@ -252,7 +252,7 @@ export const ChurchForm = () => {
   if (loading) {
     return (
       <div className="flex justify-center p-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-600"></div>
       </div>
     );
   }
@@ -267,8 +267,8 @@ export const ChurchForm = () => {
       </button>
 
       <div className="flex items-center gap-3 mb-6">
-        <div className="bg-amber-100 p-2 rounded-lg">
-          <Church className="w-6 h-6 text-amber-600" />
+        <div className="bg-slate-100 p-2 rounded-lg">
+          <Church className="w-6 h-6 text-slate-600" />
         </div>
         <h1 className="text-2xl font-bold">{isEdit ? 'Edit Church' : 'Add New Church'}</h1>
       </div>
@@ -278,55 +278,55 @@ export const ChurchForm = () => {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Church Name *</label>
             <input type="text" value={form.name} onChange={(e) => handleChange('name', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500" required />
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500" required />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Short Name *</label>
             <input type="text" value={form.short_name} onChange={(e) => handleChange('short_name', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500" required maxLength={10} />
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500" required maxLength={10} />
           </div>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Pastor / Leader Name</label>
           <input type="text" value={form.pastor_name} onChange={(e) => handleChange('pastor_name', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500" />
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500" />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Contact Email</label>
             <input type="email" value={form.contact_email} onChange={(e) => handleChange('contact_email', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500" />
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Contact Phone</label>
             <input type="tel" value={form.contact_phone} onChange={(e) => handleChange('contact_phone', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500" />
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500" />
           </div>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
           <input type="text" value={form.address} onChange={(e) => handleChange('address', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500" />
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500" />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
             <input type="text" value={form.city} onChange={(e) => handleChange('city', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500" />
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
             <input type="text" value={form.country} onChange={(e) => handleChange('country', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500" />
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
             <select value={form.timezone} onChange={(e) => handleChange('timezone', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500">
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500">
               <option value="UTC">UTC</option>
               <option value="America/New_York">US Eastern</option>
               <option value="America/Chicago">US Central</option>
@@ -356,7 +356,7 @@ export const ChurchForm = () => {
             value={adminEmail}
             onChange={(e) => setAdminEmail(e.target.value)}
             placeholder="admin@example.com"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
           />
           <p className="text-xs text-gray-400 mt-1">Email of the person who will manage this church. They must have an account.</p>
         </div>
@@ -415,7 +415,7 @@ export const ChurchForm = () => {
 
         <div className="flex gap-3 pt-4">
           <button type="submit" disabled={saving}
-            className="flex items-center gap-2 px-6 py-2.5 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700 disabled:bg-gray-400">
+            className="flex items-center gap-2 px-6 py-2.5 bg-slate-800 text-white rounded-lg font-medium hover:bg-slate-700 disabled:bg-gray-400">
             <Save className="w-4 h-4" />
             {saving ? 'Saving...' : isEdit ? 'Update Church' : 'Create Church'}
           </button>
@@ -445,13 +445,13 @@ export const ChurchForm = () => {
               <div>
                 <p className="text-xs text-gray-500 font-medium">Temporary Password</p>
                 <div className="flex items-center gap-2">
-                  <p className="text-sm font-mono font-semibold text-gray-900 bg-amber-50 px-2 py-1 rounded border border-amber-200">{generatedPassword}</p>
+                  <p className="text-sm font-mono font-semibold text-gray-900 bg-slate-50 px-2 py-1 rounded border border-slate-200">{generatedPassword}</p>
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(generatedPassword);
                       toast.success('Password copied!');
                     }}
-                    className="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded font-medium hover:bg-amber-200"
+                    className="text-xs px-2 py-1 bg-slate-100 text-slate-700 rounded font-medium hover:bg-slate-200"
                   >
                     Copy
                   </button>
@@ -467,7 +467,7 @@ export const ChurchForm = () => {
                 setGeneratedPassword(null);
                 navigate('/super-admin/churches');
               }}
-              className="w-full py-2.5 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700 text-sm"
+              className="w-full py-2.5 bg-slate-800 text-white rounded-lg font-medium hover:bg-slate-700 text-sm"
             >
               Done — Go to Churches
             </button>
