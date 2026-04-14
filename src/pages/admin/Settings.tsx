@@ -120,7 +120,7 @@ export const AdminSettings: React.FC = () => {
       </button>
 
       {/* Church Theme */}
-      <a href="/admin/theme" className="block bg-white rounded-xl shadow-sm p-4 border border-gray-200 hover:shadow-md hover:border-gray-300 transition-all group">
+      <a href="../theme" className="block bg-white rounded-xl shadow-sm p-4 border border-gray-200 hover:shadow-md hover:border-gray-300 transition-all group">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg theme-gradient flex items-center justify-center">
