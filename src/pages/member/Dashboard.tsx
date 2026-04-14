@@ -5,10 +5,14 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useChurch } from '../../contexts/ChurchContext';
 import { supabase } from '../../lib/supabase';
 import { getChurchNow, getChurchToday } from '../../lib/dateUtils';
+import { useTheme } from '../../styles/theme';
+import { PageCard } from '../../components/ui/PageCard';
+import { LoadingSkeleton } from '../../components/ui/LoadingSkeleton';
 
 export const MemberDashboard = () => {
   const { user } = useAuth();
   const { church } = useChurch();
+  const { accent, tokens } = useTheme();
   const navigate = useNavigate();
 
   const [songsCount, setSongsCount] = useState(0);
@@ -96,9 +100,6 @@ export const MemberDashboard = () => {
     return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   };
 
-  const getEventMonth = (d: string) => parseDate(d).toLocaleDateString('en-US', { month: 'short' });
-  const getEventDay = (d: string) => parseDate(d).getDate();
-
   const formatTime = (t: string) => {
     if (!t) return '';
     const [h, m] = t.split(':');
@@ -110,16 +111,20 @@ export const MemberDashboard = () => {
 
   const v = (n: number) => loading ? '–' : n;
 
+  if (loading) {
+    return <LoadingSkeleton variant="dashboard" />;
+  }
+
   return (
     <div className="space-y-4 pb-8">
-      
+
 
         {/* Greeting */}
         <div className="pt-1">
-          <p style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#c47a30' }}>
+          <p style={{ fontSize: tokens.fontSize.xs, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: accent.primary }}>
             {greeting}
           </p>
-          <h1 style={{ fontSize: '26px', fontWeight: 800, color: '#2c1810', marginTop: '2px' }}>
+          <h1 style={{ fontSize: '26px', fontWeight: 800, color: accent.primaryDark, marginTop: '2px' }}>
             {firstName} 👋
           </h1>
         </div>
@@ -130,12 +135,12 @@ export const MemberDashboard = () => {
             {messagesCount > 0 && (
               <button onClick={() => navigate('/member/messages')}
                 className="w-full flex items-center gap-3 active:scale-[0.98] transition-all"
-                style={{ background: '#FFF5EB', border: '1px solid #FFE0C4', borderRadius: '16px', padding: '12px 16px' }}>
-                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: '#FF6B35', animation: 'pulse 2s infinite' }} />
-                <span className="flex-1 text-left" style={{ fontSize: '13px', color: '#5a3a1e', fontWeight: 600 }}>
+                style={{ background: accent.primaryLight, border: `1px solid ${accent.secondary}33`, borderRadius: tokens.radius.xl, padding: '12px 16px' }}>
+                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: accent.primary, animation: 'pulse 2s infinite' }} />
+                <span className="flex-1 text-left" style={{ fontSize: '13px', color: accent.primaryDark, fontWeight: 600 }}>
                   {messagesCount} unread message{messagesCount > 1 ? 's' : ''}
                 </span>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: 'white', background: '#FF6B35', borderRadius: '10px', padding: '2px 9px' }}>
+                <span style={{ fontSize: tokens.fontSize.xs, fontWeight: 700, color: 'white', background: accent.primary, borderRadius: '10px', padding: '2px 9px' }}>
                   {messagesCount}
                 </span>
               </button>
@@ -143,12 +148,12 @@ export const MemberDashboard = () => {
             {assignmentsCount > 0 && (
               <button onClick={() => navigate('/member/vocal-coach')}
                 className="w-full flex items-center gap-3 active:scale-[0.98] transition-all"
-                style={{ background: '#F5F3FF', border: '1px solid #E9E5FF', borderRadius: '16px', padding: '12px 16px' }}>
+                style={{ background: '#F5F3FF', border: '1px solid #E9E5FF', borderRadius: tokens.radius.xl, padding: '12px 16px' }}>
                 <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: '#7C3AED', animation: 'pulse 2s infinite' }} />
                 <span className="flex-1 text-left" style={{ fontSize: '13px', color: '#3B1F7E', fontWeight: 600 }}>
                   {assignmentsCount} vocal assignment{assignmentsCount > 1 ? 's' : ''}
                 </span>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: 'white', background: '#7C3AED', borderRadius: '10px', padding: '2px 9px' }}>
+                <span style={{ fontSize: tokens.fontSize.xs, fontWeight: 700, color: 'white', background: '#7C3AED', borderRadius: '10px', padding: '2px 9px' }}>
                   {assignmentsCount}
                 </span>
               </button>
@@ -161,14 +166,14 @@ export const MemberDashboard = () => {
           <button onClick={() => navigate('/member/events/' + nextEvent.id)}
             className="w-full text-left active:scale-[0.98] transition-all relative overflow-hidden"
             style={{
-              background: 'linear-gradient(135deg, #FF8C42 0%, #FF6B35 50%, #E85D26 100%)',
+              background: accent.gradient,
               borderRadius: '22px', padding: '20px', color: 'white',
             }}>
             <div className="absolute rounded-full" style={{ top: '-30px', right: '-30px', width: '110px', height: '110px', background: 'rgba(255,255,255,0.1)' }} />
             <div className="absolute rounded-full" style={{ bottom: '-20px', left: '-20px', width: '80px', height: '80px', background: 'rgba(255,255,255,0.06)' }} />
             <p style={{ fontSize: '10px', opacity: 0.85, textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: 600 }}>Next Event</p>
             <p className="relative z-10" style={{ fontSize: '19px', fontWeight: 700, margin: '6px 0 4px' }}>{nextEvent.title}</p>
-            <p className="relative z-10" style={{ fontSize: '12px', opacity: 0.9 }}>{formatEventDate(nextEvent.date)}{nextEvent.time ? ` · ${formatTime(nextEvent.time)}` : ''}{nextEvent.location ? ` · ${nextEvent.location}` : ''}</p>
+            <p className="relative z-10" style={{ fontSize: tokens.fontSize.sm, opacity: 0.9 }}>{formatEventDate(nextEvent.date)}{nextEvent.time ? ` · ${formatTime(nextEvent.time)}` : ''}{nextEvent.location ? ` · ${nextEvent.location}` : ''}</p>
             <div className="absolute flex items-center justify-center"
               style={{ bottom: '18px', right: '18px', width: '34px', height: '34px', background: 'rgba(255,255,255,0.18)', borderRadius: '50%' }}>
               <ChevronRight className="w-4 h-4" />
@@ -177,22 +182,19 @@ export const MemberDashboard = () => {
         )}
 
         {/* Attendance */}
-        <div style={{
-          background: 'white', borderRadius: '18px', padding: '14px 16px',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.04)', border: '1px solid rgba(0,0,0,0.03)',
-        }}>
+        <PageCard style={{ padding: '14px 16px' }}>
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center" style={{ width: '36px', height: '36px', borderRadius: '12px', background: '#DCFCE7' }}>
+            <div className="flex items-center justify-center" style={{ width: '36px', height: '36px', borderRadius: tokens.radius.lg, background: '#DCFCE7' }}>
               <CheckCircle className="w-4 h-4" style={{ color: '#22c55e' }} />
             </div>
             <div>
               <p style={{ fontSize: '22px', fontWeight: 800, color: '#1a1a1a' }}>{v(attendanceCount)}</p>
               <p style={{ fontSize: '10px', color: '#999', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '1px' }}>
-                {loading ? '' : attendanceCount > 0 ? `event${attendanceCount !== 1 ? 's' : ''} attended` : 'No attendance recorded yet'}
+                {attendanceCount > 0 ? `event${attendanceCount !== 1 ? 's' : ''} attended` : 'No attendance recorded yet'}
               </p>
             </div>
           </div>
-        </div>
+        </PageCard>
 
         {/* Stats Row */}
         <div className="grid grid-cols-3 gap-2.5">
@@ -201,26 +203,22 @@ export const MemberDashboard = () => {
             { icon: Calendar, num: v(eventsCount), label: 'Events', bg: '#DBEAFE', color: '#3b82f6', route: '/member/calendar' },
             { icon: Heart, num: v(favoritesCount), label: 'Favorites', bg: '#FEE2E2', color: '#ef4444', route: '/member/repertoire?tab=favorites' },
           ].map((s) => (
-            <button key={s.label} onClick={() => navigate(s.route)}
+            <PageCard key={s.label} as="button" onClick={() => navigate(s.route)}
               className="active:scale-[0.96] transition-all"
-              style={{
-                background: 'white', borderRadius: '18px', padding: '14px 10px',
-                textAlign: 'center', boxShadow: '0 2px 10px rgba(0,0,0,0.04)',
-                border: '1px solid rgba(0,0,0,0.03)',
-              }}>
+              style={{ padding: '14px 10px', textAlign: 'center' }}>
               <div className="mx-auto flex items-center justify-center"
-                style={{ width: '36px', height: '36px', borderRadius: '12px', background: s.bg, fontSize: '16px', marginBottom: '6px' }}>
+                style={{ width: '36px', height: '36px', borderRadius: tokens.radius.lg, background: s.bg, fontSize: '16px', marginBottom: '6px' }}>
                 <s.icon className="w-4 h-4" style={{ color: s.color }} />
               </div>
               <p style={{ fontSize: '22px', fontWeight: 800, color: '#1a1a1a' }}>{s.num}</p>
               <p style={{ fontSize: '10px', color: '#999', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '1px' }}>{s.label}</p>
-            </button>
+            </PageCard>
           ))}
         </div>
 
         {/* Quick Access - Bento Grid */}
         <div>
-          <p style={{ fontSize: '11px', color: '#aaa', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '10px', paddingLeft: '4px' }}>
+          <p style={{ fontSize: tokens.fontSize.xs, color: '#aaa', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '10px', paddingLeft: '4px' }}>
             Quick Access
           </p>
           <div className="grid grid-cols-2 gap-2.5">
@@ -232,16 +230,12 @@ export const MemberDashboard = () => {
               { icon: Heart, label: 'Favorites', sub: `${v(favoritesCount)} saved`, bg: '#FEE2E2', color: '#ef4444', route: '/member/repertoire?tab=favorites' },
               { icon: Settings, label: 'Profile', sub: 'Settings', bg: '#F0FDF4', color: '#22c55e', route: '/member/profile' },
             ].map((item) => (
-              <button key={item.label} onClick={() => navigate(item.route)}
-                className="relative flex items-center gap-3 text-left active:scale-[0.97] transition-all"
-                style={{
-                  background: 'white', borderRadius: '18px', padding: '16px 14px',
-                  border: '1px solid rgba(0,0,0,0.03)',
-                  boxShadow: '0 2px 10px rgba(0,0,0,0.04)',
-                }}>
+              <PageCard key={item.label} as="button" onClick={() => navigate(item.route)}
+                className="relative flex items-center gap-3 active:scale-[0.97] transition-all"
+                style={{ padding: '16px 14px' }}>
                 <div className="flex items-center justify-center flex-shrink-0"
                   style={{ width: '42px', height: '42px', borderRadius: '14px', background: item.bg, fontSize: '18px' }}>
-                  <item.icon className="w-5 h-5" style={{ color: item.bg === '#F3E8FF' ? '#a855f7' : item.bg === '#DBEAFE' ? '#3b82f6' : item.bg === '#DCFCE7' ? '#22c55e' : item.bg === '#FEF3C7' ? '#f59e0b' : item.bg === '#FEE2E2' ? '#ef4444' : '#22c55e' }} />
+                  <item.icon className="w-5 h-5" style={{ color: item.color }} />
                 </div>
                 <div className="min-w-0">
                   <p style={{ fontSize: '13px', fontWeight: 700, color: '#1a1a1a' }}>{item.label}</p>
@@ -249,11 +243,11 @@ export const MemberDashboard = () => {
                 </div>
                 {item.badge ? (
                   <span className="absolute flex items-center justify-center"
-                    style={{ top: '10px', right: '10px', fontSize: '10px', fontWeight: 700, color: 'white', background: '#ef4444', borderRadius: '8px', padding: '1px 7px', minWidth: '20px' }}>
+                    style={{ top: '10px', right: '10px', fontSize: '10px', fontWeight: 700, color: 'white', background: '#ef4444', borderRadius: tokens.radius.md, padding: '1px 7px', minWidth: '20px' }}>
                     {item.badge}
                   </span>
                 ) : null}
-              </button>
+              </PageCard>
             ))}
           </div>
         </div>

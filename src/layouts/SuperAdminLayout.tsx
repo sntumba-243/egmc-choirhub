@@ -1,6 +1,7 @@
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Music, Church, Users, Calendar, Settings, LogOut, Menu, X, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../styles/theme';
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 
@@ -8,6 +9,7 @@ export default function SuperAdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { logout, user } = useAuth();
+  const { accent } = useTheme();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -44,7 +46,7 @@ export default function SuperAdminLayout() {
   ];
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="flex h-screen overflow-hidden" style={{ background: accent.primaryLight }}>
       <div
         className="lg:hidden fixed top-0 left-0 right-0 z-30 bg-white border-b border-gray-200 shadow-sm"
         style={{
@@ -55,10 +57,10 @@ export default function SuperAdminLayout() {
       >
         <div className="px-4 py-3 flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
+            <h1 className="text-lg font-bold" style={{ color: accent.primary }}>
               ChoirHub
             </h1>
-            <p className="text-xs text-gray-600 flex items-center gap-1">
+            <p className="text-xs flex items-center gap-1" style={{ color: accent.secondary }}>
               <Shield className="w-3 h-3" /> Super Admin
             </p>
           </div>
@@ -88,17 +90,20 @@ export default function SuperAdminLayout() {
         `}
       >
         <div className="hidden lg:block p-6 border-b border-gray-200">
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
+          <h1 className="text-2xl font-bold" style={{ color: accent.primary }}>
             ChoirHub
           </h1>
-          <p className="text-sm text-gray-600 mt-1 flex items-center gap-1">
+          <p className="text-sm mt-1 flex items-center gap-1" style={{ color: accent.secondary }}>
             <Shield className="w-4 h-4" /> Super Admin
           </p>
         </div>
 
-        <div className="p-4 border-b border-gray-200 bg-amber-50">
+        <div className="p-4 border-b border-gray-200" style={{ background: accent.primaryLight }}>
           <p className="text-sm font-medium text-gray-900">{user?.name || user?.email}</p>
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 mt-1 rounded-full text-xs font-semibold bg-amber-200 text-amber-900">
+          <span
+            className="inline-flex items-center gap-1 px-2 py-0.5 mt-1 rounded-full text-xs font-semibold"
+            style={{ background: accent.primary, color: 'white' }}
+          >
             <Shield className="w-3 h-3" /> Super Admin
           </span>
         </div>
@@ -117,9 +122,10 @@ export default function SuperAdminLayout() {
                 className={`
                   flex items-center gap-3 px-4 py-3 rounded-lg transition-all
                   ${isActive
-                    ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-md'
+                    ? 'text-white shadow-md'
                     : 'text-gray-700 hover:bg-gray-100 active:bg-gray-200'}
                 `}
+                style={isActive ? { background: accent.gradient } : undefined}
               >
                 <Icon className="w-5 h-5 flex-shrink-0" />
                 <span className="font-medium">{item.label}</span>

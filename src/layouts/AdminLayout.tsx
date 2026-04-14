@@ -2,6 +2,7 @@ import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { BarChart3, LayoutDashboard, Music, Users, Calendar, MessageSquare, Mic, Settings, LogOut, Menu, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useChurch } from '../contexts/ChurchContext';
+import { useTheme } from '../styles/theme';
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 
@@ -10,6 +11,7 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const { logout, user } = useAuth();
   const { church } = useChurch();
+  const { accent } = useTheme();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => { setSidebarOpen(false); }, [location]);
@@ -47,7 +49,7 @@ export default function AdminLayout() {
   const logoUrl = church?.logo_url;
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="flex h-screen overflow-hidden" style={{ background: accent.primaryLight }}>
       {/* Mobile Header */}
       <div
         className="lg:hidden fixed top-0 left-0 right-0 z-30 bg-white border-b border-gray-200 shadow-sm"
@@ -62,13 +64,13 @@ export default function AdminLayout() {
             {logoUrl ? (
               <img src={logoUrl} alt={churchName} className="h-8 max-h-[32px] rounded-lg object-contain" />
             ) : (
-              <div className="w-8 h-8 rounded-lg theme-gradient flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: accent.gradient }}>
                 <Music className="w-4 h-4 text-white" />
               </div>
             )}
             <div>
-              <h1 className="text-lg font-bold theme-text">{churchName}</h1>
-              <p className="text-xs text-gray-600">Admin Panel</p>
+              <h1 className="text-lg font-bold" style={{ color: accent.primaryDark }}>{churchName}</h1>
+              <p className="text-xs" style={{ color: accent.primary }}>Admin Panel</p>
             </div>
           </div>
           <button
@@ -93,13 +95,13 @@ export default function AdminLayout() {
             {logoUrl ? (
               <img src={logoUrl} alt={churchName} className="h-10 max-h-[40px] rounded-lg object-contain" />
             ) : (
-              <div className="w-10 h-10 rounded-lg theme-gradient flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: accent.gradient }}>
                 <Music className="w-5 h-5 text-white" />
               </div>
             )}
             <div className="min-w-0">
-              <h1 className="text-xl font-bold theme-text truncate">{churchName}</h1>
-              <p className="text-sm text-gray-600">Admin Panel</p>
+              <h1 className="text-xl font-bold truncate" style={{ color: accent.primaryDark }}>{churchName}</h1>
+              <p className="text-sm" style={{ color: accent.primary }}>Admin Panel</p>
             </div>
           </div>
         </div>
@@ -107,7 +109,7 @@ export default function AdminLayout() {
         {/* Mobile User Info */}
         <div className="lg:hidden p-4 border-b border-gray-200 bg-gray-50">
           <p className="text-sm font-medium text-gray-900">{user?.email}</p>
-          <p className="text-xs text-gray-600 mt-1">Administrator</p>
+          <p className="text-xs mt-1" style={{ color: accent.primary }}>Administrator</p>
         </div>
 
         {/* Navigation */}
@@ -121,7 +123,8 @@ export default function AdminLayout() {
                 key={item.path}
                 to={item.path}
                 onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive ? 'theme-active' : 'text-gray-700 hover:bg-gray-100 active:bg-gray-200'}`}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive ? 'text-white shadow-md' : 'text-gray-700 hover:bg-gray-100 active:bg-gray-200'}`}
+                style={isActive ? { background: accent.gradient } : undefined}
               >
                 <Icon className="w-5 h-5 flex-shrink-0" />
                 <span className="font-medium">{item.label}</span>

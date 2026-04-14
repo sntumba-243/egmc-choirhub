@@ -3,6 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { getDbClient } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Church, Users, Music, Calendar, Shield, Plus, ArrowRight } from 'lucide-react';
+import { useTheme } from '../../styles/theme';
+import { StatCard } from '../../components/ui/StatCard';
+import { PageCard } from '../../components/ui/PageCard';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { LoadingSkeleton } from '../../components/ui/LoadingSkeleton';
 
 interface ChurchStats {
   id: string;
@@ -16,6 +21,7 @@ interface ChurchStats {
 export const SuperAdminDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { accent, tokens } = useTheme();
   const [churches, setChurches] = useState<ChurchStats[]>([]);
   const [totalSongs, setTotalSongs] = useState(0);
   const [totalMembers, setTotalMembers] = useState(0);
@@ -68,32 +74,21 @@ export const SuperAdminDashboard = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex justify-center p-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600"></div>
-      </div>
-    );
+    return <LoadingSkeleton variant="dashboard" />;
   }
 
   const statCards = [
-    { label: 'Churches', value: churches.length, icon: Church, color: 'amber', route: '/super-admin/churches' },
-    { label: 'Total Members', value: totalMembers, icon: Users, color: 'blue', route: '/super-admin/members' },
-    { label: 'Songs', value: totalSongs, icon: Music, color: 'purple', route: '/super-admin/repertoire' },
-    { label: 'Upcoming Events', value: totalEvents, icon: Calendar, color: 'green', route: '/super-admin/events' },
+    { label: 'Churches', value: churches.length, icon: Church, iconBg: accent.primaryLight, iconColor: accent.primary, route: '/super-admin/churches' },
+    { label: 'Total Members', value: totalMembers, icon: Users, iconBg: '#DBEAFE', iconColor: '#2563EB', route: '/super-admin/members' },
+    { label: 'Songs', value: totalSongs, icon: Music, iconBg: '#F3E8FF', iconColor: '#9333EA', route: '/super-admin/repertoire' },
+    { label: 'Upcoming Events', value: totalEvents, icon: Calendar, iconBg: '#DCFCE7', iconColor: '#16A34A', route: '/super-admin/events' },
   ];
-
-  const colorMap: Record<string, string> = {
-    amber: 'bg-amber-100',
-    blue: 'bg-blue-100',
-    purple: 'bg-purple-100',
-    green: 'bg-green-100',
-  };
 
   return (
     <div className="space-y-6 pb-8">
       <div className="flex items-center gap-3">
-        <div className="bg-amber-100 p-2 rounded-lg">
-          <Shield className="w-6 h-6 text-amber-600" />
+        <div className="p-2 rounded-lg" style={{ background: accent.primaryLight }}>
+          <Shield className="w-6 h-6" style={{ color: accent.primary }} />
         </div>
         <div>
           <h1 className="text-2xl font-bold">Super Admin Dashboard</h1>
@@ -102,22 +97,17 @@ export const SuperAdminDashboard = () => {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {statCards.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <button
-              key={stat.label}
-              onClick={() => navigate(stat.route)}
-              className="bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition-all text-left border border-gray-100"
-            >
-              <div className={`${colorMap[stat.color]} p-2 rounded-lg w-fit mb-2`}>
-                <Icon className="w-5 h-5 text-gray-700" />
-              </div>
-              <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-              <p className="text-xs text-gray-600">{stat.label}</p>
-            </button>
-          );
-        })}
+        {statCards.map((stat) => (
+          <StatCard
+            key={stat.label}
+            label={stat.label}
+            value={stat.value}
+            icon={stat.icon}
+            iconBg={stat.iconBg}
+            iconColor={stat.iconColor}
+            onClick={() => navigate(stat.route)}
+          />
+        ))}
       </div>
 
       <div>
@@ -127,7 +117,8 @@ export const SuperAdminDashboard = () => {
           </h2>
           <button
             onClick={() => navigate('/super-admin/churches/new')}
-            className="flex items-center gap-1 px-3 py-1.5 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700"
+            className="flex items-center gap-1 px-3 py-1.5 text-white rounded-lg text-sm font-medium hover:opacity-90"
+            style={{ background: accent.primary }}
           >
             <Plus className="w-4 h-4" /> Add Church
           </button>
@@ -135,10 +126,12 @@ export const SuperAdminDashboard = () => {
 
         <div className="space-y-2">
           {churches.map((church) => (
-            <button
+            <PageCard
               key={church.id}
+              as="button"
               onClick={() => navigate(`/super-admin/churches/${church.id}`)}
-              className="w-full bg-white rounded-lg p-4 border border-gray-100 hover:shadow-md transition-all text-left flex items-center justify-between"
+              className="hover:shadow-md transition-all flex items-center justify-between"
+              style={{ padding: tokens.spacing.lg }}
             >
               <div className="flex items-center gap-3">
                 {church.logo_url ? (
@@ -157,14 +150,11 @@ export const SuperAdminDashboard = () => {
                 </div>
               </div>
               <ArrowRight className="w-4 h-4 text-gray-400" />
-            </button>
+            </PageCard>
           ))}
 
           {churches.length === 0 && (
-            <div className="bg-white rounded-lg p-8 text-center border border-gray-100">
-              <Church className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-              <p className="text-gray-500">No churches yet</p>
-            </div>
+            <EmptyState icon={Church} message="No churches yet" />
           )}
         </div>
       </div>
