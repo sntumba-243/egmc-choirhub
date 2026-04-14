@@ -36,6 +36,9 @@ src/pages/admin/EventForm.tsx.setlist-backup
 *.backup*
 .env*.local
 
+# Test coverage
+coverage/
+
 # Neon backup database
 neon-server.js
 export_supabase_to_neon.js

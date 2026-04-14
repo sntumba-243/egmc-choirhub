@@ -72,6 +72,27 @@ export function setupMessageListener(callback: (payload: any) => void) {
   });
 }
 
+// Register service worker and pass Firebase config
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/firebase-messaging-sw.js').then((registration) => {
+    registration.active?.postMessage({
+      type: 'FIREBASE_CONFIG',
+      config: firebaseConfig,
+    });
+    // Also post when the SW activates (first install)
+    registration.addEventListener('updatefound', () => {
+      registration.installing?.addEventListener('statechange', (e) => {
+        if ((e.target as ServiceWorker).state === 'activated') {
+          registration.active?.postMessage({
+            type: 'FIREBASE_CONFIG',
+            config: firebaseConfig,
+          });
+        }
+      });
+    });
+  });
+}
+
 // Store device token in database
 export async function storeDeviceToken(userId: string, token: string) {
   try {
