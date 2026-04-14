@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { RefreshCw, FolderOpen, CheckCircle, AlertCircle, Palette } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { googleDriveService } from '../../lib/googleDrive';
 import toast from 'react-hot-toast';
 
 export const AdminSettings: React.FC = () => {
+  const location = useLocation();
+  const isSuperAdmin = location.pathname.startsWith('/super-admin');
+  const themePath = isSuperAdmin ? '/super-admin/theme' : '/admin/theme';
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<{ added: number; skipped: number; errors: number } | null>(null);
 
@@ -120,7 +124,7 @@ export const AdminSettings: React.FC = () => {
       </button>
 
       {/* Church Theme */}
-      <a href="../theme" className="block bg-white rounded-xl shadow-sm p-4 border border-gray-200 hover:shadow-md hover:border-gray-300 transition-all group">
+      <Link to={themePath} className="block bg-white rounded-xl shadow-sm p-4 border border-gray-200 hover:shadow-md hover:border-gray-300 transition-all group">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg theme-gradient flex items-center justify-center">
@@ -133,7 +137,7 @@ export const AdminSettings: React.FC = () => {
           </div>
           <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
         </div>
-      </a>
+      </Link>
     </div>
   );
 };
