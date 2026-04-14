@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { getDbClient } from '../lib/supabase';
 import { neonAuth, NeonUser } from '../lib/neonAuth';
 import { autoFailover } from '../lib/autoFailover';
+import { Sentry } from '../lib/sentry';
 import toast from 'react-hot-toast';
 
 interface AuthContextType {
@@ -93,6 +94,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (error) throw new Error(error);
         if (user) {
           setUser(user);
+          Sentry.setUser({ id: user.id, email: user.email, role: user.role });
           toast.success('Login successful!');
           navigate(getRedirectPath(user));
         }
@@ -131,6 +133,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             };
 
             setUser(loggedInUser);
+            Sentry.setUser({ id: loggedInUser.id, email: loggedInUser.email, role: loggedInUser.role });
             // Pre-cache data for offline use
             if (loggedInUser.church_id) {
               preCacheUserData(supabase, loggedInUser.church_id).catch(() => {});
@@ -157,6 +160,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       setUser(null);
+      Sentry.setUser(null);
       toast.success('Logged out successfully');
       navigate('/login');
     } catch (error) {

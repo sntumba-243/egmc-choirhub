@@ -6,7 +6,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 );
 
-const FCM_API_URL = 'https://fcm.googleapis.com/v1/projects/***REMOVED***/messages:send';
+const FCM_API_URL = 'https://fcm.googleapis.com/v1/projects/egmc-choirhub-d712a/messages:send';
 const SERVER_API_KEY = 'BC9Zz1dHB0ucYMXShBPvv9cDYxxDqfy517FCrUNxR2YCGnDK8nbsHsJxfzhksL7P2kVLDwAizKjEtGzEij2Fls8';
 
 interface Event {

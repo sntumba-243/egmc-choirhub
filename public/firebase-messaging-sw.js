@@ -2,13 +2,13 @@ importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js');
 importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging.js');
 
 const firebaseConfig = {
-  apiKey: "***REMOVED***",
-  authDomain: "***REMOVED***.firebaseapp.com",
-  projectId: "***REMOVED***",
-  storageBucket: "***REMOVED***.firebasestorage.app",
-  messagingSenderId: "***REMOVED***",
-  appId: "1:***REMOVED***:web:b2850c69b3345857fae4a5",
-  measurementId: "***REMOVED***"
+  apiKey: "AIzaSyDPZRkBEJVmd6dU1a7e3w9Ln5GCy6ylrBE",
+  authDomain: "egmc-choirhub-d712a.firebaseapp.com",
+  projectId: "egmc-choirhub-d712a",
+  storageBucket: "egmc-choirhub-d712a.firebasestorage.app",
+  messagingSenderId: "330400833344",
+  appId: "1:330400833344:web:b2850c69b3345857fae4a5",
+  measurementId: "G-VGZVEFB1ED"
 };
 
 firebase.initializeApp(firebaseConfig);

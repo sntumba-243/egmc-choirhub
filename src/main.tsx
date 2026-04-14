@@ -4,8 +4,10 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import { registerServiceWorker, startVersionPolling } from './serviceWorkerUtils';
+import { initSentry } from './lib/sentry';
 import './index.css';
 
+initSentry();
 registerServiceWorker();
 startVersionPolling();
 

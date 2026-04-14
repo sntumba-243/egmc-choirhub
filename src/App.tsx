@@ -1,6 +1,7 @@
 import { OfflineBanner } from "./components/OfflineBanner";
 import { useEffect } from 'react';
 import { lazy, Suspense } from 'react';
+import { Sentry } from './lib/sentry';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ChurchProvider } from './contexts/ChurchContext';
@@ -84,11 +85,22 @@ const Submissions = lazy(() => import('./pages/admin/Submissions'));
 
 function App() {
   return (
+    <Sentry.ErrorBoundary fallback={
+      <div className='min-h-screen flex items-center justify-center'>
+        <div className='text-center p-8'>
+          <h2 className='text-xl font-semibold text-gray-800 mb-2'>Something went wrong</h2>
+          <p className='text-gray-500 mb-4'>Our team has been notified. Please refresh the page.</p>
+          <button onClick={() => window.location.reload()} className='px-4 py-2 bg-blue-600 text-white rounded-lg'>
+            Refresh
+          </button>
+        </div>
+      </div>
+    }>
     <AuthProvider>
       <ChurchProvider>
       <OfflineBanner />
       <AppRoutes />
-      <Toaster 
+      <Toaster
         position="top-center"
         toastOptions={{
           duration: 2500,
@@ -117,6 +129,7 @@ function App() {
       <NativeUpdateBanner />
     </ChurchProvider>
     </AuthProvider>
+    </Sentry.ErrorBoundary>
   );
 }
 

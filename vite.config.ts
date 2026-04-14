@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
 import path from 'path';
 import { writeFileSync, readFileSync } from 'fs';
 
@@ -27,7 +28,18 @@ export default defineConfig({
   define: {
     __APP_BUILD_VERSION__: JSON.stringify(getBuildVersion()),
   },
-  plugins: [react(), versionPlugin],
+  plugins: [
+    react(),
+    versionPlugin,
+    sentryVitePlugin({
+      org: 'o4511217496227841',
+      project: 'choirhub',
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+    }),
+  ],
+  build: {
+    sourcemap: true,
+  },
   server: {
     host: '0.0.0.0',
     port: 5173,
