@@ -145,7 +145,7 @@ function AppRoutes() {
       <Route path="/register" element={!user ? <Register /> : <Navigate to={user.is_super_admin ? '/super-admin' : user.role === 'admin' ? '/admin' : '/member'} />} />
 
       {/* PDF Viewer */}
-      <Route path="/pdf-viewer" element={<PDFViewerPage />} />
+      <Route path="/pdf-viewer" element={<ProtectedRoute requiredRole="member"><PDFViewerPage /></ProtectedRoute>} />
 
       {/* Super Admin Routes */}
       <Route path="/super-admin" element={

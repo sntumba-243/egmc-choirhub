@@ -41,13 +41,24 @@ export const MemberForm: React.FC = () => {
 
   const loadMember = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('members')
         .select('*')
-        .eq('id', memberId)
-        .single();
+        .eq('id', memberId);
+
+      // Scope to user's church unless super admin
+      if (!isSuperAdmin && user?.church_id) {
+        query = query.eq('church_id', user.church_id);
+      }
+
+      const { data, error } = await query.single();
 
       if (error) throw error;
+      if (!data) {
+        toast.error('Member not found or access denied');
+        navigate(-1);
+        return;
+      }
       if (data) {
         setFirstName(data.first_name || '');
         setLastName(data.last_name || '');

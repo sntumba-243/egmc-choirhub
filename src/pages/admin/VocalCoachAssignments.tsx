@@ -82,6 +82,7 @@ const avatarColors = [
 ];
 
 export default function VocalCoachAssignments() {
+  const { church } = useChurch();
   const [members, setMembers] = useState<Member[]>([]);
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [songs, setSongs] = useState<Song[]>([]);
@@ -175,7 +176,9 @@ export default function VocalCoachAssignments() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const { data: membersData } = await supabase.from('members').select('id, first_name, last_name, email, voice_part').eq('role', 'member').order('first_name');
+      let membersQuery = supabase.from('members').select('id, first_name, last_name, email, voice_part').eq('role', 'member').order('first_name');
+      if (church?.id) membersQuery = membersQuery.eq('church_id', church.id);
+      const { data: membersData } = await membersQuery;
       setMembers(membersData || []);
 
       const { data: exercisesData } = await supabase.from('smart_coach_exercises').select('id, title, description, exercise_type, difficulty').order('created_at', { ascending: false }).limit(50);

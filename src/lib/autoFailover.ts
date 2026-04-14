@@ -77,38 +77,36 @@ export class AutoFailover {
     if (typeof window !== 'undefined') {
       const notification = document.createElement('div');
       notification.id = 'failover-notification';
-      notification.innerHTML = `
-        <div style="
-          position: fixed;
-          top: 20px;
-          right: 20px;
-          background: #FFA500;
-          color: white;
-          padding: 16px 20px;
-          border-radius: 8px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-          z-index: 9999;
-          max-width: 350px;
-          font-family: system-ui, -apple-system, sans-serif;
-          font-size: 14px;
-        ">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <span style="font-size: 20px;">⚠️</span>
-            <div>
-              <strong>Running on Backup Database</strong>
-              <div style="font-size: 12px; margin-top: 4px; opacity: 0.9;">
-                Primary database unavailable. Using Neon backup.
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-      
+      Object.assign(notification.style, {
+        position: 'fixed', top: '20px', right: '20px',
+        background: '#FFA500', color: 'white', padding: '16px 20px',
+        borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        zIndex: '9999', maxWidth: '350px',
+        fontFamily: 'system-ui, -apple-system, sans-serif', fontSize: '14px',
+        display: 'flex', alignItems: 'center', gap: '10px',
+      });
+
+      const icon = document.createElement('span');
+      icon.style.fontSize = '20px';
+      icon.textContent = '\u26A0\uFE0F';
+
+      const text = document.createElement('div');
+      const title = document.createElement('strong');
+      title.textContent = 'Running on Backup Database';
+      const desc = document.createElement('div');
+      Object.assign(desc.style, { fontSize: '12px', marginTop: '4px', opacity: '0.9' });
+      desc.textContent = 'Primary database unavailable. Using Neon backup.';
+      text.appendChild(title);
+      text.appendChild(desc);
+
+      notification.appendChild(icon);
+      notification.appendChild(text);
+
       // Remove after 10 seconds
       setTimeout(() => {
         document.getElementById('failover-notification')?.remove();
       }, 10000);
-      
+
       document.body.appendChild(notification);
     }
   }

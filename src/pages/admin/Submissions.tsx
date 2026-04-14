@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Play, Pause, Mic, Square, Send, RotateCcw, Clock, CheckCircle, ChevronDown, ChevronRight, User } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface Submission {
   id: string;
@@ -25,6 +26,7 @@ interface MemberWithSubmissions {
 }
 
 export default function Submissions() {
+  const { user } = useAuth();
   const [members, setMembers] = useState<MemberWithSubmissions[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedMember, setExpandedMember] = useState<string | null>(null);
@@ -45,28 +47,41 @@ export default function Submissions() {
 
   const fetchSubmissions = async () => {
     try {
-      // Fetch all submissions with song info
+      // First get members scoped to this church
+      let churchMembersQuery = supabase
+        .from('members')
+        .select('id, first_name, last_name, email, voice_part');
+      if (user?.church_id) churchMembersQuery = churchMembersQuery.eq('church_id', user.church_id);
+      const { data: churchMembers, error: membersError } = await churchMembersQuery;
+
+      if (membersError) throw membersError;
+
+      const churchMemberIds = (churchMembers || []).map(m => m.id);
+      if (churchMemberIds.length === 0) {
+        setMembers([]);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch submissions only for this church's members
       const { data: submissions, error } = await supabase
         .from('song_submissions')
         .select(`*, song:songs(title)`)
+        .in('member_id', churchMemberIds)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Get unique member IDs
+      // Get unique member IDs from submissions
       const memberIds = [...new Set(submissions?.map(s => s.member_id) || [])];
-      
+
       if (memberIds.length === 0) {
         setMembers([]);
         setLoading(false);
         return;
       }
 
-      // Fetch member details
-      const { data: membersData, error: membersError } = await supabase
-        .from('members')
-        .select('id, first_name, last_name, email, voice_part')
-        .in('id', memberIds);
+      const membersData = churchMembers.filter(m => memberIds.includes(m.id));
 
       if (membersError) throw membersError;
 

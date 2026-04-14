@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Calendar, Clock, MapPin, Music, Eye, Trash2, Search, X, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface Event {
   id: string;
@@ -38,6 +39,7 @@ interface EventSong {
 export const AdminEventDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [event, setEvent] = useState<Event | null>(null);
   const [rsvps, setRsvps] = useState<RSVP[]>([]);
   const [eventSongs, setEventSongs] = useState<EventSong[]>([]);
@@ -62,6 +64,14 @@ export const AdminEventDetail = () => {
       ]);
 
       if (eventRes.error) throw eventRes.error;
+
+      // Verify event belongs to user's church (unless global)
+      if (eventRes.data && !eventRes.data.is_global && user?.church_id && eventRes.data.church_id !== user.church_id) {
+        toast.error('Access denied');
+        navigate('/admin/events');
+        return;
+      }
+
       setEvent(eventRes.data);
 
       // member_id stores auth.uid(), which equals members.id
