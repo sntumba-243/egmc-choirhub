@@ -39,6 +39,9 @@ src/pages/admin/EventForm.tsx.setlist-backup
 # Test coverage
 coverage/
 
+# Claude Code worktrees
+.claude/worktrees/
+
 # Neon backup database
 neon-server.js
 export_supabase_to_neon.js
