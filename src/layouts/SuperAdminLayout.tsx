@@ -82,7 +82,7 @@ export default function SuperAdminLayout() {
       <aside
         className={`
           fixed lg:static inset-y-0 left-0 z-50
-          w-64 bg-white border-r border-gray-200 flex flex-col
+          w-64 min-w-[256px] bg-white border-r border-gray-200 flex flex-col
           transform transition-transform duration-300 ease-in-out
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}

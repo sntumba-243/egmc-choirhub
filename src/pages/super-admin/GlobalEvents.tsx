@@ -193,7 +193,7 @@ export const GlobalEvents = () => {
 
   return (
     <div className="space-y-4 pb-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="bg-amber-100 p-2 rounded-lg">
             <Globe className="w-6 h-6 text-amber-600" />
@@ -205,7 +205,7 @@ export const GlobalEvents = () => {
         </div>
         <button
           onClick={() => { resetForm(); setShowForm(!showForm); }}
-          className="flex items-center gap-1 px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700"
+          className="flex items-center justify-center gap-1 px-4 py-2.5 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700"
         >
           <Plus className="w-4 h-4" /> New Global Event
         </button>
@@ -347,11 +347,11 @@ export const GlobalEvents = () => {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <button onClick={() => handleEdit(event)} className="p-1.5 hover:bg-gray-100 rounded text-gray-500">
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button onClick={(e) => { e.stopPropagation(); handleEdit(event); }} className="p-2 hover:bg-gray-100 rounded text-gray-500">
                     <Edit className="w-4 h-4" />
                   </button>
-                  <button onClick={() => handleDelete(event.id)} className="p-1.5 hover:bg-red-50 rounded text-red-500">
+                  <button onClick={(e) => { e.stopPropagation(); handleDelete(event.id); }} className="p-2 hover:bg-red-50 rounded text-red-500">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>

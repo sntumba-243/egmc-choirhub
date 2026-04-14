@@ -385,7 +385,7 @@ export const ChurchForm = () => {
                 <Upload className="w-3.5 h-3.5" />
                 {uploading ? 'Uploading...' : 'Upload Logo'}
               </button>
-              <p className="text-[10px] text-gray-400 mt-1">PNG or JPG, max 2MB</p>
+              <p className="text-xs text-gray-400 mt-1">PNG or JPG, max 2MB</p>
             </div>
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
           </div>
@@ -393,7 +393,7 @@ export const ChurchForm = () => {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Theme Colors</label>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <label className="text-xs text-gray-500">Primary</label>
               <input type="color" value={form.primary_color} onChange={(e) => handleChange('primary_color', e.target.value)}
@@ -425,55 +425,6 @@ export const ChurchForm = () => {
           </button>
         </div>
       </form>
-      {/* Generated Password Modal */}
-      {showPasswordModal && generatedPassword && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl">
-            <div className="text-center mb-4">
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <UserPlus className="w-6 h-6 text-green-600" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900">Admin Account Created</h3>
-              <p className="text-sm text-gray-500 mt-1">Share these credentials with the admin</p>
-            </div>
-            
-            <div className="bg-gray-50 rounded-lg p-4 space-y-3 mb-4">
-              <div>
-                <p className="text-xs text-gray-500 font-medium">Email</p>
-                <p className="text-sm font-mono font-semibold text-gray-900">{adminEmail}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 font-medium">Temporary Password</p>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-mono font-semibold text-gray-900 bg-amber-50 px-2 py-1 rounded border border-amber-200">{generatedPassword}</p>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(generatedPassword);
-                      toast.success('Password copied!');
-                    }}
-                    className="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded font-medium hover:bg-amber-200"
-                  >
-                    Copy
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <p className="text-xs text-red-500 mb-4">⚠️ This password will not be shown again. Please save it now.</p>
-
-            <button
-              onClick={() => {
-                setShowPasswordModal(false);
-                setGeneratedPassword(null);
-                navigate('/super-admin/churches');
-              }}
-              className="w-full py-2.5 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700 text-sm"
-            >
-              Done — Go to Churches
-            </button>
-          </div>
-        </div>
-      )}
       {/* Generated Password Modal */}
       {showPasswordModal && generatedPassword && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
