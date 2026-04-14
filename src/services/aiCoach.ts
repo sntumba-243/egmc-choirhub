@@ -1,9 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
-
-const anthropic = new Anthropic({
-  apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY,
-  dangerouslyAllowBrowser: true, // Only for development
-});
+import { supabase } from '../lib/supabase';
 
 interface VocalAnalysis {
   exerciseTitle: string;
@@ -19,15 +14,19 @@ interface VocalAnalysis {
   practiceHistory?: any[];
 }
 
+async function getAuthToken(): Promise<string | null> {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token ?? null;
+}
+
 export const aiCoachService = {
   /**
-   * Generate personalized AI feedback using Claude
+   * Generate personalized AI feedback using Claude (via server-side API)
    */
   async generatePersonalizedFeedback(analysis: VocalAnalysis): Promise<string> {
     try {
-      console.log('🔑 API Key exists:', !!import.meta.env.VITE_ANTHROPIC_API_KEY);
       console.log('📊 Analysis:', analysis);
-      
+
       const avgScore = (
         analysis.scores.pitch_accuracy +
         analysis.scores.timing_accuracy +
@@ -58,21 +57,36 @@ Please provide:
 
 Keep the tone warm, supportive, and motivating. Use emojis where appropriate. Be concise but specific.`;
 
-      console.log('🤖 Calling Claude API...');
-      
-      const message = await anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 500,
-        messages: [{
-          role: 'user',
-          content: prompt
-        }]
+      console.log('🤖 Calling AI Coach API...');
+
+      const token = await getAuthToken();
+      if (!token) {
+        throw new Error('Not authenticated');
+      }
+
+      const res = await fetch('/api/ai-coach', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 500,
+          messages: [{ role: 'user', content: prompt }],
+        }),
       });
 
-      console.log('✅ Claude API response received!');
+      if (!res.ok) {
+        throw new Error(`API error: ${res.status}`);
+      }
 
-      const feedback = message.content[0].type === 'text' 
-        ? message.content[0].text 
+      const message = await res.json();
+
+      console.log('✅ AI Coach API response received!');
+
+      const feedback = message.content[0].type === 'text'
+        ? message.content[0].text
         : 'Great practice session! Keep up the good work!';
 
       console.log('📝 Generated feedback:', feedback);
@@ -80,7 +94,7 @@ Keep the tone warm, supportive, and motivating. Use emojis where appropriate. Be
 
     } catch (error) {
       console.error('❌ Error generating AI feedback:', error);
-      
+
       // Fallback feedback if API fails
       const avgScore = (
         analysis.scores.pitch_accuracy +
