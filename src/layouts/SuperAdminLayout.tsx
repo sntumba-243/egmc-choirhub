@@ -56,7 +56,7 @@ export default function SuperAdminLayout() {
         <div className="px-4 py-3 flex items-center justify-between">
           <div>
             <h1 className="text-lg font-bold" style={{ color: '#1a2744' }}>
-              ChoirHub
+              ChoirOS
             </h1>
             <p className="text-xs flex items-center gap-1" style={{ color: '#378ADD' }}>
               <Shield className="w-3 h-3" /> Super Admin
@@ -89,7 +89,7 @@ export default function SuperAdminLayout() {
       >
         <div className="hidden lg:block p-6 border-b border-gray-200">
           <h1 className="text-2xl font-bold" style={{ color: '#1a2744' }}>
-            ChoirHub
+            ChoirOS
           </h1>
           <p className="text-sm mt-1 flex items-center gap-1" style={{ color: '#378ADD' }}>
             <Shield className="w-4 h-4" /> Super Admin

@@ -43,7 +43,7 @@ export default function MemberLayout() {
     { path: '/member/profile', icon: User, label: 'Profile' },
   ];
 
-  const churchName = church?.short_name || church?.name || 'ChoirHub';
+  const churchName = church?.short_name || church?.name || 'ChoirOS';
   const logoUrl = church?.logo_url;
 
   return (

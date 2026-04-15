@@ -178,7 +178,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister }) => {
             </div>
           )}
           <h1 className="font-bold tracking-tight" style={{ fontSize: '1.3rem', color: '#152640' }}>
-            {churchName || (<>Choir<span style={{ color: '#1e4480' }}>Hub</span></>)}
+            {churchName || (<>Choir<span style={{ color: '#1e4480' }}>OS</span></>)}
           </h1>
           <p
             className="font-light uppercase"

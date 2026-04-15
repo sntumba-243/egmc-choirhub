@@ -21,11 +21,20 @@ interface SongWithStatus extends Song {
   learning_status: 'learned' | 'learning' | 'not_started';
 }
 
+interface ChurchSong {
+  id: string;
+  title: string;
+  composer: string;
+  partition_url: string | null;
+}
+
 export const MemberRepertoire = () => {
   const { user } = useAuth();
   const { church } = useChurch();
   const [songs, setSongs] = useState<SongWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
+  const [churchSongs, setChurchSongs] = useState<ChurchSong[]>([]);
+  const [churchSongsLoading, setChurchSongsLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(false);
   const [viewingSong, setViewingSong] = useState<Song | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -61,7 +70,7 @@ export const MemberRepertoire = () => {
 
   // Initial data load
   useEffect(() => {
-    if (church?.id) { initData(); fetchFavorites(); }
+    if (church?.id) { initData(); fetchFavorites(); fetchChurchSongs(); }
   }, [church?.id]);
 
   // Refetch when page or filters change
@@ -168,6 +177,24 @@ export const MemberRepertoire = () => {
       setFavorites(new Set(data?.map(f => f.song_id) || []));
     } catch (error) {
       console.error('Error loading favorites:', error);
+    }
+  };
+
+  const fetchChurchSongs = async () => {
+    if (!church?.id) return;
+    setChurchSongsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('songs')
+        .select('id, title, composer, partition_url')
+        .eq('church_id', church.id)
+        .order('title', { ascending: true });
+      if (error) throw error;
+      setChurchSongs(data || []);
+    } catch (error) {
+      console.error('Error fetching church songs:', error);
+    } finally {
+      setChurchSongsLoading(false);
     }
   };
 
@@ -348,6 +375,32 @@ export const MemberRepertoire = () => {
               className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50">
               Next
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Church Songs */}
+      {churchSongs.length > 0 && (
+        <div className="mt-4">
+          <h2 className="text-lg font-bold text-gray-900 mb-2">Your Church Songs</h2>
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            {churchSongs.map((song, i) => (
+              <div key={song.id} className={`flex items-center gap-3 px-3 py-3 ${i !== churchSongs.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-gray-900">{song.title}</div>
+                  <div className="text-sm text-gray-400">{song.composer}</div>
+                </div>
+                {song.partition_url && (
+                  <button
+                    onClick={() => window.open(song.partition_url!, '_blank', 'noopener')}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors flex-shrink-0"
+                  >
+                    <Music className="w-3 h-3" />
+                    View Sheet Music
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}

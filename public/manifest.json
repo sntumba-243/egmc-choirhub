@@ -1,6 +1,6 @@
 {
-  "name": "ChoirHub",
-  "short_name": "ChoirHub",
+  "name": "ChoirOS",
+  "short_name": "ChoirOS",
   "description": "Choir management made simple",
   "start_url": "/",
   "display": "standalone",

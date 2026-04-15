@@ -1,121 +1,177 @@
 import React, { useState } from 'react';
-import { Music } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { Link } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 
-interface RegisterProps {
-  onNavigateToLogin: () => void;
-}
+export const Register: React.FC = () => {
+  const [submitted, setSubmitted] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [form, setForm] = useState({
+    churchName: '',
+    fullName: '',
+    email: '',
+    password: '',
+    churchSize: '',
+    plan: '',
+  });
 
-export const Register: React.FC<RegisterProps> = ({ onNavigateToLogin }) => {
-  const { register } = useAuth();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [voicePart, setVoicePart] = useState<'soprano' | 'alto' | 'tenor' | 'bass'>('soprano');
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      await register(email, password, name, voicePart);
-    } catch (error) {
-      alert('Registration failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitted(true);
+  };
+
+  const inputClass =
+    'w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-400 focus:border-transparent outline-none';
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-lg mx-auto">
+        {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-blue-900 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Music className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold text-blue-900 mb-2">Join Choir Portal</h1>
-          <p className="text-gray-600">Create your member account</p>
+          <Link to="/" className="font-bold text-2xl">
+            <span className="text-slate-800">Choir</span>
+            <span className="text-blue-600">OS</span>
+          </Link>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Full Name
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="John Doe"
-              required
-            />
-          </div>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+          {submitted ? (
+            <div className="text-center py-8">
+              <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-7 h-7 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-semibold text-slate-800 mb-2">Thanks!</h2>
+              <p className="text-gray-600">We will be in touch shortly.</p>
+              <Link to="/" className="inline-block mt-6 text-sm font-medium text-blue-600 hover:underline">
+                Back to homepage
+              </Link>
+            </div>
+          ) : (
+            <>
+              <h1 className="text-xl font-bold text-center text-slate-800 mb-1">
+                Start your free 30-day trial
+              </h1>
+              <p className="text-sm text-gray-500 text-center mb-6">No credit card required</p>
 
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="your@email.com"
-              required
-            />
-          </div>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Church name</label>
+                  <input
+                    type="text"
+                    name="churchName"
+                    value={form.churchName}
+                    onChange={handleChange}
+                    className={inputClass}
+                    placeholder="Grace Community Church"
+                    required
+                  />
+                </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="••••••••"
-              required
-              minLength={6}
-            />
-          </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Your full name</label>
+                  <input
+                    type="text"
+                    name="fullName"
+                    value={form.fullName}
+                    onChange={handleChange}
+                    className={inputClass}
+                    placeholder="John Doe"
+                    required
+                  />
+                </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Voice Part
-            </label>
-            <select
-              value={voicePart}
-              onChange={(e) => setVoicePart(e.target.value as any)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="soprano">Soprano</option>
-              <option value="alto">Alto</option>
-              <option value="tenor">Tenor</option>
-              <option value="bass">Bass</option>
-            </select>
-          </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={form.email}
+                    onChange={handleChange}
+                    className={inputClass}
+                    placeholder="you@church.org"
+                    required
+                  />
+                </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-900 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Creating account...' : 'Create Account'}
-          </button>
-        </form>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      name="password"
+                      value={form.password}
+                      onChange={handleChange}
+                      className={inputClass}
+                      style={{ paddingRight: '44px' }}
+                      placeholder="••••••••"
+                      required
+                      minLength={6}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
 
-        <p className="text-center text-gray-600 text-sm mt-6">
-          Already have an account?{' '}
-          <button
-            onClick={onNavigateToLogin}
-            className="text-blue-900 font-semibold hover:underline"
-          >
-            Sign in here
-          </button>
-        </p>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Church size</label>
+                  <select
+                    name="churchSize"
+                    value={form.churchSize}
+                    onChange={handleChange}
+                    className={inputClass}
+                    required
+                  >
+                    <option value="">Select size</option>
+                    <option value="under-20">Under 20 members</option>
+                    <option value="21-50">21-50 members</option>
+                    <option value="51-100">51-100 members</option>
+                    <option value="100+">100+ members</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Plan</label>
+                  <select
+                    name="plan"
+                    value={form.plan}
+                    onChange={handleChange}
+                    className={inputClass}
+                    required
+                  >
+                    <option value="">Select plan</option>
+                    <option value="starter">Starter — $19/month</option>
+                    <option value="growth">Growth — $39/month</option>
+                    <option value="multi-church">Multi-Church — $79/month</option>
+                  </select>
+                </div>
+
+                <button
+                  type="submit"
+                  className="bg-slate-800 text-white w-full py-3 rounded-lg font-medium hover:bg-slate-700 transition-colors"
+                >
+                  Create Free Account
+                </button>
+              </form>
+
+              <p className="text-sm text-gray-500 text-center mt-5">
+                Already have an account?{' '}
+                <Link to="/login" className="font-medium text-blue-600 hover:underline">
+                  Sign in
+                </Link>
+              </p>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

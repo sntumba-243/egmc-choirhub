@@ -24,6 +24,7 @@ import { requestNotificationPermission, setupMessageListener, storeDeviceToken }
 import { PDFViewerPage } from './components/PDFViewer';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
+import Landing from './pages/Landing';
 
 // Layouts
 import MemberLayout from './layouts/MemberLayout';
@@ -60,6 +61,7 @@ const ChurchThemeSettings = lazy(() => import("./pages/admin/ChurchThemeSettings
 import AdminVocalCoach from './pages/admin/VocalCoach';
 import VocalCoachAssignments from './pages/admin/VocalCoachAssignments';
 import AttendanceStats from './pages/admin/AttendanceStats';
+import ChurchSongs from './pages/admin/ChurchSongs';
 import { BulkSongEditor } from './pages/admin/BulkSongEditor';
 import { SongForm } from './pages/admin/SongForm';
 import { MemberForm } from './pages/admin/MemberForm';
@@ -226,6 +228,7 @@ function AppRoutes() {
         <Route path="messages" element={<AdminMessages />} />
         <Route path="settings" element={<AdminSettings />} />
         <Route path="theme" element={<Suspense fallback={<div className="flex items-center justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>}><ChurchThemeSettings /></Suspense>} />
+        <Route path="church-songs" element={<ChurchSongs />} />
         <Route path="bulk-edit" element={<BulkSongEditor />} />
         <Route path="members/new" element={<MemberForm />} />
         <Route path="members/:id/edit" element={<MemberForm />} />
@@ -235,14 +238,8 @@ function AppRoutes() {
         <Route path="messages/new" element={<MessageForm />} />        <Route path="vocal-coach" element={<AdminVocalCoach />} />        <Route path="vocal-coach/assignments" element={<VocalCoachAssignments />} />
       </Route>
 
-      {/* Root redirect */}
-      <Route path="/" element={
-        user ? (
-          <Navigate to={user.is_super_admin ? '/super-admin' : user.role === 'admin' ? '/admin' : '/member'} />
-        ) : (
-          <Navigate to="/login" />
-        )
-      } />
+      {/* Root — Landing handles its own auth redirect */}
+      <Route path="/" element={<Landing />} />
 
       {/* 404 */}
       <Route path="*" element={<Navigate to="/" />} />

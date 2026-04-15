@@ -1,5 +1,5 @@
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { BarChart3, LayoutDashboard, Music, Users, Calendar, MessageSquare, Mic, Settings, LogOut, Menu, X } from 'lucide-react';
+import { BarChart3, LayoutDashboard, Music, LibraryBig, Users, Calendar, MessageSquare, Mic, Settings, LogOut, Menu, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useChurch } from '../contexts/ChurchContext';
 import { useState, useEffect } from 'react';
@@ -35,6 +35,7 @@ export default function AdminLayout() {
   const navItems = [
     { path: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/admin/repertoire', icon: Music, label: 'Repertoire' },
+    { path: '/admin/church-songs', icon: LibraryBig, label: 'Church Songs' },
     { path: '/admin/members', icon: Users, label: 'Members' },
     { path: '/admin/events', icon: Calendar, label: 'Events' },
     { path: '/admin/attendance', icon: BarChart3, label: 'Attendance' },
@@ -43,7 +44,7 @@ export default function AdminLayout() {
     { path: '/admin/settings', icon: Settings, label: 'Settings' },
   ];
 
-  const churchName = church?.short_name || church?.name || 'ChoirHub';
+  const churchName = church?.short_name || church?.name || 'ChoirOS';
   const logoUrl = church?.logo_url;
 
   return (
