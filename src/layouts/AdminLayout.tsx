@@ -44,7 +44,7 @@ export default function AdminLayout() {
     { path: '/admin/settings', icon: Settings, label: 'Settings' },
   ];
 
-  const churchName = church?.short_name || church?.name || 'ChoirOS';
+  const churchName = church?.short_name || church?.name || 'ChoirHub';
   const logoUrl = church?.logo_url;
 
   return (

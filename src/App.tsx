@@ -23,8 +23,6 @@ import { requestNotificationPermission, setupMessageListener, storeDeviceToken }
 // PDF Viewer
 import { PDFViewerPage } from './components/PDFViewer';
 import { Login } from './pages/Login';
-import { Register } from './pages/Register';
-import Landing from './pages/Landing';
 
 // Layouts
 import MemberLayout from './layouts/MemberLayout';
@@ -157,7 +155,6 @@ function AppRoutes() {
     <Routes>
       {/* Public Routes */}
       <Route path="/login" element={!user ? <Login /> : <Navigate to={user.is_super_admin ? '/super-admin' : user.role === 'admin' ? '/admin' : '/member'} />} />
-      <Route path="/register" element={!user ? <Register /> : <Navigate to={user.is_super_admin ? '/super-admin' : user.role === 'admin' ? '/admin' : '/member'} />} />
 
       {/* PDF Viewer */}
       <Route path="/pdf-viewer" element={<ProtectedRoute requiredRole="member"><PDFViewerPage /></ProtectedRoute>} />
@@ -238,8 +235,14 @@ function AppRoutes() {
         <Route path="messages/new" element={<MessageForm />} />        <Route path="vocal-coach" element={<AdminVocalCoach />} />        <Route path="vocal-coach/assignments" element={<VocalCoachAssignments />} />
       </Route>
 
-      {/* Root — Landing handles its own auth redirect */}
-      <Route path="/" element={<Landing />} />
+      {/* Root redirect */}
+      <Route path="/" element={
+        user ? (
+          <Navigate to={user.is_super_admin ? '/super-admin' : user.role === 'admin' ? '/admin' : '/member'} />
+        ) : (
+          <Navigate to="/login" />
+        )
+      } />
 
       {/* 404 */}
       <Route path="*" element={<Navigate to="/" />} />
