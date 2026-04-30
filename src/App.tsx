@@ -59,6 +59,7 @@ const ChurchThemeSettings = lazy(() => import("./pages/admin/ChurchThemeSettings
 import AdminVocalCoach from './pages/admin/VocalCoach';
 import VocalCoachAssignments from './pages/admin/VocalCoachAssignments';
 import AttendanceStats from './pages/admin/AttendanceStats';
+import TakeAttendance from './pages/admin/TakeAttendance';
 import { BulkSongEditor } from './pages/admin/BulkSongEditor';
 import { SongForm } from './pages/admin/SongForm';
 import { MemberForm } from './pages/admin/MemberForm';
@@ -220,6 +221,8 @@ function AppRoutes() {
         <Route path="members" element={<AdminMembers />} />
         <Route path="events" element={<AdminEvents />} />
         <Route path="attendance" element={<AttendanceStats />} />
+        <Route path="attendance/take" element={<TakeAttendance />} />
+        <Route path="attendance/take/:eventId" element={<TakeAttendance />} />
                 <Route path="submissions" element={<Submissions />} />
         <Route path="messages" element={<AdminMessages />} />
         <Route path="settings" element={<AdminSettings />} />

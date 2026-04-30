@@ -1,5 +1,6 @@
 import { useChurch } from '../../contexts/ChurchContext';
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 
 interface MemberAttendance {
@@ -34,6 +35,7 @@ const getStatus = (rate: number, attended: number) => {
 };
 
 export default function AttendanceStats() {
+  const navigate = useNavigate();
   const [memberStats, setMemberStats] = useState<MemberAttendance[]>([]);
   const [loading, setLoading] = useState(true);
   const { church } = useChurch();
@@ -192,6 +194,14 @@ export default function AttendanceStats() {
 
   return (
     <div className="space-y-3 pb-8">
+      {/* Take Attendance CTA */}
+      <button
+        onClick={() => navigate('/admin/attendance/take')}
+        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-semibold shadow-sm transition-colors"
+      >
+        + Take Attendance for an Event
+      </button>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
