@@ -548,16 +548,18 @@ export const AdminRepertoire = () => {
                         onClick={(e) => { toggleFavorite(song.id, e); setActiveActionMenu(null); }}
                         className="w-full flex items-center gap-3 px-4 py-3.5 text-sm text-gray-700 hover:bg-gray-50 min-h-[44px] text-left"
                       >
-                        <span className="text-base">{isFav ? '\u2605' : '\u2606'}</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill={isFav ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} className={isFav ? 'text-amber-400' : 'text-gray-400'}>
+                          <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+                        </svg>
                         {isFav ? 'Remove favorite' : 'Add to favorites'}
                       </button>
                       <button
                         onClick={(e) => { handleStatusCycle(song.id, song.learning_status, e); setActiveActionMenu(null); }}
                         className="w-full flex items-center gap-3 px-4 py-3.5 text-sm text-gray-700 hover:bg-gray-50 min-h-[44px] text-left border-t border-gray-100"
                       >
-                        <span className="text-base">
-                          {song.learning_status === 'learned' ? '\u2705' : song.learning_status === 'learning' ? '\uD83D\uDCDA' : '\u23F3'}
-                        </span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
+                          <polyline points="20,6 9,17 4,12" />
+                        </svg>
                         Cycle status
                       </button>
                       {isSuperAdmin && (
@@ -566,14 +568,23 @@ export const AdminRepertoire = () => {
                             onClick={() => { setActiveActionMenu(null); navigate(`${song.id}/edit`); }}
                             className="w-full flex items-center gap-3 px-4 py-3.5 text-sm text-gray-700 hover:bg-gray-50 min-h-[44px] text-left border-t border-gray-100"
                           >
-                            <span className="text-base">\u270F\uFE0F</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
                             Edit song
                           </button>
                           <button
                             onClick={(e) => { handleDelete(song.id, e); setActiveActionMenu(null); }}
                             className="w-full flex items-center gap-3 px-4 py-3.5 text-sm text-red-500 hover:bg-red-50 min-h-[44px] text-left border-t border-gray-100"
                           >
-                            <span className="text-base">\uD83D\uDDD1\uFE0F</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="3,6 5,6 21,6" />
+                              <path d="M19,6l-1,14a2,2,0,0,1-2,2H8a2,2,0,0,1-2-2L5,6" />
+                              <path d="M10,11v6" />
+                              <path d="M14,11v6" />
+                              <path d="M9,6V4a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1v2" />
+                            </svg>
                             Delete
                           </button>
                         </>
