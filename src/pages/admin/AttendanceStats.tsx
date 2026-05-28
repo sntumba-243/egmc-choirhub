@@ -194,6 +194,14 @@ export default function AttendanceStats() {
 
   return (
     <div className="space-y-3 pb-8">
+      {/* Back to landing */}
+      <button
+        onClick={() => navigate('/admin/attendance')}
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900"
+      >
+        ← Attendance
+      </button>
+
       {/* Take Attendance CTA */}
       <button
         onClick={() => navigate('/admin/attendance/take')}

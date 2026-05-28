@@ -58,6 +58,7 @@ import { AdminSettings } from './pages/admin/Settings';
 const ChurchThemeSettings = lazy(() => import("./pages/admin/ChurchThemeSettings").then(m => ({ default: m.ChurchThemeSettings })));
 import AdminVocalCoach from './pages/admin/VocalCoach';
 import VocalCoachAssignments from './pages/admin/VocalCoachAssignments';
+import AttendanceLanding from './pages/admin/AttendanceLanding';
 import AttendanceStats from './pages/admin/AttendanceStats';
 import TakeAttendance from './pages/admin/TakeAttendance';
 import { BulkSongEditor } from './pages/admin/BulkSongEditor';
@@ -220,7 +221,8 @@ function AppRoutes() {
             <Route path="repertoire/:id/edit" element={<SongForm />} />
         <Route path="members" element={<AdminMembers />} />
         <Route path="events" element={<AdminEvents />} />
-        <Route path="attendance" element={<AttendanceStats />} />
+        <Route path="attendance" element={<AttendanceLanding />} />
+        <Route path="attendance/stats" element={<AttendanceStats />} />
         <Route path="attendance/take" element={<TakeAttendance />} />
         <Route path="attendance/take/:eventId" element={<TakeAttendance />} />
                 <Route path="submissions" element={<Submissions />} />
