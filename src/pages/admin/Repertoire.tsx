@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { Music, Search, Edit, Trash2, Star, Calendar, X, Loader2 } from 'lucide-react';
+import { Music, Search, Star, Calendar, X, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { useChurch } from '../../contexts/ChurchContext';
@@ -470,56 +470,47 @@ export const AdminRepertoire = () => {
           const isFav = favorites.has(song.id);
           const isSel = selectedSongs.has(song.id);
           return (
-            <div key={song.id}
-              className={`border-b border-gray-100 last:border-b-0 transition ${isSel ? 'bg-indigo-50' : ''}`}>
+            <div
+              key={song.id}
+              className={`flex items-center gap-3 px-3 py-3 border-b border-gray-100 last:border-b-0 transition ${isSel ? 'bg-indigo-50' : ''}`}
+            >
+              {/* Checkbox \u2014 admin only */}
+              <input
+                type="checkbox"
+                checked={isSel}
+                onChange={() => toggleSongSelection(song.id)}
+                onClick={(e) => e.stopPropagation()}
+                className="w-4 h-4 flex-shrink-0 accent-indigo-600"
+              />
 
-              {/* MOBILE: album-art row with 3-dot menu */}
-              <div
-                className="md:hidden relative flex items-center gap-3 px-4 py-3 border-b border-gray-100 last:border-b-0 min-h-[62px] active:bg-gray-50 cursor-pointer"
-                onClick={() => song.sheet_music_url && handleViewPDF(song)}
+              {/* Star/favorite \u2014 matches member portal */}
+              <button onClick={(e) => toggleFavorite(song.id, e)} className="flex-shrink-0 text-base leading-none">
+                <span className={isFav ? 'text-yellow-500' : 'text-gray-300'}>{isFav ? '\u2605' : '\u2606'}</span>
+              </button>
+
+              {/* Title + composer \u2014 matches member portal */}
+              <div className="flex-1 min-w-0 cursor-pointer" onClick={() => song.sheet_music_url && handleViewPDF(song)}>
+                <div className={`text-sm font-semibold ${song.sheet_music_url ? 'text-gray-900 active:text-orange-600' : 'text-gray-900'}`} style={{ whiteSpace: 'normal', overflow: 'visible' }}>{song.title}</div>
+                <div className="text-sm text-gray-400" style={{ whiteSpace: 'normal', overflow: 'visible' }}>{song.composer}</div>
+              </div>
+
+              {/* Language badge \u2014 matches member portal */}
+              <span className={`w-6 h-6 flex items-center justify-center rounded-full text-sm font-bold text-white flex-shrink-0 ${getLangColor(song.language)}`}>
+                {(song.language || '?').slice(0, 1)}
+              </span>
+
+              {/* Status \u2014 admin: tappable to cycle (uses existing handleStatusCycle which persists to church_song_status) */}
+              <button
+                onClick={(e) => handleStatusCycle(song.id, song.learning_status, e)}
+                className="flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center text-base leading-none hover:scale-110 active:scale-95 transition-transform"
+                title="Tap to change status"
               >
-                <input
-                  type="checkbox"
-                  checked={isSel}
-                  onChange={() => toggleSongSelection(song.id)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-4 h-4 flex-shrink-0 accent-indigo-600"
-                />
+                {song.learning_status === 'learned' ? '\u2705' : song.learning_status === 'learning' ? '\uD83D\uDCDA' : '\u23F3'}
+              </button>
 
-                {/* Colored initial square */}
-                <div
-                  className={`w-11 h-11 min-w-[44px] rounded-xl flex items-center justify-center text-base font-bold text-white flex-shrink-0 ${getLangColor(song.language)}`}
-                >
-                  {(song.title || '?').charAt(0).toUpperCase()}
-                </div>
-
-                {/* Title + composer + language badge */}
-                <div className="flex-1 min-w-0">
-                  <div className="text-[15px] font-medium text-gray-900 truncate leading-snug tracking-tight">
-                    {song.title}
-                    {isFav && <span className="ml-1.5 text-amber-400 text-xs">\u2605</span>}
-                  </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-[13px] text-gray-400 truncate min-w-0 flex-1">{song.composer || 'Unknown'}</span>
-                    {song.language && (
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md text-white flex-shrink-0 ${getLangColor(song.language)}`}>
-                        {song.language.charAt(0).toUpperCase()}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Status dot + 3-dot menu */}
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <div
-                    className="w-2 h-2 rounded-full"
-                    style={{
-                      background:
-                        song.learning_status === 'learned' ? '#34C759' :
-                        song.learning_status === 'learning' ? '#FF9F0A' :
-                        '#D1D1D6',
-                    }}
-                  />
+              {/* 3-dot menu \u2014 super admin only */}
+              {isSuperAdmin && (
+                <div className="relative flex-shrink-0">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -534,91 +525,38 @@ export const AdminRepertoire = () => {
                       <circle cx="2" cy="14" r="1.5" />
                     </svg>
                   </button>
-
                   {activeActionMenu === song.id && (
                     <div
-                      className="absolute right-4 top-full mt-1 bg-white border border-gray-100 rounded-2xl shadow-xl z-50 overflow-hidden min-w-[220px]"
+                      className="absolute right-0 top-full mt-1 bg-white border border-gray-100 rounded-2xl shadow-xl z-50 overflow-hidden min-w-[180px]"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <div className="px-4 py-3 border-b border-gray-100">
-                        <div className="text-sm font-semibold text-gray-900 truncate">{song.title}</div>
-                        <div className="text-xs text-gray-400 mt-0.5 truncate">{song.composer}</div>
-                      </div>
                       <button
-                        onClick={(e) => { toggleFavorite(song.id, e); setActiveActionMenu(null); }}
-                        className="w-full flex items-center gap-3 px-4 py-3.5 text-sm text-gray-700 hover:bg-gray-50 min-h-[44px] text-left"
+                        onClick={() => { setActiveActionMenu(null); navigate(`${song.id}/edit`); }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 min-h-[44px] text-left"
                       >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill={isFav ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} className={isFav ? 'text-amber-400' : 'text-gray-400'}>
-                          <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                         </svg>
-                        {isFav ? 'Remove favorite' : 'Add to favorites'}
+                        Edit song
                       </button>
                       <button
-                        onClick={(e) => { handleStatusCycle(song.id, song.learning_status, e); setActiveActionMenu(null); }}
-                        className="w-full flex items-center gap-3 px-4 py-3.5 text-sm text-gray-700 hover:bg-gray-50 min-h-[44px] text-left border-t border-gray-100"
+                        onClick={(e) => { handleDelete(song.id, e); setActiveActionMenu(null); }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-500 hover:bg-red-50 min-h-[44px] text-left border-t border-gray-100"
                       >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
-                          <polyline points="20,6 9,17 4,12" />
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="3,6 5,6 21,6" />
+                          <path d="M19,6l-1,14a2,2,0,0,1-2,2H8a2,2,0,0,1-2-2L5,6" />
+                          <path d="M10,11v6" />
+                          <path d="M14,11v6" />
+                          <path d="M9,6V4a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1v2" />
                         </svg>
-                        Cycle status
+                        Delete
                       </button>
-                      {isSuperAdmin && (
-                        <>
-                          <button
-                            onClick={() => { setActiveActionMenu(null); navigate(`${song.id}/edit`); }}
-                            className="w-full flex items-center gap-3 px-4 py-3.5 text-sm text-gray-700 hover:bg-gray-50 min-h-[44px] text-left border-t border-gray-100"
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
-                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                            </svg>
-                            Edit song
-                          </button>
-                          <button
-                            onClick={(e) => { handleDelete(song.id, e); setActiveActionMenu(null); }}
-                            className="w-full flex items-center gap-3 px-4 py-3.5 text-sm text-red-500 hover:bg-red-50 min-h-[44px] text-left border-t border-gray-100"
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="3,6 5,6 21,6" />
-                              <path d="M19,6l-1,14a2,2,0,0,1-2,2H8a2,2,0,0,1-2-2L5,6" />
-                              <path d="M10,11v6" />
-                              <path d="M14,11v6" />
-                              <path d="M9,6V4a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1v2" />
-                            </svg>
-                            Delete
-                          </button>
-                        </>
-                      )}
                     </div>
                   )}
                 </div>
-              </div>
-
-              {/* DESKTOP/TABLET: single-row layout */}
-              <div className="hidden md:flex items-center gap-3 px-3 py-3">
-                <input type="checkbox" checked={isSel} onChange={() => toggleSongSelection(song.id)} className="w-5 h-5 flex-shrink-0 accent-indigo-600" />
-                <button onClick={(e) => toggleFavorite(song.id, e)} className="flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center text-base leading-none">
-                  <span className={isFav ? 'text-yellow-500' : 'text-gray-300'}>{isFav ? '\u2605' : '\u2606'}</span>
-                </button>
-                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => song.sheet_music_url && handleViewPDF(song)}>
-                  <div className={`text-base font-semibold ${song.sheet_music_url ? 'text-gray-900 hover:text-indigo-600' : 'text-gray-900'}`} style={{ whiteSpace: 'normal', overflow: 'visible' }}>{song.title}</div>
-                  <div className="text-sm text-gray-400" style={{ whiteSpace: 'normal', overflow: 'visible' }}>{song.composer}</div>
-                </div>
-                <span className={`w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold text-white flex-shrink-0 ${getLangColor(song.language)}`}>
-                  {(song.language || '?').slice(0, 1)}
-                </span>
-                <button onClick={(e) => handleStatusCycle(song.id, song.learning_status, e)}
-                  className="flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center text-base leading-none hover:scale-125 active:scale-90 transition-transform"
-                  title="Tap to change status">
-                  {song.learning_status === 'learned' ? '\u2705' : song.learning_status === 'learning' ? '\uD83D\uDCDA' : '\u23F3'}
-                </button>
-                {isSuperAdmin && (
-                  <div className="flex flex-shrink-0">
-                    <button onClick={(e) => { e.stopPropagation(); navigate(`${song.id}/edit`); }} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded text-blue-500 hover:bg-blue-50"><Edit className="w-4 h-4" /></button>
-                    <button onClick={(e) => handleDelete(song.id, e)} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded text-red-400 hover:bg-red-50"><Trash2 className="w-4 h-4" /></button>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           );
         })}
