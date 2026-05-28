@@ -145,7 +145,7 @@ export const AdminMembers = () => {
         </div>
         <button
           onClick={() => navigate(isSuperAdmin ? '/super-admin/members/new' : '/admin/members/new')}
-          className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-500 text-white rounded-xl text-[13px] font-semibold hover:bg-blue-600 shadow-sm transition-all flex-shrink-0"
+          className="flex items-center gap-1.5 px-4 py-2 bg-blue-500 text-white rounded-xl text-[13px] font-semibold hover:bg-blue-600 shadow-sm transition-all flex-shrink-0 min-h-[44px]"
         >
           <Plus className="w-4 h-4" />
           <span>Add New</span>
@@ -194,7 +194,7 @@ export const AdminMembers = () => {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-3 py-1.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-xs"
+            className="px-3 py-1.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-xs min-h-[44px]"
           >
             <option value="all">All Status</option>
             <option value="active">Active</option>
@@ -204,7 +204,7 @@ export const AdminMembers = () => {
           <select
             value={filterRole}
             onChange={(e) => setFilterRole(e.target.value)}
-            className="px-3 py-1.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-xs"
+            className="px-3 py-1.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-xs min-h-[44px]"
           >
             <option value="all">All Roles</option>
             <option value="admin">Admin</option>

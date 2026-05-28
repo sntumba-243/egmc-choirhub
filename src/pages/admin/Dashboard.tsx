@@ -470,7 +470,7 @@ export const AdminDashboard = () => {
         </h2>
         <button
           onClick={sendEventReminders}
-          className="flex items-center gap-2 px-3 py-1.5 mb-2 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-1.5 mb-2 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 transition-colors min-h-[44px]"
         >
           <Bell className="w-3 h-3" />
           Send RSVP Reminders

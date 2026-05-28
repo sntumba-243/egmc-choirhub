@@ -246,7 +246,7 @@ export default function AttendanceLanding() {
             <div className="text-base font-medium text-gray-700">No rehearsal today</div>
             <button
               onClick={() => navigate('/admin/attendance/take')}
-              className="text-sm mt-1"
+              className="text-sm mt-1 block py-3 min-h-[44px]"
               style={{ color: primary }}
             >
               Take attendance for a past event →
@@ -391,7 +391,7 @@ export default function AttendanceLanding() {
 
                 <button
                   onClick={() => navigate('/admin/attendance/stats')}
-                  className="w-full mt-5 text-xs font-medium text-left"
+                  className="w-full mt-5 text-xs font-medium text-left min-h-[44px] flex items-center"
                   style={{ color: primary }}
                 >
                   View full choir health →

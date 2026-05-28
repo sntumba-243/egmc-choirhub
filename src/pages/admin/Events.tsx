@@ -216,13 +216,13 @@ export const AdminEvents = () => {
       </div>
 
       <div className="flex gap-1.5 overflow-x-auto pb-2 -mt-1">
-        <button onClick={() => setTimelineFilter('upcoming')} className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${timelineFilter === 'upcoming' ? 'bg-blue-500 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+        <button onClick={() => setTimelineFilter('upcoming')} className={`min-h-[44px] px-4 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${timelineFilter === 'upcoming' ? 'bg-blue-500 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
           Upcoming ({events.filter(e => !isPast(e.date, e.time)).length})
         </button>
-        <button onClick={() => setTimelineFilter('past')} className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${timelineFilter === 'past' ? 'bg-gray-500 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+        <button onClick={() => setTimelineFilter('past')} className={`min-h-[44px] px-4 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${timelineFilter === 'past' ? 'bg-gray-500 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
           Past ({events.filter(e => isPast(e.date, e.time)).length})
         </button>
-        <button onClick={() => setTimelineFilter('all')} className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${timelineFilter === 'all' ? 'bg-teal-500 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+        <button onClick={() => setTimelineFilter('all')} className={`min-h-[44px] px-4 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${timelineFilter === 'all' ? 'bg-teal-500 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
           All ({events.length})
         </button>
       </div>
@@ -260,7 +260,7 @@ export const AdminEvents = () => {
                       {(rsvpCounts[event.id] || 0) > 0 && (
                         <button
                           onClick={(e) => { e.stopPropagation(); handleResetRsvps(event.id, event.title); }}
-                          className="text-xs text-red-500 hover:text-red-600 font-medium"
+                          className="text-xs text-red-500 hover:text-red-600 font-medium p-2 min-h-[44px] min-w-[44px]"
                         >
                           Reset
                         </button>
@@ -272,7 +272,7 @@ export const AdminEvents = () => {
                   <div className="pt-1">
                     <button
                       onClick={(e) => { e.stopPropagation(); navigate(`/admin/attendance/take/${event.id}`); }}
-                      className="text-xs font-medium text-blue-600 hover:text-blue-800"
+                      className="text-xs font-medium text-blue-600 hover:text-blue-800 py-3 min-h-[44px] inline-flex items-center"
                     >
                       Take Attendance →
                     </button>
@@ -283,14 +283,14 @@ export const AdminEvents = () => {
               <div className="flex gap-1.5 px-3 pb-3 pt-2 sm:px-2.5 sm:pb-2.5 sm:pt-2">
                 <button
                   onClick={(e) => { e.stopPropagation(); navigate(`/admin/events/${event.id}/edit`); }}
-                  className="p-2 min-h-[44px] min-w-[44px] rounded-lg bg-gray-100 text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                  className="p-3 min-h-[44px] min-w-[44px] rounded-lg bg-gray-100 text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition-colors"
                   title="Edit"
                 >
                   <Edit className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={(e) => handleDelete(e, event.id, event.title)}
-                  className="p-2 min-h-[44px] min-w-[44px] rounded-lg bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-700 transition-colors"
+                  className="p-3 min-h-[44px] min-w-[44px] rounded-lg bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-700 transition-colors"
                   title="Delete"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -328,8 +328,8 @@ export const AdminEvents = () => {
                     <td className="px-3 sm:px-4 py-3 whitespace-nowrap"><div className="flex items-center gap-2"><div className="w-6 h-6 rounded-lg bg-purple-500 flex items-center justify-center shadow-sm flex-shrink-0"><Clock className="w-3 h-3 text-white" strokeWidth={2.5} /></div><span className="text-xs text-gray-700">{formatTime(event.time)}</span></div></td>
                     <td className="px-3 sm:px-4 py-3 whitespace-nowrap"><div className="flex items-center gap-2"><div className="w-6 h-6 rounded-lg bg-teal-500 flex items-center justify-center shadow-sm flex-shrink-0"><MapPin className="w-3 h-3 text-white" strokeWidth={2.5} /></div><span className="text-xs text-gray-700">{event.location}</span></div></td>
                     <td className="px-3 sm:px-4 py-3 whitespace-nowrap">{event.type && <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-700 shadow-sm">{event.type}</span>}</td>
-                    <td className="px-3 sm:px-4 py-3 whitespace-nowrap">{event.requires_rsvp ? (<div className="flex items-center justify-center gap-1"><Users className="w-4 h-4 text-green-600" /><span className="text-xs font-semibold text-green-600">{rsvpCounts[event.id] || 0}</span>{(rsvpCounts[event.id] || 0) > 0 && <button onClick={(e) => { e.stopPropagation(); handleResetRsvps(event.id, event.title); }} className="ml-1 text-xs text-red-500 hover:text-red-600 font-medium">Reset</button>}</div>) : <span className="text-xs text-gray-400">-</span>}</td>
-                    <td className="px-3 sm:px-4 py-3 whitespace-nowrap text-right"><div className="flex items-center justify-end gap-2">{!isPast(event.date, event.time) && (<button onClick={(e) => { e.stopPropagation(); navigate(`/admin/attendance/take/${event.id}`); }} className="text-xs font-medium text-blue-600 hover:text-blue-800 whitespace-nowrap">Take Attendance</button>)}{!event.is_global && (<div className="flex items-center justify-end gap-1"><button onClick={(e) => { e.stopPropagation(); navigate(`/admin/events/${event.id}/edit`); }} className="p-2 min-h-[44px] min-w-[44px] rounded-lg bg-gray-100 text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition-colors"><Edit className="w-3.5 h-3.5" /></button><button onClick={(e) => handleDelete(e, event.id, event.title)} className="p-2 min-h-[44px] min-w-[44px] rounded-lg bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-700 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button></div>)}</div></td>
+                    <td className="px-3 sm:px-4 py-3 whitespace-nowrap">{event.requires_rsvp ? (<div className="flex items-center justify-center gap-1"><Users className="w-4 h-4 text-green-600" /><span className="text-xs font-semibold text-green-600">{rsvpCounts[event.id] || 0}</span>{(rsvpCounts[event.id] || 0) > 0 && <button onClick={(e) => { e.stopPropagation(); handleResetRsvps(event.id, event.title); }} className="ml-1 text-xs text-red-500 hover:text-red-600 font-medium p-2 min-h-[44px] min-w-[44px]">Reset</button>}</div>) : <span className="text-xs text-gray-400">-</span>}</td>
+                    <td className="px-3 sm:px-4 py-3 whitespace-nowrap text-right"><div className="flex items-center justify-end gap-2">{!isPast(event.date, event.time) && (<button onClick={(e) => { e.stopPropagation(); navigate(`/admin/attendance/take/${event.id}`); }} className="text-xs font-medium text-blue-600 hover:text-blue-800 whitespace-nowrap py-3 min-h-[44px] inline-flex items-center">Take Attendance</button>)}{!event.is_global && (<div className="flex items-center justify-end gap-1"><button onClick={(e) => { e.stopPropagation(); navigate(`/admin/events/${event.id}/edit`); }} className="p-3 min-h-[44px] min-w-[44px] rounded-lg bg-gray-100 text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition-colors"><Edit className="w-3.5 h-3.5" /></button><button onClick={(e) => handleDelete(e, event.id, event.title)} className="p-3 min-h-[44px] min-w-[44px] rounded-lg bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-700 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button></div>)}</div></td>
                   </tr>
                 ))}
               </tbody>

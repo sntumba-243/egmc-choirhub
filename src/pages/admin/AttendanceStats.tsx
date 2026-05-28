@@ -240,7 +240,7 @@ export default function AttendanceStats() {
         <div className="flex bg-gray-100/80 rounded-xl p-0.5">
           {(['week', 'month', 'year', 'all'] as TimePeriod[]).map(p => (
             <button key={p} onClick={() => setTimePeriod(p)}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${timePeriod === p ? 'bg-blue-500 text-white shadow-sm font-semibold' : 'text-gray-500'}`}>
+              className={`min-h-[44px] px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${timePeriod === p ? 'bg-blue-500 text-white shadow-sm font-semibold' : 'text-gray-500'}`}>
               {timePeriodLabels[p]}
             </button>
           ))}
@@ -273,11 +273,11 @@ export default function AttendanceStats() {
           <span className="text-xs font-medium text-gray-400">Sort:</span>
           <div className="flex bg-gray-100/80 rounded-lg p-0.5">
             <button onClick={() => toggleSort('name')}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${sortBy === 'name' ? 'bg-white shadow-sm text-gray-900 font-semibold' : 'text-gray-500'}`}>
+              className={`min-h-[44px] px-3 py-1 rounded-md text-xs font-medium transition-all ${sortBy === 'name' ? 'bg-white shadow-sm text-gray-900 font-semibold' : 'text-gray-500'}`}>
               Name {sortBy === 'name' && (sortDir === 'asc' ? '↑' : '↓')}
             </button>
             <button onClick={() => toggleSort('rate')}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${sortBy === 'rate' ? 'bg-white shadow-sm text-gray-900 font-semibold' : 'text-gray-500'}`}>
+              className={`min-h-[44px] px-3 py-1 rounded-md text-xs font-medium transition-all ${sortBy === 'rate' ? 'bg-white shadow-sm text-gray-900 font-semibold' : 'text-gray-500'}`}>
               Attendance {sortBy === 'rate' && (sortDir === 'asc' ? '↑' : '↓')}
             </button>
           </div>
@@ -286,13 +286,13 @@ export default function AttendanceStats() {
           <div className="flex bg-gray-100/80 rounded-lg p-0.5">
             {([['all', 'All'], ['regulars', 'Regulars'], ['followup', 'Follow-up']] as const).map(([key, label]) => (
               <button key={key} onClick={() => setStatusFilter(key as StatusFilter)}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${statusFilter === key ? 'bg-white shadow-sm text-gray-900 font-semibold' : 'text-gray-500'}`}>
+                className={`min-h-[44px] px-3 py-1 rounded-md text-xs font-medium transition-all ${statusFilter === key ? 'bg-white shadow-sm text-gray-900 font-semibold' : 'text-gray-500'}`}>
                 {label}
               </button>
             ))}
           </div>
           <select value={voiceFilter} onChange={e => setVoiceFilter(e.target.value)}
-            className="px-2 py-1 text-xs font-medium text-gray-600 bg-white rounded-lg border border-gray-200/60 shadow-sm">
+            className="min-h-[44px] px-3 py-1 text-xs font-medium text-gray-600 bg-white rounded-lg border border-gray-200/60 shadow-sm">
             <option value="all">All Voices</option>
             {voiceParts.map(vp => <option key={vp} value={vp}>{vp}</option>)}
           </select>
