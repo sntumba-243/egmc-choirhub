@@ -202,10 +202,10 @@ export const AdminEvents = () => {
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="flex bg-gray-100 rounded-lg p-1">
-            <button onClick={() => setViewMode('cards')} className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md transition-colors ${viewMode === 'cards' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
+            <button onClick={() => setViewMode('cards')} className={`flex-1 sm:flex-none min-h-[44px] min-w-[44px] flex items-center justify-center gap-2 px-4 py-2 rounded-md transition-colors ${viewMode === 'cards' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
               <Grid className="w-4 h-4" /><span className="text-sm">Cards</span>
             </button>
-            <button onClick={() => setViewMode('list')} className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
+            <button onClick={() => setViewMode('list')} className={`flex-1 sm:flex-none min-h-[44px] min-w-[44px] flex items-center justify-center gap-2 px-4 py-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
               <List className="w-4 h-4" /><span className="text-sm">List</span>
             </button>
           </div>

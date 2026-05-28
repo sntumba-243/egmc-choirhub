@@ -332,7 +332,7 @@ export default function TakeAttendance() {
     for (let i = 0; i < yes; i++) items.push('yes');
     for (let i = 0; i < no; i++) items.push('no');
     for (let i = 0; i < check; i++) items.push('check');
-    const visible = items.slice(0, 10);
+    const visible = items.slice(0, 6);
     const overflow = items.length - visible.length;
     return (
       <div className="flex items-center gap-1">

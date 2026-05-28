@@ -104,6 +104,17 @@ export default function AdminLayout() {
           </div>
         </div>
 
+        {/* Mobile close button */}
+        <div className="lg:hidden flex justify-end p-2 border-b border-gray-100">
+          <button
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Close menu"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-500 hover:text-gray-900 rounded-lg"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
         {/* Mobile User Info */}
         <div className="lg:hidden p-4 border-b border-gray-200 bg-gray-50">
           <p className="text-sm font-medium text-gray-900">{user?.email}</p>

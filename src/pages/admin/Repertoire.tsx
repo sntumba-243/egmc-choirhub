@@ -347,7 +347,7 @@ export const AdminRepertoire = () => {
           </p>
         </div>
         {isSuperAdmin && (
-          <button onClick={() => navigate('new')} className="text-sm text-indigo-600 font-semibold">+ Add</button>
+          <button onClick={() => navigate('new')} className="text-sm text-indigo-600 font-semibold min-h-[44px] px-4 inline-flex items-center">+ Add</button>
         )}
       </div>
 
@@ -360,7 +360,7 @@ export const AdminRepertoire = () => {
           { key: 'not_started' as const, label: '\u23F3', value: songStats.notStarted, cls: 'bg-gray-50' },
         ].map(s => (
           <button key={s.key} onClick={() => { setStatusFilter(s.key); setCurrentPage(1); }}
-            className={`flex-1 rounded-lg border p-1.5 text-center transition ${s.cls} ${statusFilter === s.key ? 'ring-2 ring-indigo-500' : 'border-gray-200'}`}>
+            className={`flex-1 rounded-lg border p-1.5 text-center transition min-h-[44px] ${s.cls} ${statusFilter === s.key ? 'ring-2 ring-indigo-500' : 'border-gray-200'}`}>
             <div className="text-sm font-bold">{s.value}</div>
             <div className="text-sm text-gray-500">{s.label}</div>
           </button>
@@ -376,14 +376,14 @@ export const AdminRepertoire = () => {
         <div className="flex-1 relative">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-300 w-3.5 h-3.5" />
           <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+            className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent min-h-[44px]" />
         </div>
         <button onClick={() => { setShowFavoritesOnly(!showFavoritesOnly); setCurrentPage(1); }}
-          className={`w-8 h-8 flex items-center justify-center rounded-lg border text-sm ${showFavoritesOnly ? 'bg-yellow-500 border-yellow-500 text-white' : 'bg-white border-gray-200'}`}>
-          <Star className={`w-3.5 h-3.5 ${showFavoritesOnly ? 'fill-white' : 'text-gray-400'}`} />
+          className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg border text-sm ${showFavoritesOnly ? 'bg-yellow-500 border-yellow-500 text-white' : 'bg-white border-gray-200'}`}>
+          <Star className={`w-4 h-4 ${showFavoritesOnly ? 'fill-white' : 'text-gray-400'}`} />
         </button>
         <button onClick={() => setShowFilters(!showFilters)}
-          className={`w-10 h-10 flex items-center justify-center rounded-lg border text-sm font-bold ${showFilters ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-gray-200 text-gray-400'}`}>
+          className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg border text-sm font-bold ${showFilters ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-gray-200 text-gray-400'}`}>
           {'\u2699'}
         </button>
       </div>
@@ -393,13 +393,13 @@ export const AdminRepertoire = () => {
         <div className="bg-white rounded-lg border border-gray-200 p-2 flex gap-2">
           <div className="flex-1">
             <label className="text-sm font-medium text-gray-400 uppercase">Sort</label>
-            <select value={sortBy} onChange={(e) => { setSortBy(e.target.value as any); setCurrentPage(1); }} className="w-full mt-0.5 px-3 py-2 text-sm border border-gray-200 rounded bg-white">
+            <select value={sortBy} onChange={(e) => { setSortBy(e.target.value as any); setCurrentPage(1); }} className="w-full mt-0.5 px-3 py-2 text-sm border border-gray-200 rounded bg-white min-h-[44px]">
               <option value="a-z">A &rarr; Z</option><option value="z-a">Z &rarr; A</option><option value="recent">Recent</option>
             </select>
           </div>
           <div className="flex-1">
             <label className="text-sm font-medium text-gray-400 uppercase">Language</label>
-            <select value={languageFilter} onChange={(e) => { setLanguageFilter(e.target.value); setCurrentPage(1); }} className="w-full mt-0.5 px-3 py-2 text-sm border border-gray-200 rounded bg-white">
+            <select value={languageFilter} onChange={(e) => { setLanguageFilter(e.target.value); setCurrentPage(1); }} className="w-full mt-0.5 px-3 py-2 text-sm border border-gray-200 rounded bg-white min-h-[44px]">
               <option value="all">All</option><option value="english">English</option><option value="french">French</option><option value="portuguese">Portuguese</option><option value="lingala">Lingala</option><option value="tshiluba">Tshiluba</option><option value="kikongo">Kikongo</option><option value="swahili">Swahili</option>
             </select>
           </div>
@@ -411,14 +411,14 @@ export const AdminRepertoire = () => {
         <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-2 flex items-center justify-between">
           <span className="text-sm font-semibold text-indigo-900">{selectedSongs.size} selected</span>
           <div className="flex items-center gap-1.5">
-            <button onClick={() => setShowEventModal(true)} className="flex items-center gap-1 px-3 py-2 bg-green-600 text-white rounded text-sm font-semibold">
+            <button onClick={() => setShowEventModal(true)} className="flex items-center gap-1 px-4 py-2 bg-green-600 text-white rounded text-sm font-semibold min-h-[44px]">
               <Calendar className="w-3 h-3" /> Event
             </button>
             <select value="" onChange={(e) => { if (e.target.value) handleBulkStatusUpdate(e.target.value as any); }}
-              className="px-3 py-2 text-sm border border-indigo-300 rounded bg-white font-medium">
+              className="px-3 py-2 text-sm border border-indigo-300 rounded bg-white font-medium min-h-[44px]">
               <option value="">Mark as...</option><option value="learned">{'\u2705'} Learned</option><option value="learning">{'\uD83D\uDCDA'} Learning</option><option value="not_started">{'\u23F3'} Not Started</option>
             </select>
-            <button onClick={() => setSelectedSongs(new Set())} className="text-sm text-gray-500 px-1">{'\u2715'}</button>
+            <button onClick={() => setSelectedSongs(new Set())} className="text-sm text-gray-500 min-w-[44px] min-h-[44px] flex items-center justify-center">{'\u2715'}</button>
           </div>
         </div>
       )}
@@ -428,19 +428,19 @@ export const AdminRepertoire = () => {
         <div className="flex gap-2">
           {!loadAll && isPaginated && totalPages > 1 && (
             <button onClick={() => { setLoadAll(true); setCurrentPage(1); }}
-              className="px-3 py-2 text-sm rounded font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200">
+              className="px-4 py-2 text-sm rounded font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 min-h-[44px]">
               Load all songs
             </button>
           )}
           {loadAll && (
             <button onClick={() => { setLoadAll(false); setCurrentPage(1); }}
-              className="px-3 py-2 text-sm rounded font-semibold bg-indigo-100 text-indigo-700 hover:bg-indigo-200">
+              className="px-4 py-2 text-sm rounded font-semibold bg-indigo-100 text-indigo-700 hover:bg-indigo-200 min-h-[44px]">
               Back to pages
             </button>
           )}
         </div>
         <button onClick={selectedSongs.size > 0 ? () => setSelectedSongs(new Set()) : () => { setSelectedSongs(new Set(songs.map(s => s.id))); toast.success(`Selected ${songs.length}`); }}
-          className={`px-3 py-2 text-sm rounded font-semibold ${selectedSongs.size > 0 ? 'bg-red-100 text-red-700' : 'bg-indigo-100 text-indigo-700'}`}>
+          className={`px-4 py-2 text-sm rounded font-semibold min-h-[44px] ${selectedSongs.size > 0 ? 'bg-red-100 text-red-700' : 'bg-indigo-100 text-indigo-700'}`}>
           {selectedSongs.size > 0 ? `Deselect (${selectedSongs.size})` : 'Select All'}
         </button>
       </div>
@@ -464,8 +464,8 @@ export const AdminRepertoire = () => {
           return (
             <div key={song.id}
               className={`flex items-center gap-3 px-3 py-3 border-b border-gray-100 last:border-b-0 transition ${isSel ? 'bg-indigo-50' : ''}`}>
-              <input type="checkbox" checked={isSel} onChange={() => toggleSongSelection(song.id)} className="w-3.5 h-3.5 flex-shrink-0 accent-indigo-600" />
-              <button onClick={(e) => toggleFavorite(song.id, e)} className="flex-shrink-0 text-base leading-none">
+              <input type="checkbox" checked={isSel} onChange={() => toggleSongSelection(song.id)} className="w-5 h-5 flex-shrink-0 accent-indigo-600" />
+              <button onClick={(e) => toggleFavorite(song.id, e)} className="flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center text-base leading-none">
                 <span className={isFav ? 'text-yellow-500' : 'text-gray-300'}>{isFav ? '\u2605' : '\u2606'}</span>
               </button>
               <div className="flex-1 min-w-0 cursor-pointer" onClick={() => song.sheet_music_url && handleViewPDF(song)}>
@@ -476,14 +476,14 @@ export const AdminRepertoire = () => {
                 {(song.language || '?').slice(0, 1)}
               </span>
               <button onClick={(e) => handleStatusCycle(song.id, song.learning_status, e)}
-                className="flex-shrink-0 text-base leading-none hover:scale-125 active:scale-90 transition-transform"
+                className="flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center text-base leading-none hover:scale-125 active:scale-90 transition-transform"
                 title="Tap to change status">
                 {song.learning_status === 'learned' ? '\u2705' : song.learning_status === 'learning' ? '\uD83D\uDCDA' : '\u23F3'}
               </button>
               {isSuperAdmin && (
                 <div className="flex flex-shrink-0">
-                  <button onClick={(e) => { e.stopPropagation(); navigate(`${song.id}/edit`); }} className="w-[22px] h-[22px] flex items-center justify-center rounded text-blue-500 hover:bg-blue-50"><Edit className="w-3 h-3" /></button>
-                  <button onClick={(e) => handleDelete(song.id, e)} className="w-[22px] h-[22px] flex items-center justify-center rounded text-red-400 hover:bg-red-50"><Trash2 className="w-3 h-3" /></button>
+                  <button onClick={(e) => { e.stopPropagation(); navigate(`${song.id}/edit`); }} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded text-blue-500 hover:bg-blue-50"><Edit className="w-4 h-4" /></button>
+                  <button onClick={(e) => handleDelete(song.id, e)} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded text-red-400 hover:bg-red-50"><Trash2 className="w-4 h-4" /></button>
                 </div>
               )}
             </div>
@@ -499,12 +499,12 @@ export const AdminRepertoire = () => {
           </p>
           <div className="flex items-center gap-2">
             <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1}
-              className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50">
+              className="px-4 py-1.5 text-sm font-medium rounded-lg border border-gray-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 min-h-[44px]">
               Previous
             </button>
             <span className="text-sm text-gray-600">Page {currentPage} of {totalPages}</span>
             <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages}
-              className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50">
+              className="px-4 py-1.5 text-sm font-medium rounded-lg border border-gray-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 min-h-[44px]">
               Next
             </button>
           </div>

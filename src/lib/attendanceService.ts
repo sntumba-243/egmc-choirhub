@@ -41,6 +41,16 @@ export async function getEventAttendanceWithMembers(
     return [];
   }
 
+  // Exclude system / non-choir admin accounts from the attendance roster:
+  // - any account whose name reads "Super Admin"
+  // - admin-role accounts without a voice_part (those are app admins, not singers)
+  const choirMembers = members.filter(m => {
+    const fullName = `${m.first_name || ''} ${m.last_name || ''}`.toLowerCase();
+    if (fullName.includes('super admin')) return false;
+    if (m.role === 'admin' && (!m.voice_part || m.voice_part === '')) return false;
+    return true;
+  });
+
   const { data: records, error: recordsError } = await supabase
     .from('attendance_history')
     .select('member_id, status, marked_by_admin')
@@ -59,7 +69,7 @@ export async function getEventAttendanceWithMembers(
     });
   }
 
-  return members.map(m => {
+  return choirMembers.map(m => {
     const rec = recordMap.get(m.id);
     const rawStatus = rec?.status ?? null;
     const status: 'yes' | 'no' | null = rawStatus === 'yes' || rawStatus === 'no' ? rawStatus : null;

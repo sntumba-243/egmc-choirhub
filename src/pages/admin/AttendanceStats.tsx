@@ -299,8 +299,22 @@ export default function AttendanceStats() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm overflow-x-auto">
+      {totalEvents === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+          <div className="text-4xl mb-4">🎵</div>
+          <div className="text-base font-medium text-gray-900 mb-2">No attendance recorded yet</div>
+          <div className="text-sm text-gray-400 mb-6">Take attendance at your first rehearsal to see stats here.</div>
+          <button
+            onClick={() => navigate('/admin/attendance/take')}
+            className="bg-blue-600 text-white text-sm font-medium px-6 py-3 rounded-xl min-h-[44px]"
+          >
+            Take attendance →
+          </button>
+        </div>
+      ) : (
+      <>
+      {/* Table — desktop only */}
+      <div className="hidden md:block bg-white rounded-2xl border border-gray-200/60 shadow-sm overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-100">
@@ -348,6 +362,50 @@ export default function AttendanceStats() {
           </tbody>
         </table>
       </div>
+
+      {/* Mobile card view */}
+      <div className="md:hidden bg-white rounded-2xl border border-gray-200/60 shadow-sm overflow-hidden">
+        {sorted.length === 0 ? (
+          <div className="px-4 py-8 text-center text-sm text-gray-400">No members match this filter</div>
+        ) : (
+          sorted.map(m => {
+            const s = getStatus(m.attendance_rate, m.attended);
+            const initials = `${(m.first_name || '').charAt(0)}${(m.last_name || '').charAt(0)}`.toUpperCase() || '?';
+            const avatarBg: Record<string, string> = {
+              Soprano: 'bg-pink-500',
+              Alto: 'bg-purple-500',
+              Tenor: 'bg-blue-500',
+              Bass: 'bg-green-500',
+              Instrumentalist: 'bg-orange-500',
+            };
+            const bg = avatarBg[m.voice_part] || 'bg-gray-400';
+            return (
+              <div
+                key={m.id}
+                className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 last:border-b-0 min-h-[64px]"
+              >
+                <div className={`w-9 h-9 rounded-full ${bg} flex items-center justify-center text-xs font-semibold text-white flex-shrink-0`}>
+                  {initials}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-900 truncate">
+                    {m.first_name} {m.last_name}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-0.5">{m.voice_part || '—'}</div>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <div className={`text-sm font-semibold ${m.attended === 0 ? 'text-gray-400' : m.attendance_rate >= 50 ? 'text-green-600' : m.attendance_rate >= 25 ? 'text-amber-600' : 'text-orange-500'}`}>
+                    {m.attended} / {m.total_events}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-0.5">{s.label}</div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+      </>
+      )}
 
       </div>
     </div>
