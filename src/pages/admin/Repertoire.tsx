@@ -463,29 +463,63 @@ export const AdminRepertoire = () => {
           const isSel = selectedSongs.has(song.id);
           return (
             <div key={song.id}
-              className={`flex items-center gap-3 px-3 py-3 border-b border-gray-100 last:border-b-0 transition ${isSel ? 'bg-indigo-50' : ''}`}>
-              <input type="checkbox" checked={isSel} onChange={() => toggleSongSelection(song.id)} className="w-5 h-5 flex-shrink-0 accent-indigo-600" />
-              <button onClick={(e) => toggleFavorite(song.id, e)} className="flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center text-base leading-none">
-                <span className={isFav ? 'text-yellow-500' : 'text-gray-300'}>{isFav ? '\u2605' : '\u2606'}</span>
-              </button>
-              <div className="flex-1 min-w-0 cursor-pointer" onClick={() => song.sheet_music_url && handleViewPDF(song)}>
-                <div className={`text-base font-semibold ${song.sheet_music_url ? 'text-gray-900 hover:text-indigo-600' : 'text-gray-900'}`} style={{ whiteSpace: 'normal', overflow: 'visible' }}>{song.title}</div>
-                <div className="text-sm text-gray-400" style={{ whiteSpace: 'normal', overflow: 'visible' }}>{song.composer}</div>
-              </div>
-              <span className={`w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold text-white flex-shrink-0 ${getLangColor(song.language)}`}>
-                {(song.language || '?').slice(0, 1)}
-              </span>
-              <button onClick={(e) => handleStatusCycle(song.id, song.learning_status, e)}
-                className="flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center text-base leading-none hover:scale-125 active:scale-90 transition-transform"
-                title="Tap to change status">
-                {song.learning_status === 'learned' ? '\u2705' : song.learning_status === 'learning' ? '\uD83D\uDCDA' : '\u23F3'}
-              </button>
-              {isSuperAdmin && (
-                <div className="flex flex-shrink-0">
-                  <button onClick={(e) => { e.stopPropagation(); navigate(`${song.id}/edit`); }} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded text-blue-500 hover:bg-blue-50"><Edit className="w-4 h-4" /></button>
-                  <button onClick={(e) => handleDelete(song.id, e)} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded text-red-400 hover:bg-red-50"><Trash2 className="w-4 h-4" /></button>
+              className={`border-b border-gray-100 last:border-b-0 transition ${isSel ? 'bg-indigo-50' : ''}`}>
+
+              {/* MOBILE: two-line layout */}
+              <div className="md:hidden px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <input type="checkbox" checked={isSel} onChange={() => toggleSongSelection(song.id)} className="w-5 h-5 flex-shrink-0 accent-indigo-600" />
+                  <button onClick={(e) => toggleFavorite(song.id, e)} className="flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center text-base leading-none">
+                    <span className={isFav ? 'text-yellow-500' : 'text-gray-300'}>{isFav ? '\u2605' : '\u2606'}</span>
+                  </button>
+                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => song.sheet_music_url && handleViewPDF(song)}>
+                    <div className={`text-sm font-medium truncate ${song.sheet_music_url ? 'text-gray-900 hover:text-indigo-600' : 'text-gray-900'}`}>{song.title}</div>
+                    <div className="text-xs text-gray-400 truncate mt-0.5">{song.composer}</div>
+                  </div>
+                  <span className={`w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-full text-xs font-bold text-white ${getLangColor(song.language)}`}>
+                    {(song.language || '?').slice(0, 1)}
+                  </span>
                 </div>
-              )}
+                <div className="flex items-center justify-end gap-2 mt-1 pl-[88px]">
+                  <button onClick={(e) => handleStatusCycle(song.id, song.learning_status, e)}
+                    className="min-w-[44px] min-h-[44px] flex items-center justify-center text-base leading-none hover:scale-125 active:scale-90 transition-transform"
+                    title="Tap to change status">
+                    {song.learning_status === 'learned' ? '\u2705' : song.learning_status === 'learning' ? '\uD83D\uDCDA' : '\u23F3'}
+                  </button>
+                  {isSuperAdmin && (
+                    <>
+                      <button onClick={(e) => { e.stopPropagation(); navigate(`${song.id}/edit`); }} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded text-blue-500 hover:bg-blue-50"><Edit className="w-4 h-4" /></button>
+                      <button onClick={(e) => handleDelete(song.id, e)} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded text-red-400 hover:bg-red-50"><Trash2 className="w-4 h-4" /></button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* DESKTOP/TABLET: single-row layout */}
+              <div className="hidden md:flex items-center gap-3 px-3 py-3">
+                <input type="checkbox" checked={isSel} onChange={() => toggleSongSelection(song.id)} className="w-5 h-5 flex-shrink-0 accent-indigo-600" />
+                <button onClick={(e) => toggleFavorite(song.id, e)} className="flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center text-base leading-none">
+                  <span className={isFav ? 'text-yellow-500' : 'text-gray-300'}>{isFav ? '\u2605' : '\u2606'}</span>
+                </button>
+                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => song.sheet_music_url && handleViewPDF(song)}>
+                  <div className={`text-base font-semibold ${song.sheet_music_url ? 'text-gray-900 hover:text-indigo-600' : 'text-gray-900'}`} style={{ whiteSpace: 'normal', overflow: 'visible' }}>{song.title}</div>
+                  <div className="text-sm text-gray-400" style={{ whiteSpace: 'normal', overflow: 'visible' }}>{song.composer}</div>
+                </div>
+                <span className={`w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold text-white flex-shrink-0 ${getLangColor(song.language)}`}>
+                  {(song.language || '?').slice(0, 1)}
+                </span>
+                <button onClick={(e) => handleStatusCycle(song.id, song.learning_status, e)}
+                  className="flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center text-base leading-none hover:scale-125 active:scale-90 transition-transform"
+                  title="Tap to change status">
+                  {song.learning_status === 'learned' ? '\u2705' : song.learning_status === 'learning' ? '\uD83D\uDCDA' : '\u23F3'}
+                </button>
+                {isSuperAdmin && (
+                  <div className="flex flex-shrink-0">
+                    <button onClick={(e) => { e.stopPropagation(); navigate(`${song.id}/edit`); }} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded text-blue-500 hover:bg-blue-50"><Edit className="w-4 h-4" /></button>
+                    <button onClick={(e) => handleDelete(song.id, e)} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded text-red-400 hover:bg-red-50"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                )}
+              </div>
             </div>
           );
         })}
