@@ -8,7 +8,7 @@ import toast from 'react-hot-toast';
 export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { logout, user } = useAuth();
+  const { logout } = useAuth();
   const { church } = useChurch();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -88,7 +88,10 @@ export default function AdminLayout() {
       {/* Sidebar */}
       <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 min-w-[256px] flex-shrink-0 bg-white border-r border-gray-200 flex flex-col transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         {/* Desktop Header */}
-        <div className="hidden lg:block p-6 border-b border-gray-200">
+        <div
+          className="hidden lg:block px-6 pb-6 border-b border-gray-200"
+          style={{ paddingTop: 'calc(16px + env(safe-area-inset-top, 0px))' }}
+        >
           <div className="flex items-center gap-3">
             {logoUrl ? (
               <img src={logoUrl} alt={churchName} className="h-10 max-h-[40px] rounded-lg object-contain" />
@@ -99,15 +102,8 @@ export default function AdminLayout() {
             )}
             <div className="min-w-0">
               <h1 className="text-xl font-bold theme-text truncate">{churchName}</h1>
-              <p className="text-sm text-gray-600">Admin Panel</p>
             </div>
           </div>
-        </div>
-
-        {/* Mobile User Info */}
-        <div className="lg:hidden p-4 border-b border-gray-200 bg-gray-50">
-          <p className="text-sm font-medium text-gray-900">{user?.email}</p>
-          <p className="text-xs text-gray-600 mt-1">Administrator</p>
         </div>
 
         {/* Navigation */}
