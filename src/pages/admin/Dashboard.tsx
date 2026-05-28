@@ -509,69 +509,6 @@ export const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* Dynamic RSVP Alerts */}
-      {alerts.length > 0 && (
-        <div>
-          <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 flex items-center gap-2">
-            <span className="text-xl sm:text-2xl">🚨</span> 
-            <span>
-              Alerts 
-              {alerts[0]?.data?.totalEventsNeedingRsvps > 1 
-                ? ` (${alerts[0].data.totalEventsNeedingRsvps} events need RSVPs)` 
-                : ''}
-            </span>
-          </h2>
-          <div className="space-y-3">
-            {/* Show only most urgent or all alerts based on expanded state */}
-            {(alertsExpanded ? allRsvpAlerts : alerts).map((alert, index) => (
-              <div key={alert.id} className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-4">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-gray-900 font-medium text-sm sm:text-base">
-                      {/* For first alert, show the message with (+X more) if applicable */}
-                      {index === 0 && !alertsExpanded ? (
-                        <>
-                          {alert.message.split(' (+')[0]}
-                          {alert.data?.totalEventsNeedingRsvps > 1 && (
-                            <>
-                              {' '}
-                              <button
-                                onClick={() => setAlertsExpanded(true)}
-                                className="text-yellow-700 hover:text-yellow-900 underline font-medium"
-                              >
-                                (+{alert.data.totalEventsNeedingRsvps - 1} more event{alert.data.totalEventsNeedingRsvps > 2 ? 's' : ''} need RSVPs)
-                              </button>
-                            </>
-                          )}
-                        </>
-                      ) : (
-                        alert.message.split(' (+')[0]
-                      )}
-                    </p>
-                    <button 
-                      onClick={() => navigate(alert.action)}
-                      className="text-yellow-700 text-xs sm:text-sm font-medium hover:underline mt-1"
-                    >
-                      {alert.actionLabel} →
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-            
-            {/* Show collapse button when expanded */}
-            {alertsExpanded && allRsvpAlerts.length > 1 && (
-              <button
-                onClick={() => setAlertsExpanded(false)}
-                className="w-full text-center text-sm text-yellow-700 hover:text-yellow-900 font-medium py-2"
-              >
-                Show Less ↑
-              </button>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };
