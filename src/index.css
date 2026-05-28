@@ -139,3 +139,21 @@ html, body { overflow-x: hidden; max-width: 100vw; }
 .theme-btn:hover {
   opacity: 0.9;
 }
+
+/* ========================================= */
+/* Attendance focus mode                     */
+/* Hide sidebar + mobile header so the take- */
+/* attendance flow gets the full viewport.   */
+/* ========================================= */
+body.attendance-focus-mode aside {
+  display: none !important;
+}
+body.attendance-focus-mode .lg\:hidden.fixed.top-0 {
+  display: none !important;
+}
+body.attendance-focus-mode main {
+  margin-left: 0 !important;
+  max-width: 100vw !important;
+  width: 100% !important;
+  padding-top: env(safe-area-inset-top, 0) !important;
+}

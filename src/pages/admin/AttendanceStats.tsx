@@ -1,6 +1,7 @@
 import { useChurch } from '../../contexts/ChurchContext';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ChevronLeft } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface MemberAttendance {
@@ -26,12 +27,21 @@ const voicePartColors: Record<string, string> = {
   Instrumentalist: 'text-orange-600 bg-orange-50',
 };
 
-const getStatus = (rate: number, attended: number) => {
-  if (attended === 0) return { emoji: '❌', label: 'Never', color: 'bg-red-50 text-red-600', barColor: 'bg-gray-300', rowBg: 'bg-red-50/20' };
-  if (rate >= 75) return { emoji: '💪', label: 'Always', color: 'bg-green-50 text-green-700', barColor: 'bg-green-500', rowBg: '' };
-  if (rate >= 50) return { emoji: '👍', label: 'Often', color: 'bg-green-50 text-green-700', barColor: 'bg-green-500', rowBg: '' };
-  if (rate >= 25) return { emoji: '🤷', label: 'Sometimes', color: 'bg-yellow-50 text-yellow-700', barColor: 'bg-yellow-500', rowBg: '' };
-  return { emoji: '⚠️', label: 'Rarely', color: 'bg-red-50 text-red-600', barColor: 'bg-red-500', rowBg: 'bg-red-50/20' };
+interface StatusInfo {
+  label: string;
+  pillBg: string;
+  pillText: string;
+  dot: string;
+  barColor: string;
+  rowBg: string;
+}
+
+const getStatus = (rate: number, attended: number): StatusInfo => {
+  if (attended === 0) return { label: 'Not seen yet', pillBg: 'bg-gray-100', pillText: 'text-gray-500', dot: 'bg-gray-400', barColor: 'bg-gray-300', rowBg: '' };
+  if (rate >= 75)     return { label: 'Always here', pillBg: 'bg-green-50', pillText: 'text-green-700', dot: 'bg-green-500', barColor: 'bg-green-500', rowBg: '' };
+  if (rate >= 50)     return { label: 'Often here', pillBg: 'bg-blue-50', pillText: 'text-blue-700', dot: 'bg-blue-500', barColor: 'bg-blue-500', rowBg: '' };
+  if (rate >= 25)     return { label: 'Sometimes', pillBg: 'bg-amber-50', pillText: 'text-amber-700', dot: 'bg-amber-500', barColor: 'bg-amber-500', rowBg: '' };
+  return                     { label: 'Rarely', pillBg: 'bg-orange-50', pillText: 'text-orange-700', dot: 'bg-orange-500', barColor: 'bg-orange-500', rowBg: '' };
 };
 
 export default function AttendanceStats() {
@@ -39,7 +49,7 @@ export default function AttendanceStats() {
   const [memberStats, setMemberStats] = useState<MemberAttendance[]>([]);
   const [loading, setLoading] = useState(true);
   const { church } = useChurch();
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>('week');
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>('all');
   const [sortBy, setSortBy] = useState<'name' | 'rate'>('rate');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -193,30 +203,33 @@ export default function AttendanceStats() {
   );
 
   return (
-    <div className="space-y-3 pb-8">
-      {/* Back to landing */}
-      <button
-        onClick={() => navigate('/admin/attendance')}
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900"
-      >
-        ← Attendance
-      </button>
+    <div className="-m-4 sm:-m-6 lg:-m-8 pb-8">
+      {/* New header — back chevron, title, primary CTA */}
+      <div className="px-6 pt-5 pb-4 border-b border-gray-100">
+        <button
+          onClick={() => navigate('/admin/attendance')}
+          className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 mb-4"
+        >
+          <ChevronLeft size={16} /> Attendance
+        </button>
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Choir health</h1>
+          <button
+            onClick={() => navigate('/admin/attendance/take')}
+            className="text-sm font-medium text-white px-4 py-2 rounded-xl min-h-[44px] whitespace-nowrap"
+            style={{ background: church?.primary_color ?? '#185FA5' }}
+          >
+            Take attendance →
+          </button>
+        </div>
+      </div>
 
-      {/* Take Attendance CTA */}
-      <button
-        onClick={() => navigate('/admin/attendance/take')}
-        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-semibold shadow-sm transition-colors"
-      >
-        + Take Attendance for an Event
-      </button>
+      <div className="px-4 sm:px-6 lg:px-8 pt-4 space-y-3">
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Subtitle + period selector */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">Attendance</h1>
-            <p className="text-xs text-gray-500">Based on archived attendance · {totalEvents} past events in period</p>
-          </div>
+          <p className="text-xs text-gray-500">Based on archived attendance · {totalEvents} past event{totalEvents === 1 ? '' : 's'} in period</p>
           <button onClick={() => loadStats()} title="Refresh"
             className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all">
             <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -235,7 +248,7 @@ export default function AttendanceStats() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-2.5">
           <div className="text-xs text-gray-400">Members</div>
           <div className="text-xl font-bold text-gray-900">{memberStats.length}</div>
@@ -245,11 +258,11 @@ export default function AttendanceStats() {
           <div className="text-xl font-bold text-gray-900">{totalEvents}</div>
         </div>
         <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-2.5">
-          <div className="text-xs text-gray-400">Regulars 💪</div>
+          <div className="text-xs text-gray-400">Regulars</div>
           <div className="text-xl font-bold text-green-600">{regularsCount}</div>
         </div>
         <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-2.5">
-          <div className="text-xs text-gray-400">Follow-up ⚠️</div>
+          <div className="text-xs text-gray-400">Follow-up</div>
           <div className="text-xl font-bold text-red-500">{followupCount}</div>
         </div>
       </div>
@@ -271,7 +284,7 @@ export default function AttendanceStats() {
         </div>
         <div className="flex items-center gap-2">
           <div className="flex bg-gray-100/80 rounded-lg p-0.5">
-            {([['all', 'All'], ['regulars', '💪 Regulars'], ['followup', '⚠️ Follow-up']] as const).map(([key, label]) => (
+            {([['all', 'All'], ['regulars', 'Regulars'], ['followup', 'Follow-up']] as const).map(([key, label]) => (
               <button key={key} onClick={() => setStatusFilter(key as StatusFilter)}
                 className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${statusFilter === key ? 'bg-white shadow-sm text-gray-900 font-semibold' : 'text-gray-500'}`}>
                 {label}
@@ -324,8 +337,9 @@ export default function AttendanceStats() {
                     </div>
                   </td>
                   <td className="px-3 py-2.5 text-center">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${s.color}`}>
-                      {s.emoji} {s.label}
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${s.pillBg} ${s.pillText}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+                      {s.label}
                     </span>
                   </td>
                 </tr>
@@ -335,15 +349,6 @@ export default function AttendanceStats() {
         </table>
       </div>
 
-      {/* Legend */}
-      <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm px-4 py-2">
-        <div className="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
-          <span><span className="font-semibold text-green-600">💪 Always</span> 75%+</span>
-          <span><span className="font-semibold text-green-600">👍 Often</span> 50-74%</span>
-          <span><span className="font-semibold text-yellow-600">🤷 Sometimes</span> 25-49%</span>
-          <span><span className="font-semibold text-red-500">⚠️ Rarely</span> 1-24%</span>
-          <span><span className="font-semibold text-red-500">❌ Never</span> 0%</span>
-        </div>
       </div>
     </div>
   );

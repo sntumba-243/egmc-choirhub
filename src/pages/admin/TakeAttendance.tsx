@@ -29,14 +29,6 @@ interface Entry {
   rsvpStatus: 'yes' | 'no' | 'maybe' | null;
 }
 
-const voicePartColors: Record<string, string> = {
-  Soprano: 'text-pink-600 bg-pink-50',
-  Alto: 'text-purple-600 bg-purple-50',
-  Tenor: 'text-blue-600 bg-blue-50',
-  Bass: 'text-green-600 bg-green-50',
-  Instrumentalist: 'text-orange-600 bg-orange-50',
-};
-
 const voicePartAvatarBg: Record<string, string> = {
   Soprano: 'bg-pink-500',
   Alto: 'bg-purple-500',
@@ -98,17 +90,23 @@ export default function TakeAttendance() {
   const { church } = useChurch();
   const churchId = user?.church_id || church?.id;
 
+  // Focus mode — hide sidebar + mobile header while on this page
+  useEffect(() => {
+    document.body.classList.add('attendance-focus-mode');
+    return () => document.body.classList.remove('attendance-focus-mode');
+  }, []);
+
   const [phase, setPhase] = useState<Phase>(eventId ? 'prompt' : 'selector');
 
   // Selector phase
   const [events, setEvents] = useState<EventLite[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
 
-  // Selected event (used in prompt/sheet/saved phases)
+  // Selected event
   const [selectedEvent, setSelectedEvent] = useState<EventLite | null>(null);
   const [loadingEvent, setLoadingEvent] = useState(false);
 
-  // Sheet phase state
+  // Sheet state
   const [rows, setRows] = useState<MemberAttendanceRow[]>([]);
   const [entries, setEntries] = useState<Map<string, Entry>>(new Map());
   const [saving, setSaving] = useState<Set<string>>(new Set());
@@ -117,7 +115,7 @@ export default function TakeAttendance() {
   const [showSaveSheet, setShowSaveSheet] = useState(false);
   const [search, setSearch] = useState('');
 
-  // Load selector events
+  // Selector list
   useEffect(() => {
     if (eventId || !churchId) return;
     let cancelled = false;
@@ -148,7 +146,7 @@ export default function TakeAttendance() {
     return () => { cancelled = true; };
   }, [eventId, churchId]);
 
-  // Load selected event when eventId in URL
+  // Load selected event
   useEffect(() => {
     if (!eventId || !churchId) return;
     let cancelled = false;
@@ -176,7 +174,9 @@ export default function TakeAttendance() {
   }, [eventId, churchId, navigate]);
 
   const loadMembersAndRsvps = useCallback(async () => {
-    if (!selectedEvent || !churchId) return { rows: [] as MemberAttendanceRow[], rsvps: new Map<string, 'yes' | 'no' | 'maybe'>() };
+    if (!selectedEvent || !churchId) {
+      return { rows: [] as MemberAttendanceRow[], rsvps: new Map<string, 'yes' | 'no' | 'maybe'>() };
+    }
     const [memberRows, rsvpList] = await Promise.all([
       getEventAttendanceWithMembers(selectedEvent.id, churchId),
       getRSVPsForEvent(selectedEvent.id),
@@ -228,7 +228,6 @@ export default function TakeAttendance() {
     if (!selectedEvent || !churchId) return;
     const cur = entries.get(memberId);
     if (!cur) return;
-    // null → yes, yes → no, no → yes
     const next: 'yes' | 'no' = cur.status === 'yes' ? 'no' : 'yes';
     const prevStatus = cur.status;
 
@@ -268,26 +267,40 @@ export default function TakeAttendance() {
     }
   };
 
-  // Computed counts (yes + null counted as present per spec)
+  const handleMarkRemaining = async () => {
+    if (!selectedEvent || !churchId) return;
+    const remainingIds = rows
+      .filter(r => (entries.get(r.member.id)?.status ?? null) === null)
+      .map(r => r.member.id);
+    if (remainingIds.length === 0) return;
+    setEntries(prev => {
+      const m = new Map(prev);
+      for (const id of remainingIds) {
+        const cur = m.get(id);
+        if (cur) m.set(id, { ...cur, status: 'yes' });
+      }
+      return m;
+    });
+    const ok = await bulkMarkAllPresent(
+      selectedEvent.id,
+      selectedEvent.title,
+      selectedEvent.date,
+      remainingIds,
+      churchId
+    );
+    if (!ok) toast.error('Some records could not be saved');
+  };
+
   const counts = useMemo(() => {
     let yesCount = 0, noCount = 0, nullCount = 0;
     for (const r of rows) {
-      const e = entries.get(r.member.id);
-      const s = e?.status ?? null;
+      const s = entries.get(r.member.id)?.status ?? null;
       if (s === 'yes') yesCount++;
       else if (s === 'no') noCount++;
       else nullCount++;
     }
     const present = yesCount + nullCount;
-    return {
-      yes: yesCount,
-      no: noCount,
-      nullCount,
-      present,
-      absent: noCount,
-      checkLater: nullCount,
-      total: rows.length,
-    };
+    return { yes: yesCount, no: noCount, nullCount, present, absent: noCount, checkLater: nullCount, total: rows.length };
   }, [rows, entries]);
 
   const filteredRows = useMemo(() => {
@@ -314,27 +327,35 @@ export default function TakeAttendance() {
 
   const searchActive = search.trim().length > 0;
 
+  const renderDots = (yes: number, no: number, check: number) => {
+    const items: Array<'yes' | 'no' | 'check'> = [];
+    for (let i = 0; i < yes; i++) items.push('yes');
+    for (let i = 0; i < no; i++) items.push('no');
+    for (let i = 0; i < check; i++) items.push('check');
+    const visible = items.slice(0, 10);
+    const overflow = items.length - visible.length;
+    return (
+      <div className="flex items-center gap-1">
+        {visible.map((kind, i) => {
+          if (kind === 'yes') return <span key={i} className="w-[9px] h-[9px] rounded-full bg-green-500" />;
+          if (kind === 'no') return <span key={i} className="w-[9px] h-[9px] rounded-full bg-red-500" />;
+          return <span key={i} className="w-[9px] h-[9px] rounded-full border border-gray-300 bg-white" />;
+        })}
+        {overflow > 0 && <span className="text-xs text-gray-400 ml-0.5">+{overflow}</span>}
+      </div>
+    );
+  };
+
   const renderMemberRow = (r: MemberAttendanceRow) => {
     const entry = entries.get(r.member.id);
     const status = entry?.status ?? null;
-    const rsvp = entry?.rsvpStatus ?? null;
     const isSaving = saving.has(r.member.id);
     const avatarBg = voicePartAvatarBg[r.member.voice_part || 'Unassigned'] || 'bg-gray-400';
 
-    let subText: React.ReactNode = null;
-    let subClass = '';
+    let subText = 'Check later';
+    let subClass = 'text-gray-400';
     if (status === 'yes') { subText = 'Present'; subClass = 'text-green-600'; }
-    else if (status === 'no') { subText = 'Absent'; subClass = 'text-red-600'; }
-    else { subText = 'Check later'; subClass = 'text-gray-400'; }
-
-    let rsvpSuffix: React.ReactNode = null;
-    const differs =
-      (rsvp === 'yes' && status !== 'yes') ||
-      (rsvp === 'no' && status !== 'no');
-    if (differs) {
-      const rsvpLabel = rsvp === 'yes' ? 'Going' : 'Cant come';
-      rsvpSuffix = <span className="text-gray-400"> · RSVP: {rsvpLabel}</span>;
-    }
+    else if (status === 'no') { subText = 'Absent'; subClass = 'text-red-500'; }
 
     const ariaLabel = status === 'yes'
       ? `Mark ${r.member.first_name} ${r.member.last_name} absent`
@@ -343,56 +364,51 @@ export default function TakeAttendance() {
     return (
       <li
         key={r.member.id}
-        className="px-4 py-3 flex items-center gap-3 bg-white border-b border-gray-100"
+        onClick={() => toggleEntry(r.member.id)}
+        role="button"
+        aria-label={ariaLabel}
+        className="min-h-[64px] flex items-center gap-3 px-5 border-b border-gray-100 cursor-pointer active:bg-gray-50"
       >
         <div
-          className={`w-9 h-9 rounded-full ${avatarBg} flex items-center justify-center text-white text-xs font-medium flex-shrink-0`}
+          className={`w-[38px] h-[38px] rounded-full ${avatarBg} flex items-center justify-center text-white text-xs font-semibold flex-shrink-0`}
         >
           {initialsOf(r.member.first_name, r.member.last_name)}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="font-medium text-sm text-gray-900 truncate">
+          <div className="text-[15px] font-medium text-gray-900 tracking-tight truncate">
             {r.member.first_name} {r.member.last_name}
           </div>
-          <div className="text-xs mt-0.5">
-            <span className={subClass}>{subText}</span>
-            {rsvpSuffix}
-          </div>
+          <div className={`text-xs mt-1 ${subClass}`}>{subText}</div>
         </div>
-        <button
-          onClick={() => toggleEntry(r.member.id)}
-          disabled={isSaving}
-          aria-label={ariaLabel}
-          className="min-w-[44px] min-h-[44px] flex items-center justify-center cursor-pointer disabled:cursor-wait"
-        >
+        <div className="min-w-[44px] min-h-[44px] flex items-center justify-center flex-shrink-0">
           <span
-            className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
+            className={`w-[38px] h-[38px] rounded-full flex items-center justify-center transition-all ${
               isSaving
                 ? 'border-2 border-gray-200 border-t-gray-500 animate-spin'
                 : status === 'yes'
                   ? 'bg-green-600'
                   : status === 'no'
-                    ? 'bg-red-600'
-                    : 'bg-white border-2 border-gray-300'
+                    ? 'bg-red-500'
+                    : 'bg-white border-2 border-gray-200'
             }`}
           >
             {!isSaving && status === 'yes' && (
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             )}
             {!isSaving && status === 'no' && (
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
             )}
             {!isSaving && status === null && (
-              <svg className="w-3.5 h-3.5 text-gray-300" fill="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <circle cx="12" cy="12" r="6" />
               </svg>
             )}
           </span>
-        </button>
+        </div>
       </li>
     );
   };
@@ -400,10 +416,16 @@ export default function TakeAttendance() {
   // ───────────────── selector phase ─────────────────
   if (phase === 'selector') {
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 px-4 sm:px-6 lg:px-8 py-4">
+        <button
+          onClick={() => navigate('/admin/attendance')}
+          className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+        >
+          <ArrowLeft className="w-4 h-4" /> Attendance
+        </button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Take Attendance</h1>
-          <p className="text-sm text-gray-500 mt-1">Choose the event you're running today</p>
+          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Take attendance</h1>
+          <p className="text-sm text-gray-500 mt-1">Choose the event you're running</p>
         </div>
 
         {eventsLoading ? (
@@ -413,7 +435,7 @@ export default function TakeAttendance() {
             ))}
           </div>
         ) : events.length === 0 ? (
-          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+          <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
             <p className="text-gray-600 mb-4">No events in the last 14 days or next 7 days.</p>
             <button
               onClick={() => navigate('/admin/events/new')}
@@ -441,24 +463,13 @@ export default function TakeAttendance() {
                       <div className="text-[11px] font-semibold text-gray-400 mt-0.5 tracking-wider">{monthShort(ev.date)}</div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-sm font-semibold text-gray-900 truncate">{ev.title}</h3>
-                        {today && (
-                          <span className="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-semibold rounded-full uppercase tracking-wider">
-                            Today
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2">
+                      <h3 className="text-sm font-semibold text-gray-900 truncate">{ev.title}</h3>
+                      <div className="text-xs text-gray-500 mt-0.5">
                         {ev.time && <span>{formatTime(ev.time)}</span>}
-                        {ev.type && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 bg-gray-100 text-gray-600 text-[10px] font-medium rounded">
-                            {ev.type}
-                          </span>
-                        )}
+                        {ev.type && <span className="ml-2 text-gray-400">{ev.type}</span>}
                       </div>
                     </div>
-                    <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                    <ChevronRight className="w-5 h-5 text-gray-400" />
                   </button>
                 </li>
               );
@@ -474,15 +485,23 @@ export default function TakeAttendance() {
     if (loadingEvent || !selectedEvent) {
       return (
         <div className="flex justify-center p-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent" />
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-gray-700" />
         </div>
       );
     }
     return (
-      <div className="-m-4 sm:-m-6 lg:-m-8 min-h-[calc(100vh-4rem)] flex flex-col">
-        <div className="bg-gray-900 px-6 py-5">
+      <div className="min-h-screen flex flex-col">
+        <div
+          className="bg-gray-900 px-6"
+          style={{
+            paddingTop: 'calc(20px + env(safe-area-inset-top, 0px))',
+            paddingBottom: '20px',
+          }}
+        >
           <div className="text-white text-lg font-semibold">{selectedEvent.title}</div>
-          <div className="text-gray-300 text-sm mt-1">{formatLongDate(selectedEvent.date)}{selectedEvent.time ? ` · ${formatTime(selectedEvent.time)}` : ''}</div>
+          <div className="text-gray-300 text-sm mt-1">
+            {formatLongDate(selectedEvent.date)}{selectedEvent.time ? ` · ${formatTime(selectedEvent.time)}` : ''}
+          </div>
         </div>
         <div className="flex-1 bg-white px-6 py-12 flex flex-col items-center justify-start">
           <div className="w-full max-w-sm text-center">
@@ -512,9 +531,15 @@ export default function TakeAttendance() {
     const progressPct = counts.total > 0 ? Math.round((counts.present / counts.total) * 100) : 0;
 
     return (
-      <div className="-m-4 sm:-m-6 lg:-m-8 pb-32">
+      <div className="pb-40">
         {/* Sticky header */}
-        <div className="sticky top-0 z-20 bg-gray-900 px-4 py-3 flex items-center gap-3">
+        <div
+          className="sticky top-0 z-20 bg-gray-900 px-4 flex items-center gap-3"
+          style={{
+            paddingTop: 'calc(12px + env(safe-area-inset-top, 0px))',
+            paddingBottom: '12px',
+          }}
+        >
           <button
             onClick={() => setPhase('prompt')}
             aria-label="Back"
@@ -542,79 +567,65 @@ export default function TakeAttendance() {
           </div>
         )}
 
-        {/* Search */}
-        <div className="bg-white px-4 py-3 border-b border-gray-100">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search members..."
-              className="w-full bg-white border border-gray-200 rounded-xl pl-10 pr-10 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-300"
+        {/* Count bar (FIRST after header) */}
+        <div className="bg-white border-b border-gray-100 px-5 py-3">
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-semibold tracking-tight text-gray-900">{counts.present}</span>
+            <span className="text-lg text-gray-400 font-normal">of {counts.total}</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-gray-100 mt-2.5 mb-1.5 overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-300"
+              style={{
+                width: `${progressPct}%`,
+                background: `var(--church-primary, ${church?.primary_color ?? '#185FA5'})`,
+              }}
             />
-            {searchActive && (
-              <button
-                onClick={() => setSearch('')}
-                aria-label="Clear search"
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
+          </div>
+          <div className="text-xs text-gray-400">
+            {counts.absent} absent · {counts.checkLater} to check later
           </div>
         </div>
 
-        {/* Headline bar */}
-        <div className="bg-gray-50 border-b border-gray-200 px-4 py-3">
-          <div className="flex items-baseline gap-1">
-            <span className="text-2xl font-semibold text-gray-900">{counts.present}</span>
-            <span className="text-base text-gray-400">of {counts.total}</span>
-          </div>
-          <div className="h-1.5 bg-gray-200 rounded-full mt-2 overflow-hidden">
-            <div
-              className="h-full bg-green-500 transition-all duration-300"
-              style={{ width: `${progressPct}%` }}
-            />
-          </div>
-          {(counts.absent > 0 || counts.checkLater > 0) && (
-            <div className="text-xs text-gray-500 mt-1">
-              {counts.absent} absent · {counts.checkLater} to check later
-            </div>
+        {/* Search (SECOND) */}
+        <div className="mx-4 my-2 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search members"
+            className="w-full bg-gray-100 rounded-xl pl-9 pr-10 py-2.5 text-base text-gray-900 placeholder-gray-400 border-none outline-none"
+            style={{ fontSize: '16px' }}
+          />
+          {searchActive && (
+            <button
+              onClick={() => setSearch('')}
+              aria-label="Clear search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-gray-600 rounded-md"
+            >
+              <X className="w-4 h-4" />
+            </button>
           )}
         </div>
 
-        {/* Members — flat list when searching, grouped by voice part otherwise */}
+        {/* Members */}
         {searchActive ? (
           filteredRows.length === 0 ? (
             <div className="bg-white px-4 py-12 text-center text-sm text-gray-500">
               No members match "{search.trim()}"
             </div>
           ) : (
-            <ul>
-              {filteredRows.map(renderMemberRow)}
-            </ul>
+            <ul>{filteredRows.map(renderMemberRow)}</ul>
           )
         ) : (
           <div>
             {grouped.map(group => {
               const sectionEntries = group.rows.map(r => entries.get(r.member.id));
-              const sectionYes = sectionEntries.filter(e => e?.status === 'yes').length;
-              const sectionNo = sectionEntries.filter(e => e?.status === 'no').length;
-              const sectionNull = sectionEntries.filter(e => (e?.status ?? null) === null).length;
-              const sectionTotal = group.rows.length;
+              const yesN = sectionEntries.filter(e => e?.status === 'yes').length;
+              const noN = sectionEntries.filter(e => e?.status === 'no').length;
+              const nullN = sectionEntries.filter(e => (e?.status ?? null) === null).length;
               const isCollapsed = collapsed.has(group.key);
-
-              let summaryNode;
-              if (sectionYes === sectionTotal) {
-                summaryNode = <span className="text-green-600 text-xs">All here</span>;
-              } else if (sectionNo > 0 && sectionNull === 0) {
-                summaryNode = <span className="text-red-600 text-xs">{sectionNo} missing</span>;
-              } else if (sectionNull > 0) {
-                summaryNode = <span className="text-gray-400 text-xs">{sectionNull} to check</span>;
-              } else {
-                summaryNode = <span className="text-red-600 text-xs">{sectionNo} missing</span>;
-              }
 
               return (
                 <div key={group.key}>
@@ -627,26 +638,18 @@ export default function TakeAttendance() {
                         return s;
                       });
                     }}
-                    className="w-full bg-gray-50 px-4 py-2 border-b border-gray-200 flex justify-between items-center hover:bg-gray-100"
+                    className="w-full min-h-[44px] flex items-center justify-between px-5 bg-gray-50 border-b border-gray-100 cursor-pointer hover:bg-gray-100 transition-colors"
                   >
+                    <span className="text-sm font-medium text-gray-500">{group.key}</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                        {group.key}
-                      </span>
-                      {summaryNode}
+                      {renderDots(yesN, noN, nullN)}
+                      {isCollapsed
+                        ? <ChevronRight className="w-4 h-4 text-gray-400 ml-1" />
+                        : <ChevronDown className="w-4 h-4 text-gray-400 ml-1" />}
                     </div>
-                    {isCollapsed ? (
-                      <ChevronRight className="w-4 h-4 text-gray-400" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-gray-400" />
-                    )}
                   </button>
 
-                  {!isCollapsed && (
-                    <ul>
-                      {group.rows.map(renderMemberRow)}
-                    </ul>
-                  )}
+                  {!isCollapsed && <ul>{group.rows.map(renderMemberRow)}</ul>}
                 </div>
               );
             })}
@@ -655,24 +658,34 @@ export default function TakeAttendance() {
 
         {/* Sticky footer */}
         <div
-          className="fixed bottom-0 left-0 right-0 bg-gray-900 px-4 py-3 flex justify-between items-center z-30 lg:left-64"
-          style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 12px)' }}
+          className="fixed bottom-0 left-0 right-0 bg-gray-900 px-4 pt-3 z-30"
+          style={{ paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))' }}
         >
-          <div>
-            <div className="text-white font-semibold text-sm">
-              {counts.present} of {counts.total}
+          {counts.nullCount > 0 && (
+            <button
+              onClick={handleMarkRemaining}
+              className="text-xs text-gray-400 cursor-pointer hover:text-gray-200 mb-2 block"
+            >
+              Mark remaining {counts.nullCount} as present
+            </button>
+          )}
+          <div className="flex justify-between items-center">
+            <div>
+              <div className="text-xl font-semibold text-white tracking-tight">
+                {counts.present} of {counts.total}
+              </div>
+              <div className="text-xs text-gray-500 mt-1">{counts.checkLater} to check later</div>
             </div>
-            <div className="text-gray-400 text-xs">{counts.checkLater} to check later</div>
+            <button
+              onClick={() => setShowSaveSheet(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-6 py-3 rounded-xl min-h-[48px]"
+            >
+              Save attendance
+            </button>
           </div>
-          <button
-            onClick={() => setShowSaveSheet(true)}
-            className="bg-blue-700 hover:bg-blue-800 text-white px-5 py-2.5 rounded-xl font-medium text-sm"
-          >
-            Save attendance
-          </button>
         </div>
 
-        {/* Confirm save bottom sheet */}
+        {/* Save confirmation sheet */}
         {showSaveSheet && (
           <>
             <div
@@ -681,7 +694,7 @@ export default function TakeAttendance() {
             />
             <div
               className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl px-6 py-6 z-50"
-              style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 24px)' }}
+              style={{ paddingBottom: 'calc(24px + env(safe-area-inset-bottom, 0px))' }}
             >
               <h3 className="font-semibold text-lg text-gray-900">Save attendance?</h3>
               <p className="text-sm text-gray-500 mt-2">
@@ -689,7 +702,6 @@ export default function TakeAttendance() {
               </p>
               <button
                 onClick={async () => {
-                  // Persist null-status (check later) members as 'yes' on save
                   if (churchId && selectedEvent) {
                     const toMark = rows
                       .filter(r => (entries.get(r.member.id)?.status ?? null) === null)
@@ -735,8 +747,14 @@ export default function TakeAttendance() {
     else if (rate >= 50) warmMessage = 'Good session today';
 
     return (
-      <div className="-m-4 sm:-m-6 lg:-m-8">
-        <div className="bg-gray-900 px-4 py-3 flex items-center gap-3">
+      <div>
+        <div
+          className="bg-gray-900 px-4 flex items-center gap-3"
+          style={{
+            paddingTop: 'calc(12px + env(safe-area-inset-top, 0px))',
+            paddingBottom: '12px',
+          }}
+        >
           <button
             onClick={() => navigate('/admin/attendance')}
             aria-label="Back"
@@ -753,21 +771,27 @@ export default function TakeAttendance() {
           <div className="text-5xl font-bold text-gray-900">{counts.present}</div>
           <div className="text-gray-500 mt-1">of {counts.total} members were here</div>
           <div className="h-2 bg-gray-100 rounded-full mt-4 overflow-hidden">
-            <div className="h-full bg-green-500 transition-all duration-300" style={{ width: `${rate}%` }} />
+            <div
+              className="h-full transition-all duration-300"
+              style={{
+                width: `${rate}%`,
+                background: `var(--church-primary, ${church?.primary_color ?? '#185FA5'})`,
+              }}
+            />
           </div>
           <div className="mt-6 bg-amber-50 border border-amber-100 rounded-xl p-4 text-center">
             <div className="text-amber-800 font-medium">{warmMessage}</div>
           </div>
           <div className="mt-6 space-y-2">
             {grouped.map(group => {
-              const sectionYes = group.rows.filter(r => (entries.get(r.member.id)?.status ?? null) !== 'no').length;
+              const here = group.rows.filter(r => (entries.get(r.member.id)?.status ?? null) !== 'no').length;
               const total = group.rows.length;
-              const allHere = sectionYes === total;
+              const allHere = here === total;
               return (
                 <div key={group.key} className="flex items-center justify-between py-2 border-b border-gray-100">
                   <span className="text-sm font-medium text-gray-700">{group.key}</span>
                   <span className={`text-sm ${allHere ? 'text-green-600' : 'text-gray-500'}`}>
-                    {allHere ? 'All here' : `${sectionYes} of ${total} here`}
+                    {allHere ? 'All here' : `${here} of ${total} here`}
                   </span>
                 </div>
               );
