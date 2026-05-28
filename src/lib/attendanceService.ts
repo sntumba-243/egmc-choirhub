@@ -101,6 +101,52 @@ export async function markMemberAttendance(
   return true;
 }
 
+export async function bulkMarkAllPresent(
+  eventId: string,
+  eventTitle: string,
+  eventDate: string,
+  memberIds: string[],
+  churchId: string
+): Promise<boolean> {
+  if (memberIds.length === 0) return true;
+  const markedAt = new Date().toISOString();
+  const rows = memberIds.map(memberId => ({
+    event_id: eventId,
+    member_id: memberId,
+    event_title: eventTitle,
+    event_date: eventDate,
+    status: 'yes' as const,
+    church_id: churchId,
+    marked_by_admin: true,
+    marked_at: markedAt,
+  }));
+  const { error } = await supabase
+    .from('attendance_history')
+    .upsert(rows, { onConflict: 'event_id,member_id' });
+  if (error) {
+    console.error('bulkMarkAllPresent:', error.message);
+    return false;
+  }
+  return true;
+}
+
+export interface EventRSVP {
+  member_id: string;
+  status: 'yes' | 'no' | 'maybe';
+}
+
+export async function getRSVPsForEvent(eventId: string): Promise<EventRSVP[]> {
+  const { data, error } = await supabase
+    .from('event_rsvps')
+    .select('member_id, status')
+    .eq('event_id', eventId);
+  if (error) {
+    console.error('getRSVPsForEvent:', error.message);
+    return [];
+  }
+  return (data || []) as EventRSVP[];
+}
+
 export interface EventAttendanceSummary {
   total: number;
   present: number;

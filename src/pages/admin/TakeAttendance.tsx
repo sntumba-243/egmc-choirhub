@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Calendar, Check, ChevronDown, ChevronUp, Search, Users, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -8,10 +8,12 @@ import { useChurch } from '../../contexts/ChurchContext';
 import {
   getEventAttendanceWithMembers,
   markMemberAttendance,
-  summaryFromRows,
+  bulkMarkAllPresent,
+  getRSVPsForEvent,
   type MemberAttendanceRow,
-  type EventAttendanceSummary,
 } from '../../lib/attendanceService';
+
+type Phase = 'selector' | 'prompt' | 'sheet' | 'saved';
 
 interface EventLite {
   id: string;
@@ -22,6 +24,11 @@ interface EventLite {
   location?: string | null;
 }
 
+interface Entry {
+  status: 'yes' | 'no' | null;
+  rsvpStatus: 'yes' | 'no' | 'maybe' | null;
+}
+
 const voicePartColors: Record<string, string> = {
   Soprano: 'text-pink-600 bg-pink-50',
   Alto: 'text-purple-600 bg-purple-50',
@@ -30,56 +37,86 @@ const voicePartColors: Record<string, string> = {
   Instrumentalist: 'text-orange-600 bg-orange-50',
 };
 
-const voicePartCircleColors: Record<string, string> = {
+const voicePartAvatarBg: Record<string, string> = {
   Soprano: 'bg-pink-500',
   Alto: 'bg-purple-500',
   Tenor: 'bg-blue-500',
   Bass: 'bg-green-500',
   Instrumentalist: 'bg-orange-500',
+  Unassigned: 'bg-gray-400',
 };
 
-const formatDate = (dateString: string) => {
+const SECTION_ORDER = ['Soprano', 'Alto', 'Tenor', 'Bass', 'Instrumentalist', 'Unassigned'];
+
+const todayYMD = () => {
+  const d = new Date();
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+};
+
+const fmtYMD = (d: Date) =>
+  d.getFullYear() + '-' +
+  String(d.getMonth() + 1).padStart(2, '0') + '-' +
+  String(d.getDate()).padStart(2, '0');
+
+const formatLongDate = (dateString: string) => {
   const d = new Date(dateString + 'T00:00:00');
   return d.toLocaleDateString('en-US', {
-    weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
   });
 };
 
-const formatTime = (timeString: string) => {
+const formatTime = (timeString?: string | null) => {
   if (!timeString) return '';
-  const [hours, minutes] = timeString.split(':');
-  const hour = parseInt(hours, 10);
+  const [hh, mm] = timeString.split(':');
+  const hour = parseInt(hh, 10);
   const ampm = hour >= 12 ? 'PM' : 'AM';
   const displayHour = hour % 12 || 12;
-  return `${displayHour}:${minutes} ${ampm}`;
+  return `${displayHour}:${mm} ${ampm}`;
 };
 
 const initialsOf = (first: string, last: string) =>
   `${(first || '').charAt(0)}${(last || '').charAt(0)}`.toUpperCase() || '?';
+
+const dayNumber = (dateString: string) => {
+  const d = new Date(dateString + 'T00:00:00');
+  return d.getDate();
+};
+
+const monthShort = (dateString: string) => {
+  const d = new Date(dateString + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+};
+
+const isSameDayAsToday = (dateString: string) => dateString === todayYMD();
 
 export default function TakeAttendance() {
   const navigate = useNavigate();
   const { eventId } = useParams<{ eventId?: string }>();
   const { user } = useAuth();
   const { church } = useChurch();
+  const churchId = user?.church_id || church?.id;
 
+  const [phase, setPhase] = useState<Phase>(eventId ? 'prompt' : 'selector');
+
+  // Selector phase
   const [events, setEvents] = useState<EventLite[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
 
-  const [event, setEvent] = useState<EventLite | null>(null);
+  // Selected event (used in prompt/sheet/saved phases)
+  const [selectedEvent, setSelectedEvent] = useState<EventLite | null>(null);
+  const [loadingEvent, setLoadingEvent] = useState(false);
+
+  // Sheet phase state
   const [rows, setRows] = useState<MemberAttendanceRow[]>([]);
-  const [optimistic, setOptimistic] = useState<Map<string, 'yes' | 'no'>>(new Map());
+  const [entries, setEntries] = useState<Map<string, Entry>>(new Map());
   const [saving, setSaving] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(false);
-
-  const [voiceFilter, setVoiceFilter] = useState<string>('all');
-  const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const [showCloseSheet, setShowCloseSheet] = useState(false);
+  const [rsvpBannerVisible, setRsvpBannerVisible] = useState(false);
+  const [showSaveSheet, setShowSaveSheet] = useState(false);
 
-  const churchId = user?.church_id || church?.id;
-
-  // Load event-selector list
+  // Load selector events
   useEffect(() => {
     if (eventId || !churchId) return;
     let cancelled = false;
@@ -89,16 +126,13 @@ export default function TakeAttendance() {
         const today = new Date();
         const start = new Date(today); start.setDate(today.getDate() - 14);
         const end = new Date(today); end.setDate(today.getDate() + 7);
-        const fmt = (d: Date) => d.getFullYear() + '-' +
-          String(d.getMonth() + 1).padStart(2, '0') + '-' +
-          String(d.getDate()).padStart(2, '0');
         const { data, error } = await supabase
           .from('events')
           .select('id, title, date, time, type, location, church_id, is_global')
           .or(`church_id.eq.${churchId},is_global.eq.true`)
-          .gte('date', fmt(start))
-          .lte('date', fmt(end))
-          .order('date', { ascending: false });
+          .gte('date', fmtYMD(start))
+          .lte('date', fmtYMD(end))
+          .order('date', { ascending: true });
         if (cancelled) return;
         if (error) {
           console.error('TakeAttendance events:', error.message);
@@ -113,45 +147,93 @@ export default function TakeAttendance() {
     return () => { cancelled = true; };
   }, [eventId, churchId]);
 
-  // Load the event + attendance rows for the selected event
+  // Load selected event when eventId in URL
   useEffect(() => {
     if (!eventId || !churchId) return;
     let cancelled = false;
     (async () => {
-      setLoading(true);
+      setLoadingEvent(true);
       try {
-        const { data: ev, error: evErr } = await supabase
+        const { data, error } = await supabase
           .from('events')
           .select('id, title, date, time, type, location')
           .eq('id', eventId)
           .single();
         if (cancelled) return;
-        if (evErr || !ev) {
+        if (error || !data) {
           toast.error('Event not found');
           navigate('/admin/attendance/take');
           return;
         }
-        setEvent(ev);
-        const data = await getEventAttendanceWithMembers(eventId, churchId);
-        if (cancelled) return;
-        setRows(data);
-        setOptimistic(new Map());
+        setSelectedEvent(data);
+        setPhase('prompt');
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setLoadingEvent(false);
       }
     })();
     return () => { cancelled = true; };
   }, [eventId, churchId, navigate]);
 
-  const handleToggle = async (row: MemberAttendanceRow) => {
-    if (!event || !churchId) return;
-    const memberId = row.member.id;
-    const current = optimistic.get(memberId) ?? row.status;
-    const next: 'yes' | 'no' = current === 'yes' ? 'no' : 'yes';
+  const loadMembersAndRsvps = useCallback(async () => {
+    if (!selectedEvent || !churchId) return { rows: [] as MemberAttendanceRow[], rsvps: new Map<string, 'yes' | 'no' | 'maybe'>() };
+    const [memberRows, rsvpList] = await Promise.all([
+      getEventAttendanceWithMembers(selectedEvent.id, churchId),
+      getRSVPsForEvent(selectedEvent.id),
+    ]);
+    const rsvpMap = new Map<string, 'yes' | 'no' | 'maybe'>();
+    for (const r of rsvpList) rsvpMap.set(r.member_id, r.status);
+    return { rows: memberRows, rsvps: rsvpMap };
+  }, [selectedEvent, churchId]);
 
-    setOptimistic(prev => {
+  const handleEveryoneHere = async () => {
+    if (!selectedEvent || !churchId) return;
+    const { rows: memberRows, rsvps } = await loadMembersAndRsvps();
+    const map = new Map<string, Entry>();
+    for (const r of memberRows) {
+      map.set(r.member.id, { status: 'yes', rsvpStatus: rsvps.get(r.member.id) ?? null });
+    }
+    setRows(memberRows);
+    setEntries(map);
+    setRsvpBannerVisible(false);
+    setPhase('sheet');
+    bulkMarkAllPresent(
+      selectedEvent.id,
+      selectedEvent.title,
+      selectedEvent.date,
+      memberRows.map(r => r.member.id),
+      churchId
+    ).then(ok => { if (!ok) toast.error('Some records could not be saved'); });
+  };
+
+  const handleMarkIndividually = async () => {
+    if (!selectedEvent || !churchId) return;
+    const { rows: memberRows, rsvps } = await loadMembersAndRsvps();
+    const map = new Map<string, Entry>();
+    let prefilledCount = 0;
+    for (const r of memberRows) {
+      const rsvp = rsvps.get(r.member.id) ?? null;
+      let status: 'yes' | 'no' | null = null;
+      if (rsvp === 'yes') { status = 'yes'; prefilledCount++; }
+      else if (rsvp === 'no') { status = 'no'; prefilledCount++; }
+      map.set(r.member.id, { status, rsvpStatus: rsvp });
+    }
+    setRows(memberRows);
+    setEntries(map);
+    setRsvpBannerVisible(prefilledCount > 0);
+    setPhase('sheet');
+  };
+
+  const toggleEntry = async (memberId: string) => {
+    if (!selectedEvent || !churchId) return;
+    const cur = entries.get(memberId);
+    if (!cur) return;
+    // null → yes, yes → no, no → yes
+    const next: 'yes' | 'no' = cur.status === 'yes' ? 'no' : 'yes';
+    const prevStatus = cur.status;
+
+    setEntries(prev => {
       const m = new Map(prev);
-      m.set(memberId, next);
+      m.set(memberId, { ...cur, status: next });
       return m;
     });
     setSaving(prev => {
@@ -161,9 +243,9 @@ export default function TakeAttendance() {
     });
 
     const ok = await markMemberAttendance(
-      event.id,
-      event.title,
-      event.date,
+      selectedEvent.id,
+      selectedEvent.title,
+      selectedEvent.date,
       memberId,
       churchId,
       next
@@ -176,99 +258,57 @@ export default function TakeAttendance() {
     });
 
     if (!ok) {
-      setOptimistic(prev => {
+      setEntries(prev => {
         const m = new Map(prev);
-        if (current === null) m.delete(memberId);
-        else m.set(memberId, current);
+        m.set(memberId, { ...cur, status: prevStatus });
         return m;
       });
-      toast.error(`Could not save ${row.member.first_name}`);
+      toast.error('Could not save');
     }
   };
 
-  const handleMarkAllPresent = async () => {
-    if (!event || !churchId) return;
-    const targets = rows.filter(r => (optimistic.get(r.member.id) ?? r.status) === null);
-    if (targets.length === 0) {
-      toast('Everyone is already marked');
-      return;
+  // Computed counts (yes + null counted as present per spec)
+  const counts = useMemo(() => {
+    let yesCount = 0, noCount = 0, nullCount = 0;
+    for (const r of rows) {
+      const e = entries.get(r.member.id);
+      const s = e?.status ?? null;
+      if (s === 'yes') yesCount++;
+      else if (s === 'no') noCount++;
+      else nullCount++;
     }
-    setOptimistic(prev => {
-      const m = new Map(prev);
-      for (const r of targets) m.set(r.member.id, 'yes');
-      return m;
-    });
-    setSaving(prev => {
-      const s = new Set(prev);
-      for (const r of targets) s.add(r.member.id);
-      return s;
-    });
-    let failures = 0;
-    await Promise.all(
-      targets.map(async r => {
-        const ok = await markMemberAttendance(
-          event.id, event.title, event.date, r.member.id, churchId!, 'yes'
-        );
-        if (!ok) failures++;
-      })
-    );
-    setSaving(new Set());
-    if (failures > 0) {
-      toast.error(`${failures} could not be saved`);
-    } else {
-      toast.success(`Marked ${targets.length} present`);
-    }
-  };
-
-  const visibleRows = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return rows.filter(r => {
-      if (voiceFilter !== 'all' && r.member.voice_part !== voiceFilter) return false;
-      if (q) {
-        const name = `${r.member.first_name || ''} ${r.member.last_name || ''}`.toLowerCase();
-        if (!name.includes(q) && !(r.member.email || '').toLowerCase().includes(q)) return false;
-      }
-      return true;
-    });
-  }, [rows, voiceFilter, search]);
+    const present = yesCount + nullCount;
+    return {
+      yes: yesCount,
+      no: noCount,
+      nullCount,
+      present,
+      absent: noCount,
+      checkLater: nullCount,
+      total: rows.length,
+    };
+  }, [rows, entries]);
 
   const grouped = useMemo(() => {
-    const order = ['Soprano', 'Alto', 'Tenor', 'Bass', 'Instrumentalist'];
     const groups = new Map<string, MemberAttendanceRow[]>();
-    for (const r of visibleRows) {
-      const key = r.member.voice_part || 'Other';
-      const bucket = order.includes(key) ? key : 'Other';
-      if (!groups.has(bucket)) groups.set(bucket, []);
-      groups.get(bucket)!.push(r);
+    for (const r of rows) {
+      const vp = r.member.voice_part || 'Unassigned';
+      const key = SECTION_ORDER.includes(vp) ? vp : 'Unassigned';
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(r);
     }
-    return [...order, 'Other']
+    return SECTION_ORDER
       .filter(k => groups.has(k))
       .map(k => ({ key: k, rows: groups.get(k)! }));
-  }, [visibleRows]);
+  }, [rows]);
 
-  const summary: EventAttendanceSummary = useMemo(
-    () => summaryFromRows(rows, optimistic),
-    [rows, optimistic]
-  );
-
-  const markedCount = summary.present + summary.absent;
-  const percent = summary.total > 0 ? Math.round((markedCount / summary.total) * 100) : 0;
-
-  // ─────────── Event selector ───────────
-  if (!eventId) {
+  // ───────────────── selector phase ─────────────────
+  if (phase === 'selector') {
     return (
-      <div className="space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Take Attendance</h1>
-            <p className="text-sm sm:text-base text-gray-500 mt-1">Select an event to mark who attended</p>
-          </div>
-          <button
-            onClick={() => navigate('/admin/attendance')}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100"
-          >
-            View Stats
-          </button>
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Take Attendance</h1>
+          <p className="text-sm text-gray-500 mt-1">Choose the event you're running today</p>
         </div>
 
         {eventsLoading ? (
@@ -278,260 +318,282 @@ export default function TakeAttendance() {
             ))}
           </div>
         ) : events.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 sm:p-16 text-center">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4 sm:mb-6">
-              <Calendar className="w-8 h-8 sm:w-10 sm:h-10 text-blue-600" />
-            </div>
-            <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">No recent or upcoming events</h3>
-            <p className="text-sm sm:text-base text-gray-600 mb-6">Create an event before taking attendance.</p>
+          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+            <p className="text-gray-600 mb-4">No events in the last 14 days or next 7 days.</p>
             <button
               onClick={() => navigate('/admin/events/new')}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
             >
               + Add Event
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {events.map(ev => (
-              <button
-                key={ev.id}
-                onClick={() => navigate(`/admin/attendance/take/${ev.id}`)}
-                className="group text-left bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 border border-gray-200 hover:border-blue-300 p-4"
-              >
-                <div className="flex items-start justify-between gap-2 mb-3">
-                  <h3 className="text-sm font-bold text-gray-900 line-clamp-2 leading-tight group-hover:text-blue-600 transition-colors">
-                    {ev.title}
-                  </h3>
-                  {ev.type && (
-                    <span className="inline-flex items-center px-2 py-0.5 bg-blue-50 text-blue-600 text-xs font-semibold rounded-full whitespace-nowrap">
-                      {ev.type}
-                    </span>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-1.5 text-gray-700">
-                    <Calendar className="w-3.5 h-3.5 text-blue-500" strokeWidth={2.5} />
-                    <span className="text-xs font-medium">{formatDate(ev.date)}</span>
-                    {ev.time && <span className="text-xs text-gray-400">· {formatTime(ev.time)}</span>}
-                  </div>
-                  {ev.location && (
-                    <div className="text-xs text-gray-500 truncate">{ev.location}</div>
-                  )}
-                </div>
-                <div className="mt-3 text-xs font-semibold text-blue-600 group-hover:text-blue-800">
-                  Take Attendance →
-                </div>
-              </button>
-            ))}
-          </div>
+          <ul className="space-y-2">
+            {events.map(ev => {
+              const today = isSameDayAsToday(ev.date);
+              return (
+                <li key={ev.id}>
+                  <button
+                    onClick={() => {
+                      setSelectedEvent(ev);
+                      setPhase('prompt');
+                      navigate(`/admin/attendance/take/${ev.id}`);
+                    }}
+                    className={`w-full text-left bg-white rounded-xl border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all p-4 flex items-center gap-4 ${today ? 'border-l-4 border-l-blue-500' : ''}`}
+                  >
+                    <div className="flex-shrink-0 w-14 text-center">
+                      <div className="text-2xl font-bold text-gray-900 leading-none">{dayNumber(ev.date)}</div>
+                      <div className="text-[11px] font-semibold text-gray-400 mt-0.5 tracking-wider">{monthShort(ev.date)}</div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-sm font-semibold text-gray-900 truncate">{ev.title}</h3>
+                        {today && (
+                          <span className="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-semibold rounded-full uppercase tracking-wider">
+                            Today
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2">
+                        {ev.time && <span>{formatTime(ev.time)}</span>}
+                        {ev.type && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 bg-gray-100 text-gray-600 text-[10px] font-medium rounded">
+                            {ev.type}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </div>
     );
   }
 
-  // ─────────── Attendance sheet ───────────
-  if (loading) {
-    return (
-      <div className="space-y-3">
-        <div className="h-8 bg-gray-100 rounded animate-pulse w-2/3" />
-        <div className="h-4 bg-gray-100 rounded animate-pulse w-1/3" />
-        <div className="h-2 bg-gray-100 rounded-full animate-pulse" />
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
-          {[0, 1, 2, 3].map(i => <div key={i} className="h-16 bg-gray-100 rounded-xl animate-pulse" />)}
+  // ───────────────── prompt phase ─────────────────
+  if (phase === 'prompt') {
+    if (loadingEvent || !selectedEvent) {
+      return (
+        <div className="flex justify-center p-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent" />
         </div>
-        <div className="space-y-2 mt-4">
-          {[0, 1, 2, 3, 4].map(i => <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />)}
+      );
+    }
+    return (
+      <div className="-m-4 sm:-m-6 lg:-m-8 min-h-[calc(100vh-4rem)] flex flex-col">
+        <div className="bg-gray-900 px-6 py-5">
+          <div className="text-white text-lg font-semibold">{selectedEvent.title}</div>
+          <div className="text-gray-300 text-sm mt-1">{formatLongDate(selectedEvent.date)}{selectedEvent.time ? ` · ${formatTime(selectedEvent.time)}` : ''}</div>
+        </div>
+        <div className="flex-1 bg-white px-6 py-12 flex flex-col items-center justify-start">
+          <div className="w-full max-w-sm text-center">
+            <div className="text-xl font-medium text-gray-900">Is everyone here today?</div>
+            <div className="text-sm text-gray-500 mt-2">Your answer sets the starting point</div>
+            <button
+              onClick={handleEveryoneHere}
+              className="bg-gray-900 text-white w-full py-4 rounded-xl mt-10 font-medium hover:bg-gray-800 transition-colors"
+            >
+              Yes, everyone is here
+            </button>
+            <button
+              onClick={handleMarkIndividually}
+              className="border-2 border-gray-300 text-gray-700 w-full py-4 rounded-xl mt-3 font-medium hover:bg-gray-50 transition-colors"
+            >
+              I will mark individually
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
-  if (rows.length === 0) {
+  // ───────────────── sheet phase ─────────────────
+  if (phase === 'sheet') {
+    if (!selectedEvent) return null;
+    const progressPct = counts.total > 0 ? Math.round((counts.present / counts.total) * 100) : 0;
+
     return (
-      <div className="space-y-4">
-        <button
-          onClick={() => navigate('/admin/attendance/take')}
-          className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
-        >
-          <ArrowLeft className="w-4 h-4" /> Events
-        </button>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 sm:p-16 text-center">
-          <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4">
-            <Users className="w-8 h-8 text-blue-600" />
-          </div>
-          <h3 className="text-xl font-bold text-gray-900 mb-2">No active members</h3>
-          <p className="text-sm text-gray-600 mb-6">Add members to your church before taking attendance.</p>
+      <div className="-m-4 sm:-m-6 lg:-m-8 pb-32">
+        {/* Sticky header */}
+        <div className="sticky top-0 z-20 bg-gray-900 px-4 py-3 flex items-center gap-3">
           <button
-            onClick={() => navigate('/admin/members/new')}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            onClick={() => setPhase('prompt')}
+            aria-label="Back"
+            className="text-white p-1 -ml-1 hover:bg-gray-800 rounded-lg"
           >
-            + Add Member
+            <ArrowLeft className="w-5 h-5" />
           </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4 pb-32">
-      {/* Header */}
-      <div>
-        <button
-          onClick={() => navigate('/admin/attendance/take')}
-          className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 mb-2"
-        >
-          <ArrowLeft className="w-4 h-4" /> Events
-        </button>
-        <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">{event?.title}</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
-          {event && formatDate(event.date)}
-          {event?.time && <span className="text-gray-400"> · {formatTime(event.time)}</span>}
-        </p>
-        <div className="mt-2 flex items-center gap-3">
-          <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-            <div className="h-full bg-green-500 transition-all duration-300" style={{ width: `${percent}%` }} />
+          <div className="flex-1 min-w-0">
+            <div className="text-white font-semibold text-sm truncate">{selectedEvent.title}</div>
+            <div className="text-gray-400 text-xs">{formatLongDate(selectedEvent.date)}</div>
           </div>
-          <span className="text-sm text-gray-500 whitespace-nowrap">
-            {markedCount} / {summary.total} marked
-          </span>
         </div>
-      </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-3">
-          <div className="text-xs text-gray-400">Present</div>
-          <div className="text-xl font-bold text-green-600">{summary.present}</div>
-        </div>
-        <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-3">
-          <div className="text-xs text-gray-400">Absent</div>
-          <div className="text-xl font-bold text-red-500">{summary.absent}</div>
-        </div>
-        <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-3">
-          <div className="text-xs text-gray-400">Unmarked</div>
-          <div className="text-xl font-bold text-gray-500">{summary.unmarked}</div>
-        </div>
-        <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-3">
-          <div className="text-xs text-gray-400">Rate</div>
-          <div className="text-xl font-bold text-blue-600">{summary.rate}%</div>
-        </div>
-      </div>
+        {/* RSVP banner */}
+        {rsvpBannerVisible && (
+          <div className="bg-blue-50 border-b border-blue-100 px-4 py-2 flex items-center justify-between">
+            <div className="text-blue-700 text-xs">Pre-filled from RSVPs — tap to correct</div>
+            <button
+              onClick={() => setRsvpBannerVisible(false)}
+              aria-label="Dismiss"
+              className="text-blue-500 text-xs font-medium ml-2 hover:text-blue-700"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
-      {/* Toolbar */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleMarkAllPresent}
-            disabled={summary.unmarked === 0}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Check className="w-4 h-4" /> Mark all present
-          </button>
-          <select
-            value={voiceFilter}
-            onChange={e => setVoiceFilter(e.target.value)}
-            className="px-3 py-2 text-sm font-medium text-gray-700 bg-white rounded-lg border border-gray-200 shadow-sm"
-          >
-            <option value="all">All voices</option>
-            <option value="Soprano">Soprano</option>
-            <option value="Alto">Alto</option>
-            <option value="Tenor">Tenor</option>
-            <option value="Bass">Bass</option>
-          </select>
+        {/* Headline bar */}
+        <div className="bg-gray-50 border-b border-gray-200 px-4 py-3">
+          <div className="flex items-baseline gap-1">
+            <span className="text-2xl font-semibold text-gray-900">{counts.present}</span>
+            <span className="text-base text-gray-400">of {counts.total}</span>
+          </div>
+          <div className="h-1.5 bg-gray-200 rounded-full mt-2 overflow-hidden">
+            <div
+              className="h-full bg-green-500 transition-all duration-300"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+          {(counts.absent > 0 || counts.checkLater > 0) && (
+            <div className="text-xs text-gray-500 mt-1">
+              {counts.absent} absent · {counts.checkLater} to check later
+            </div>
+          )}
         </div>
-        <div className="relative sm:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search by name…"
-            className="w-full pl-9 pr-3 py-2 text-sm bg-white rounded-lg border border-gray-200 shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-300"
-          />
-        </div>
-      </div>
 
-      {/* Members grouped by voice part */}
-      {grouped.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-sm text-gray-500">
-          No members match this filter
-        </div>
-      ) : (
-        <div className="space-y-3">
+        {/* Voice part sections */}
+        <div>
           {grouped.map(group => {
+            const sectionEntries = group.rows.map(r => entries.get(r.member.id));
+            const sectionYes = sectionEntries.filter(e => e?.status === 'yes').length;
+            const sectionNo = sectionEntries.filter(e => e?.status === 'no').length;
+            const sectionNull = sectionEntries.filter(e => (e?.status ?? null) === null).length;
+            const sectionTotal = group.rows.length;
             const isCollapsed = collapsed.has(group.key);
-            const groupPresent = group.rows.filter(r => (optimistic.get(r.member.id) ?? r.status) === 'yes').length;
-            const groupTotal = group.rows.length;
+
+            let summaryNode;
+            if (sectionYes === sectionTotal) {
+              summaryNode = <span className="text-green-600 text-xs">All here</span>;
+            } else if (sectionNo > 0 && sectionNull === 0) {
+              summaryNode = <span className="text-red-600 text-xs">{sectionNo} missing</span>;
+            } else if (sectionNull > 0) {
+              summaryNode = <span className="text-gray-400 text-xs">{sectionNull} to check</span>;
+            } else {
+              summaryNode = <span className="text-red-600 text-xs">{sectionNo} missing</span>;
+            }
+
             return (
-              <div key={group.key} className="bg-white rounded-2xl border border-gray-200/60 shadow-sm overflow-hidden">
+              <div key={group.key}>
                 <button
                   onClick={() => {
                     setCollapsed(prev => {
                       const s = new Set(prev);
-                      if (s.has(group.key)) s.delete(group.key); else s.add(group.key);
+                      if (s.has(group.key)) s.delete(group.key);
+                      else s.add(group.key);
                       return s;
                     });
                   }}
-                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+                  className="w-full bg-gray-50 px-4 py-2 border-b border-gray-200 flex justify-between items-center hover:bg-gray-100"
                 >
                   <div className="flex items-center gap-2">
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-md ${voicePartColors[group.key] || 'text-gray-600 bg-gray-50'}`}>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
                       {group.key}
                     </span>
-                    <span className="text-xs text-gray-500 font-medium">
-                      {groupPresent} / {groupTotal}
-                    </span>
+                    {summaryNode}
                   </div>
-                  {isCollapsed
-                    ? <ChevronDown className="w-4 h-4 text-gray-400" />
-                    : <ChevronUp className="w-4 h-4 text-gray-400" />}
+                  {isCollapsed ? (
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                  )}
                 </button>
+
                 {!isCollapsed && (
-                  <ul className="divide-y divide-gray-50 lg:grid lg:grid-cols-2 lg:divide-y-0">
+                  <ul>
                     {group.rows.map(r => {
-                      const eff = optimistic.get(r.member.id) ?? r.status;
+                      const entry = entries.get(r.member.id);
+                      const status = entry?.status ?? null;
+                      const rsvp = entry?.rsvpStatus ?? null;
                       const isSaving = saving.has(r.member.id);
-                      const circleColor = voicePartCircleColors[r.member.voice_part || ''] || 'bg-gray-400';
+                      const avatarBg = voicePartAvatarBg[r.member.voice_part || 'Unassigned'] || 'bg-gray-400';
+
+                      let subText: React.ReactNode = null;
+                      let subClass = '';
+                      if (status === 'yes') { subText = 'Present'; subClass = 'text-green-600'; }
+                      else if (status === 'no') { subText = 'Absent'; subClass = 'text-red-600'; }
+                      else { subText = 'Check later'; subClass = 'text-gray-400'; }
+
+                      // append RSVP if differs
+                      let rsvpSuffix: React.ReactNode = null;
+                      const differs =
+                        (rsvp === 'yes' && status !== 'yes') ||
+                        (rsvp === 'no' && status !== 'no');
+                      if (differs) {
+                        const rsvpLabel = rsvp === 'yes' ? 'Going' : 'Cant come';
+                        rsvpSuffix = <span className="text-gray-400"> · RSVP: {rsvpLabel}</span>;
+                      }
+
+                      const ariaLabel = status === 'yes'
+                        ? `Mark ${r.member.first_name} ${r.member.last_name} absent`
+                        : `Mark ${r.member.first_name} ${r.member.last_name} present`;
+
                       return (
-                        <li key={r.member.id} className="flex items-center gap-3 px-4 py-3 lg:border-b lg:border-gray-50">
-                          <div className={`w-9 h-9 rounded-full ${circleColor} flex items-center justify-center text-white text-xs font-bold shadow-sm flex-shrink-0`}>
+                        <li
+                          key={r.member.id}
+                          className="px-4 py-3 flex items-center gap-3 bg-white border-b border-gray-100"
+                        >
+                          <div
+                            className={`w-9 h-9 rounded-full ${avatarBg} flex items-center justify-center text-white text-xs font-medium flex-shrink-0`}
+                          >
                             {initialsOf(r.member.first_name, r.member.last_name)}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium text-gray-900 truncate">
+                            <div className="font-medium text-sm text-gray-900 truncate">
                               {r.member.first_name} {r.member.last_name}
                             </div>
-                            <div className="hidden sm:flex items-center gap-2 text-xs text-gray-400 mt-0.5">
-                              {r.member.voice_part && (
-                                <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded ${voicePartColors[r.member.voice_part] || 'text-gray-600 bg-gray-50'}`}>
-                                  {r.member.voice_part}
-                                </span>
-                              )}
-                              {r.markedByAdmin && <span>· admin</span>}
+                            <div className="text-xs mt-0.5">
+                              <span className={subClass}>{subText}</span>
+                              {rsvpSuffix}
                             </div>
                           </div>
                           <button
-                            onClick={() => handleToggle(r)}
+                            onClick={() => toggleEntry(r.member.id)}
                             disabled={isSaving}
-                            aria-label={
-                              eff === 'yes' ? 'Mark absent' : eff === 'no' ? 'Mark present' : 'Mark present'
-                            }
-                            className={`relative w-11 h-11 min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center transition-all ${
-                              eff === 'yes'
-                                ? 'bg-green-500 text-white shadow-sm hover:bg-green-600'
-                                : eff === 'no'
-                                  ? 'bg-red-500 text-white shadow-sm hover:bg-red-600'
-                                  : 'bg-white border-2 border-gray-300 text-gray-300 hover:border-gray-400'
-                            }`}
+                            aria-label={ariaLabel}
+                            className="min-w-[44px] min-h-[44px] flex items-center justify-center cursor-pointer disabled:cursor-wait"
                           >
-                            {isSaving ? (
-                              <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                            ) : eff === 'yes' ? (
-                              <Check className="w-5 h-5" strokeWidth={3} />
-                            ) : eff === 'no' ? (
-                              <X className="w-5 h-5" strokeWidth={3} />
-                            ) : null}
+                            <span
+                              className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
+                                isSaving
+                                  ? 'border-2 border-gray-200 border-t-gray-500 animate-spin'
+                                  : status === 'yes'
+                                    ? 'bg-green-600'
+                                    : status === 'no'
+                                      ? 'bg-red-600'
+                                      : 'bg-white border-2 border-gray-300'
+                              }`}
+                            >
+                              {!isSaving && status === 'yes' && (
+                                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                              {!isSaving && status === 'no' && (
+                                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              )}
+                              {!isSaving && status === null && (
+                                <svg className="w-3.5 h-3.5 text-gray-300" fill="currentColor" viewBox="0 0 24 24">
+                                  <circle cx="12" cy="12" r="6" />
+                                </svg>
+                              )}
+                            </span>
                           </button>
                         </li>
                       );
@@ -542,61 +604,145 @@ export default function TakeAttendance() {
             );
           })}
         </div>
-      )}
 
-      {/* Sticky footer */}
-      <div
-        className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 lg:left-64 z-20"
-        style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 12px)' }}
-      >
-        <div className="max-w-5xl mx-auto flex items-center justify-between gap-3">
-          <div className="text-xs text-gray-500">
-            {summary.unmarked > 0
-              ? <>{summary.unmarked} unmarked · default present</>
-              : <>All members marked</>}
+        {/* Sticky footer */}
+        <div
+          className="fixed bottom-0 left-0 right-0 bg-gray-900 px-4 py-3 flex justify-between items-center z-30 lg:left-64"
+          style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 12px)' }}
+        >
+          <div>
+            <div className="text-white font-semibold text-sm">
+              {counts.present} of {counts.total}
+            </div>
+            <div className="text-gray-400 text-xs">{counts.checkLater} to check later</div>
           </div>
           <button
-            onClick={() => setShowCloseSheet(true)}
-            className="px-4 py-2 rounded-lg bg-gray-800 text-white text-sm font-semibold hover:bg-gray-900"
+            onClick={() => setShowSaveSheet(true)}
+            className="bg-blue-700 hover:bg-blue-800 text-white px-5 py-2.5 rounded-xl font-medium text-sm"
           >
-            Close Session
+            Save attendance
           </button>
         </div>
-      </div>
 
-      {/* Confirm sheet */}
-      {showCloseSheet && (
-        <div className="fixed inset-0 z-30 flex items-end sm:items-center sm:justify-center bg-black/50" onClick={() => setShowCloseSheet(false)}>
-          <div
-            className="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-xl p-5"
-            onClick={e => e.stopPropagation()}
-            style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 20px)' }}
-          >
-            <h3 className="text-lg font-semibold text-gray-900">Close attendance for {event?.title}?</h3>
-            <p className="mt-2 text-sm text-gray-600">
-              {summary.unmarked} unmarked member{summary.unmarked === 1 ? '' : 's'} will be treated as present (default).
-            </p>
-            <div className="mt-5 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+        {/* Confirm save bottom sheet */}
+        {showSaveSheet && (
+          <>
+            <div
+              className="fixed inset-0 bg-black/40 z-40"
+              onClick={() => setShowSaveSheet(false)}
+            />
+            <div
+              className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl px-6 py-6 z-50"
+              style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 24px)' }}
+            >
+              <h3 className="font-semibold text-lg text-gray-900">Save attendance?</h3>
+              <p className="text-sm text-gray-500 mt-2">
+                {selectedEvent.title} · {counts.checkLater} to check later counted as present.
+              </p>
               <button
-                onClick={() => setShowCloseSheet(false)}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200"
+                onClick={async () => {
+                  // Persist null-status (check later) members as 'yes' on save
+                  if (churchId && selectedEvent) {
+                    const toMark = rows
+                      .filter(r => (entries.get(r.member.id)?.status ?? null) === null)
+                      .map(r => r.member.id);
+                    if (toMark.length > 0) {
+                      const ok = await bulkMarkAllPresent(
+                        selectedEvent.id,
+                        selectedEvent.title,
+                        selectedEvent.date,
+                        toMark,
+                        churchId
+                      );
+                      if (!ok) toast.error('Some records could not be saved');
+                    }
+                  }
+                  setShowSaveSheet(false);
+                  setPhase('saved');
+                }}
+                className="bg-gray-900 hover:bg-black text-white w-full py-3 rounded-xl font-medium mt-5"
               >
-                Keep Taking Attendance
+                Save
               </button>
               <button
-                onClick={() => {
-                  setShowCloseSheet(false);
-                  toast.success('Session closed');
-                  navigate('/admin/attendance');
-                }}
-                className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-gray-800 hover:bg-gray-900"
+                onClick={() => setShowSaveSheet(false)}
+                className="border border-gray-300 text-gray-700 w-full py-3 rounded-xl mt-2 hover:bg-gray-50"
               >
-                Close Session
+                Keep marking
               </button>
             </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // ───────────────── saved phase ─────────────────
+  if (phase === 'saved') {
+    if (!selectedEvent) return null;
+    const rate = counts.total > 0 ? Math.round((counts.present / counts.total) * 100) : 0;
+    let warmMessage = 'Attendance recorded for today';
+    if (rate >= 90) warmMessage = 'Excellent turnout today 🎉';
+    else if (rate >= 75) warmMessage = 'Great rehearsal attendance 👏';
+    else if (rate >= 50) warmMessage = 'Good session today';
+
+    return (
+      <div className="-m-4 sm:-m-6 lg:-m-8">
+        <div className="bg-gray-900 px-4 py-3 flex items-center gap-3">
+          <button
+            onClick={() => navigate('/admin/attendance')}
+            aria-label="Back"
+            className="text-white p-1 -ml-1 hover:bg-gray-800 rounded-lg"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div className="flex-1 min-w-0">
+            <div className="text-white font-semibold text-sm truncate">{selectedEvent.title}</div>
+            <div className="text-gray-400 text-xs">{formatLongDate(selectedEvent.date)}</div>
           </div>
         </div>
-      )}
-    </div>
-  );
+        <div className="px-6 py-8 bg-white min-h-[calc(100vh-4rem)]">
+          <div className="text-5xl font-bold text-gray-900">{counts.present}</div>
+          <div className="text-gray-500 mt-1">of {counts.total} members were here</div>
+          <div className="h-2 bg-gray-100 rounded-full mt-4 overflow-hidden">
+            <div className="h-full bg-green-500 transition-all duration-300" style={{ width: `${rate}%` }} />
+          </div>
+          <div className="mt-6 bg-amber-50 border border-amber-100 rounded-xl p-4 text-center">
+            <div className="text-amber-800 font-medium">{warmMessage}</div>
+          </div>
+          <div className="mt-6 space-y-2">
+            {grouped.map(group => {
+              const sectionYes = group.rows.filter(r => (entries.get(r.member.id)?.status ?? null) !== 'no').length;
+              const total = group.rows.length;
+              const allHere = sectionYes === total;
+              return (
+                <div key={group.key} className="flex items-center justify-between py-2 border-b border-gray-100">
+                  <span className="text-sm font-medium text-gray-700">{group.key}</span>
+                  <span className={`text-sm ${allHere ? 'text-green-600' : 'text-gray-500'}`}>
+                    {allHere ? 'All here' : `${sectionYes} of ${total} here`}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-8 text-center flex flex-col gap-3">
+            <button
+              onClick={() => navigate('/admin/events')}
+              className="text-gray-600 underline text-sm hover:text-gray-900"
+            >
+              Back to events
+            </button>
+            <button
+              onClick={() => navigate('/admin/attendance')}
+              className="text-gray-600 underline text-sm hover:text-gray-900"
+            >
+              View attendance history
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 }
