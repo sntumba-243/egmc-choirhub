@@ -33,7 +33,7 @@ export async function getEventAttendanceWithMembers(
     .from('members')
     .select('id, first_name, last_name, email, voice_part, role')
     .eq('church_id', churchId)
-    .neq('role', 'inactive')
+    .in('role', ['admin', 'member', 'section_leader'])
     .order('last_name', { ascending: true });
 
   if (membersError || !members) {

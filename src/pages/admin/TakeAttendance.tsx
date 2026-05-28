@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronDown, ChevronRight, ArrowLeft } from 'lucide-react';
+import { ChevronDown, ChevronRight, ArrowLeft, Search, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -115,6 +115,7 @@ export default function TakeAttendance() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [rsvpBannerVisible, setRsvpBannerVisible] = useState(false);
   const [showSaveSheet, setShowSaveSheet] = useState(false);
+  const [search, setSearch] = useState('');
 
   // Load selector events
   useEffect(() => {
@@ -289,9 +290,18 @@ export default function TakeAttendance() {
     };
   }, [rows, entries]);
 
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter(r => {
+      const full = `${r.member.first_name || ''} ${r.member.last_name || ''}`.toLowerCase();
+      return full.includes(q);
+    });
+  }, [rows, search]);
+
   const grouped = useMemo(() => {
     const groups = new Map<string, MemberAttendanceRow[]>();
-    for (const r of rows) {
+    for (const r of filteredRows) {
       const vp = r.member.voice_part || 'Unassigned';
       const key = SECTION_ORDER.includes(vp) ? vp : 'Unassigned';
       if (!groups.has(key)) groups.set(key, []);
@@ -300,7 +310,92 @@ export default function TakeAttendance() {
     return SECTION_ORDER
       .filter(k => groups.has(k))
       .map(k => ({ key: k, rows: groups.get(k)! }));
-  }, [rows]);
+  }, [filteredRows]);
+
+  const searchActive = search.trim().length > 0;
+
+  const renderMemberRow = (r: MemberAttendanceRow) => {
+    const entry = entries.get(r.member.id);
+    const status = entry?.status ?? null;
+    const rsvp = entry?.rsvpStatus ?? null;
+    const isSaving = saving.has(r.member.id);
+    const avatarBg = voicePartAvatarBg[r.member.voice_part || 'Unassigned'] || 'bg-gray-400';
+
+    let subText: React.ReactNode = null;
+    let subClass = '';
+    if (status === 'yes') { subText = 'Present'; subClass = 'text-green-600'; }
+    else if (status === 'no') { subText = 'Absent'; subClass = 'text-red-600'; }
+    else { subText = 'Check later'; subClass = 'text-gray-400'; }
+
+    let rsvpSuffix: React.ReactNode = null;
+    const differs =
+      (rsvp === 'yes' && status !== 'yes') ||
+      (rsvp === 'no' && status !== 'no');
+    if (differs) {
+      const rsvpLabel = rsvp === 'yes' ? 'Going' : 'Cant come';
+      rsvpSuffix = <span className="text-gray-400"> · RSVP: {rsvpLabel}</span>;
+    }
+
+    const ariaLabel = status === 'yes'
+      ? `Mark ${r.member.first_name} ${r.member.last_name} absent`
+      : `Mark ${r.member.first_name} ${r.member.last_name} present`;
+
+    return (
+      <li
+        key={r.member.id}
+        className="px-4 py-3 flex items-center gap-3 bg-white border-b border-gray-100"
+      >
+        <div
+          className={`w-9 h-9 rounded-full ${avatarBg} flex items-center justify-center text-white text-xs font-medium flex-shrink-0`}
+        >
+          {initialsOf(r.member.first_name, r.member.last_name)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-sm text-gray-900 truncate">
+            {r.member.first_name} {r.member.last_name}
+          </div>
+          <div className="text-xs mt-0.5">
+            <span className={subClass}>{subText}</span>
+            {rsvpSuffix}
+          </div>
+        </div>
+        <button
+          onClick={() => toggleEntry(r.member.id)}
+          disabled={isSaving}
+          aria-label={ariaLabel}
+          className="min-w-[44px] min-h-[44px] flex items-center justify-center cursor-pointer disabled:cursor-wait"
+        >
+          <span
+            className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
+              isSaving
+                ? 'border-2 border-gray-200 border-t-gray-500 animate-spin'
+                : status === 'yes'
+                  ? 'bg-green-600'
+                  : status === 'no'
+                    ? 'bg-red-600'
+                    : 'bg-white border-2 border-gray-300'
+            }`}
+          >
+            {!isSaving && status === 'yes' && (
+              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            )}
+            {!isSaving && status === 'no' && (
+              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            )}
+            {!isSaving && status === null && (
+              <svg className="w-3.5 h-3.5 text-gray-300" fill="currentColor" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="6" />
+              </svg>
+            )}
+          </span>
+        </button>
+      </li>
+    );
+  };
 
   // ───────────────── selector phase ─────────────────
   if (phase === 'selector') {
@@ -447,6 +542,29 @@ export default function TakeAttendance() {
           </div>
         )}
 
+        {/* Search */}
+        <div className="bg-white px-4 py-3 border-b border-gray-100">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search members..."
+              className="w-full bg-white border border-gray-200 rounded-xl pl-10 pr-10 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-300"
+            />
+            {searchActive && (
+              <button
+                onClick={() => setSearch('')}
+                aria-label="Clear search"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Headline bar */}
         <div className="bg-gray-50 border-b border-gray-200 px-4 py-3">
           <div className="flex items-baseline gap-1">
@@ -466,144 +584,74 @@ export default function TakeAttendance() {
           )}
         </div>
 
-        {/* Voice part sections */}
-        <div>
-          {grouped.map(group => {
-            const sectionEntries = group.rows.map(r => entries.get(r.member.id));
-            const sectionYes = sectionEntries.filter(e => e?.status === 'yes').length;
-            const sectionNo = sectionEntries.filter(e => e?.status === 'no').length;
-            const sectionNull = sectionEntries.filter(e => (e?.status ?? null) === null).length;
-            const sectionTotal = group.rows.length;
-            const isCollapsed = collapsed.has(group.key);
+        {/* Members — flat list when searching, grouped by voice part otherwise */}
+        {searchActive ? (
+          filteredRows.length === 0 ? (
+            <div className="bg-white px-4 py-12 text-center text-sm text-gray-500">
+              No members match "{search.trim()}"
+            </div>
+          ) : (
+            <ul>
+              {filteredRows.map(renderMemberRow)}
+            </ul>
+          )
+        ) : (
+          <div>
+            {grouped.map(group => {
+              const sectionEntries = group.rows.map(r => entries.get(r.member.id));
+              const sectionYes = sectionEntries.filter(e => e?.status === 'yes').length;
+              const sectionNo = sectionEntries.filter(e => e?.status === 'no').length;
+              const sectionNull = sectionEntries.filter(e => (e?.status ?? null) === null).length;
+              const sectionTotal = group.rows.length;
+              const isCollapsed = collapsed.has(group.key);
 
-            let summaryNode;
-            if (sectionYes === sectionTotal) {
-              summaryNode = <span className="text-green-600 text-xs">All here</span>;
-            } else if (sectionNo > 0 && sectionNull === 0) {
-              summaryNode = <span className="text-red-600 text-xs">{sectionNo} missing</span>;
-            } else if (sectionNull > 0) {
-              summaryNode = <span className="text-gray-400 text-xs">{sectionNull} to check</span>;
-            } else {
-              summaryNode = <span className="text-red-600 text-xs">{sectionNo} missing</span>;
-            }
+              let summaryNode;
+              if (sectionYes === sectionTotal) {
+                summaryNode = <span className="text-green-600 text-xs">All here</span>;
+              } else if (sectionNo > 0 && sectionNull === 0) {
+                summaryNode = <span className="text-red-600 text-xs">{sectionNo} missing</span>;
+              } else if (sectionNull > 0) {
+                summaryNode = <span className="text-gray-400 text-xs">{sectionNull} to check</span>;
+              } else {
+                summaryNode = <span className="text-red-600 text-xs">{sectionNo} missing</span>;
+              }
 
-            return (
-              <div key={group.key}>
-                <button
-                  onClick={() => {
-                    setCollapsed(prev => {
-                      const s = new Set(prev);
-                      if (s.has(group.key)) s.delete(group.key);
-                      else s.add(group.key);
-                      return s;
-                    });
-                  }}
-                  className="w-full bg-gray-50 px-4 py-2 border-b border-gray-200 flex justify-between items-center hover:bg-gray-100"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                      {group.key}
-                    </span>
-                    {summaryNode}
-                  </div>
-                  {isCollapsed ? (
-                    <ChevronRight className="w-4 h-4 text-gray-400" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
+              return (
+                <div key={group.key}>
+                  <button
+                    onClick={() => {
+                      setCollapsed(prev => {
+                        const s = new Set(prev);
+                        if (s.has(group.key)) s.delete(group.key);
+                        else s.add(group.key);
+                        return s;
+                      });
+                    }}
+                    className="w-full bg-gray-50 px-4 py-2 border-b border-gray-200 flex justify-between items-center hover:bg-gray-100"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                        {group.key}
+                      </span>
+                      {summaryNode}
+                    </div>
+                    {isCollapsed ? (
+                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-gray-400" />
+                    )}
+                  </button>
+
+                  {!isCollapsed && (
+                    <ul>
+                      {group.rows.map(renderMemberRow)}
+                    </ul>
                   )}
-                </button>
-
-                {!isCollapsed && (
-                  <ul>
-                    {group.rows.map(r => {
-                      const entry = entries.get(r.member.id);
-                      const status = entry?.status ?? null;
-                      const rsvp = entry?.rsvpStatus ?? null;
-                      const isSaving = saving.has(r.member.id);
-                      const avatarBg = voicePartAvatarBg[r.member.voice_part || 'Unassigned'] || 'bg-gray-400';
-
-                      let subText: React.ReactNode = null;
-                      let subClass = '';
-                      if (status === 'yes') { subText = 'Present'; subClass = 'text-green-600'; }
-                      else if (status === 'no') { subText = 'Absent'; subClass = 'text-red-600'; }
-                      else { subText = 'Check later'; subClass = 'text-gray-400'; }
-
-                      // append RSVP if differs
-                      let rsvpSuffix: React.ReactNode = null;
-                      const differs =
-                        (rsvp === 'yes' && status !== 'yes') ||
-                        (rsvp === 'no' && status !== 'no');
-                      if (differs) {
-                        const rsvpLabel = rsvp === 'yes' ? 'Going' : 'Cant come';
-                        rsvpSuffix = <span className="text-gray-400"> · RSVP: {rsvpLabel}</span>;
-                      }
-
-                      const ariaLabel = status === 'yes'
-                        ? `Mark ${r.member.first_name} ${r.member.last_name} absent`
-                        : `Mark ${r.member.first_name} ${r.member.last_name} present`;
-
-                      return (
-                        <li
-                          key={r.member.id}
-                          className="px-4 py-3 flex items-center gap-3 bg-white border-b border-gray-100"
-                        >
-                          <div
-                            className={`w-9 h-9 rounded-full ${avatarBg} flex items-center justify-center text-white text-xs font-medium flex-shrink-0`}
-                          >
-                            {initialsOf(r.member.first_name, r.member.last_name)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm text-gray-900 truncate">
-                              {r.member.first_name} {r.member.last_name}
-                            </div>
-                            <div className="text-xs mt-0.5">
-                              <span className={subClass}>{subText}</span>
-                              {rsvpSuffix}
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => toggleEntry(r.member.id)}
-                            disabled={isSaving}
-                            aria-label={ariaLabel}
-                            className="min-w-[44px] min-h-[44px] flex items-center justify-center cursor-pointer disabled:cursor-wait"
-                          >
-                            <span
-                              className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
-                                isSaving
-                                  ? 'border-2 border-gray-200 border-t-gray-500 animate-spin'
-                                  : status === 'yes'
-                                    ? 'bg-green-600'
-                                    : status === 'no'
-                                      ? 'bg-red-600'
-                                      : 'bg-white border-2 border-gray-300'
-                              }`}
-                            >
-                              {!isSaving && status === 'yes' && (
-                                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                </svg>
-                              )}
-                              {!isSaving && status === 'no' && (
-                                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                              )}
-                              {!isSaving && status === null && (
-                                <svg className="w-3.5 h-3.5 text-gray-300" fill="currentColor" viewBox="0 0 24 24">
-                                  <circle cx="12" cy="12" r="6" />
-                                </svg>
-                              )}
-                            </span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Sticky footer */}
         <div
