@@ -128,7 +128,9 @@ export default function AttendanceLanding() {
           return;
         }
 
-        const sevenMostRecent = recent.slice(0, 7);
+        const sevenMostRecent = recent
+          .slice(0, 7)
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         setEvents(sevenMostRecent);
 
         const eventIds = sevenMostRecent.map(e => e.id);
