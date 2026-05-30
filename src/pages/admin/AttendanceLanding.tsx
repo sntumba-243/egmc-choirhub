@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -74,7 +74,6 @@ function getContrastText(hexColor: string): string {
 
 export default function AttendanceLanding() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { user } = useAuth();
   const { church } = useChurch();
   const churchId = user?.church_id || church?.id;
@@ -83,6 +82,7 @@ export default function AttendanceLanding() {
   const headerText = getContrastText(primary);
 
   const [events, setEvents] = useState<EventLite[]>([]);
+  const [todayEvent, setTodayEvent] = useState<EventLite | null>(null);
   const [attendanceMap, setAttendanceMap] = useState<Map<string, AttendanceInfo>>(new Map());
   const [sectionStats, setSectionStats] = useState<SectionStat[]>([]);
   const [monthTotals, setMonthTotals] = useState<{ present: number; possible: number; eventCount: number }>({
@@ -92,7 +92,6 @@ export default function AttendanceLanding() {
   });
   const [memberCount, setMemberCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [redirecting, setRedirecting] = useState(false);
 
   useEffect(() => {
     if (!churchId) return;
@@ -119,21 +118,10 @@ export default function AttendanceLanding() {
         if (cancelled) return;
         const recent: EventLite[] = evData || [];
 
-        // Auto-redirect if there is an event today, unless the user
-        // just came back from the attendance flow (prevents loop).
         const today = todayYMD();
-        const todayEvent = recent.find(e => e.date === today);
-        const fromAttendance = (location.state as { fromAttendance?: boolean } | null)?.fromAttendance === true;
-        if (fromAttendance) {
-          // Consume the flag so a later refresh still auto-redirects normally.
-          window.history.replaceState({}, document.title);
-        }
-        if (todayEvent && !fromAttendance) {
-          if (cancelled) return;
-          setRedirecting(true);
-          navigate(`/admin/attendance/take/${todayEvent.id}`, { replace: true });
-          return;
-        }
+        const foundTodayEvent = recent.find(e => e.date === today) || null;
+        if (cancelled) return;
+        setTodayEvent(foundTodayEvent);
 
         const sevenMostRecent = recent
           .slice(0, 7)
@@ -209,14 +197,6 @@ export default function AttendanceLanding() {
     return () => { cancelled = true; };
   }, [churchId, navigate]);
 
-  if (redirecting) {
-    return (
-      <div className="flex justify-center p-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-gray-700" />
-      </div>
-    );
-  }
-
   const monthRate = monthTotals.possible > 0
     ? Math.round((monthTotals.present / monthTotals.possible) * 100)
     : 0;
@@ -250,17 +230,43 @@ export default function AttendanceLanding() {
       <div className="md:grid md:grid-cols-2 md:gap-0">
         {/* LEFT — no event card + recent events + stats link */}
         <div>
-          {/* No event today card */}
-          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 mx-3 mt-3">
-            <div className="text-base font-medium text-gray-700">No rehearsal today</div>
-            <button
-              onClick={() => navigate('/admin/attendance/take')}
-              className="text-sm mt-1 block py-3 min-h-[44px]"
-              style={{ color: primary }}
+          {/* Today's event card OR no-rehearsal card */}
+          {todayEvent ? (
+            <div
+              className="rounded-2xl p-5 mx-3 mt-3 shadow-sm"
+              style={{ background: `var(--church-primary, ${primary})`, color: headerText }}
             >
-              Take attendance for a past event →
-            </button>
-          </div>
+              <div className="text-xs uppercase tracking-widest" style={{ opacity: 0.7 }}>
+                Today
+              </div>
+              <div className="text-lg font-semibold mt-1">{todayEvent.title}</div>
+              <div className="text-sm mt-0.5" style={{ opacity: 0.75 }}>
+                {formatTime(todayEvent.time)}
+                {todayEvent.location ? ` · ${todayEvent.location}` : ''}
+              </div>
+              <button
+                onClick={() => navigate(`/admin/attendance/take/${todayEvent.id}`)}
+                className="mt-4 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-semibold text-sm min-h-[48px]"
+                style={{
+                  background: headerText === '#ffffff' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)',
+                  color: headerText,
+                }}
+              >
+                Take attendance →
+              </button>
+            </div>
+          ) : (
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 mx-3 mt-3">
+              <div className="text-base font-medium text-gray-700">No rehearsal today</div>
+              <button
+                onClick={() => navigate('/admin/attendance/take')}
+                className="text-sm mt-1 block py-3 min-h-[44px]"
+                style={{ color: primary }}
+              >
+                Take attendance for a past event →
+              </button>
+            </div>
+          )}
 
           {/* Recent events */}
           <div className="text-xs font-semibold uppercase tracking-widest text-gray-400 px-5 pt-5 pb-2">
