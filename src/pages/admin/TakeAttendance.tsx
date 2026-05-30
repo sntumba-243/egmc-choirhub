@@ -504,7 +504,7 @@ export default function TakeAttendance() {
           }}
         >
           <button
-            onClick={() => navigate('/admin/attendance/take')}
+            onClick={() => navigate('/admin/attendance')}
             aria-label="Back to events"
             className="min-w-[44px] min-h-[44px] flex items-center justify-center text-white opacity-80 hover:opacity-100 mr-2 flex-shrink-0"
           >
@@ -557,7 +557,7 @@ export default function TakeAttendance() {
           }}
         >
           <button
-            onClick={() => navigate('/admin/attendance/take')}
+            onClick={() => navigate('/admin/attendance')}
             aria-label="Back to events"
             className="min-w-[44px] min-h-[44px] flex items-center justify-center text-white opacity-80 hover:opacity-100 mr-2 flex-shrink-0"
           >
