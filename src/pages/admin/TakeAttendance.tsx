@@ -423,7 +423,7 @@ export default function TakeAttendance() {
     return (
       <div className="space-y-4 px-4 sm:px-6 lg:px-8 py-4">
         <button
-          onClick={() => navigate('/admin/attendance')}
+          onClick={() => navigate('/admin/attendance', { state: { fromAttendance: true } })}
           className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
         >
           <ArrowLeft className="w-4 h-4" /> Attendance
@@ -774,7 +774,7 @@ export default function TakeAttendance() {
           }}
         >
           <button
-            onClick={() => navigate('/admin/attendance')}
+            onClick={() => navigate('/admin/attendance', { state: { fromAttendance: true } })}
             aria-label="Back to attendance"
             className="min-w-[44px] min-h-[44px] flex items-center justify-center text-white opacity-80 hover:opacity-100 mr-2 flex-shrink-0"
           >
@@ -825,7 +825,7 @@ export default function TakeAttendance() {
               Back to events
             </button>
             <button
-              onClick={() => navigate('/admin/attendance')}
+              onClick={() => navigate('/admin/attendance', { state: { fromAttendance: true } })}
               className="text-gray-600 underline text-sm hover:text-gray-900"
             >
               View attendance history

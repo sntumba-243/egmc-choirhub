@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -74,6 +74,7 @@ function getContrastText(hexColor: string): string {
 
 export default function AttendanceLanding() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { church } = useChurch();
   const churchId = user?.church_id || church?.id;
@@ -118,10 +119,16 @@ export default function AttendanceLanding() {
         if (cancelled) return;
         const recent: EventLite[] = evData || [];
 
-        // Auto-redirect if there is an event today
+        // Auto-redirect if there is an event today, unless the user
+        // just came back from the attendance flow (prevents loop).
         const today = todayYMD();
         const todayEvent = recent.find(e => e.date === today);
-        if (todayEvent) {
+        const fromAttendance = (location.state as { fromAttendance?: boolean } | null)?.fromAttendance === true;
+        if (fromAttendance) {
+          // Consume the flag so a later refresh still auto-redirects normally.
+          window.history.replaceState({}, document.title);
+        }
+        if (todayEvent && !fromAttendance) {
           if (cancelled) return;
           setRedirecting(true);
           navigate(`/admin/attendance/take/${todayEvent.id}`, { replace: true });
