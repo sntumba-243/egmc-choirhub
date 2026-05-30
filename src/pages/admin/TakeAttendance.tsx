@@ -173,6 +173,11 @@ export default function TakeAttendance() {
     return () => { cancelled = true; };
   }, [eventId, churchId, navigate]);
 
+  // Sync phase to URL: if eventId is dropped (back navigation), return to selector
+  useEffect(() => {
+    if (!eventId) setPhase('selector');
+  }, [eventId]);
+
   const loadMembersAndRsvps = useCallback(async () => {
     if (!selectedEvent || !churchId) {
       return { rows: [] as MemberAttendanceRow[], rsvps: new Map<string, 'yes' | 'no' | 'maybe'>() };
@@ -492,15 +497,26 @@ export default function TakeAttendance() {
     return (
       <div className="min-h-screen flex flex-col">
         <div
-          className="bg-gray-900 px-6"
+          className="bg-gray-900 px-4 flex items-center"
           style={{
             paddingTop: 'calc(20px + env(safe-area-inset-top, 0px))',
             paddingBottom: '20px',
           }}
         >
-          <div className="text-white text-lg font-semibold">{selectedEvent.title}</div>
-          <div className="text-gray-300 text-sm mt-1">
-            {formatLongDate(selectedEvent.date)}{selectedEvent.time ? ` · ${formatTime(selectedEvent.time)}` : ''}
+          <button
+            onClick={() => navigate('/admin/attendance/take')}
+            aria-label="Back to events"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center text-white opacity-80 hover:opacity-100 mr-2 flex-shrink-0"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15,18 9,12 15,6" />
+            </svg>
+          </button>
+          <div className="flex-1 min-w-0">
+            <div className="text-white text-lg font-semibold">{selectedEvent.title}</div>
+            <div className="text-gray-300 text-sm mt-1">
+              {formatLongDate(selectedEvent.date)}{selectedEvent.time ? ` · ${formatTime(selectedEvent.time)}` : ''}
+            </div>
           </div>
         </div>
         <div className="flex-1 bg-white px-6 py-12 flex flex-col items-center justify-start">
@@ -541,11 +557,13 @@ export default function TakeAttendance() {
           }}
         >
           <button
-            onClick={() => setPhase('prompt')}
-            aria-label="Back"
-            className="text-white p-1 -ml-1 hover:bg-gray-800 rounded-lg"
+            onClick={() => navigate('/admin/attendance/take')}
+            aria-label="Back to events"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center text-white opacity-80 hover:opacity-100 mr-2 flex-shrink-0"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15,18 9,12 15,6" />
+            </svg>
           </button>
           <div className="flex-1 min-w-0">
             <div className="text-white font-semibold text-sm truncate">{selectedEvent.title}</div>
@@ -757,10 +775,12 @@ export default function TakeAttendance() {
         >
           <button
             onClick={() => navigate('/admin/attendance')}
-            aria-label="Back"
-            className="text-white p-1 -ml-1 hover:bg-gray-800 rounded-lg"
+            aria-label="Back to attendance"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center text-white opacity-80 hover:opacity-100 mr-2 flex-shrink-0"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15,18 9,12 15,6" />
+            </svg>
           </button>
           <div className="flex-1 min-w-0">
             <div className="text-white font-semibold text-sm truncate">{selectedEvent.title}</div>
