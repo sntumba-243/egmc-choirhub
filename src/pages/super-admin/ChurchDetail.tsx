@@ -52,6 +52,8 @@ export const ChurchDetail = () => {
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
   const [createdAdminEmail, setCreatedAdminEmail] = useState<string>('');
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     if (id) fetchAll();
@@ -296,6 +298,26 @@ export const ChurchDetail = () => {
     }
   };
 
+  const handleResetAttendance = async () => {
+    if (!church?.id) return;
+    setResetting(true);
+    try {
+      const supabase = getDbClient();
+      const { error } = await supabase
+        .from('attendance_history')
+        .delete()
+        .eq('church_id', church.id);
+      if (error) throw error;
+      toast.success(`Attendance reset for ${church.name}`);
+      setShowResetModal(false);
+    } catch (error: any) {
+      console.error('Reset failed:', error);
+      toast.error(error?.message || 'Reset failed');
+    } finally {
+      setResetting(false);
+    }
+  };
+
   const toggleSuperAdmin = async (memberId: string, currentStatus: boolean) => {
     const action = currentStatus ? 'remove super admin from' : 'make super admin';
     if (!confirm(`Are you sure you want to ${action} this member?`)) return;
@@ -528,6 +550,28 @@ export const ChurchDetail = () => {
         </div>
       </div>
 
+      {/* Danger Zone */}
+      <div className="mt-6 border border-red-200 rounded-2xl overflow-hidden">
+        <div className="bg-red-50 px-6 py-4 border-b border-red-200">
+          <h3 className="text-sm font-semibold text-red-700">Danger Zone</h3>
+          <p className="text-xs text-red-500 mt-0.5">These actions are irreversible.</p>
+        </div>
+        <div className="bg-white px-6 py-4 flex items-center justify-between gap-6">
+          <div>
+            <div className="text-sm font-medium text-gray-900">Reset attendance data</div>
+            <div className="text-xs text-gray-500 mt-0.5">
+              Permanently delete all attendance records for {church?.name}
+            </div>
+          </div>
+          <button
+            onClick={() => setShowResetModal(true)}
+            className="text-sm font-medium text-red-600 border border-red-300 bg-white hover:bg-red-50 px-4 py-2 rounded-xl min-h-[44px] whitespace-nowrap flex-shrink-0"
+          >
+            Reset attendance
+          </button>
+        </div>
+      </div>
+
       {/* Add Admin Modal */}
       {showAddAdmin && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -619,6 +663,35 @@ export const ChurchDetail = () => {
             >
               Done
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Attendance Modal */}
+      {showResetModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <div className="text-lg font-semibold text-gray-900 mb-2">Reset attendance data?</div>
+            <div className="text-sm text-gray-500 mb-6 leading-relaxed">
+              This will permanently delete all attendance records for{' '}
+              <span className="font-semibold text-gray-900">{church?.name}</span>.{' '}
+              This cannot be undone.
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowResetModal(false)}
+                className="flex-1 px-4 py-3 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 min-h-[44px]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleResetAttendance}
+                disabled={resetting}
+                className="flex-1 px-4 py-3 rounded-xl bg-red-500 text-white text-sm font-medium hover:bg-red-600 disabled:opacity-50 min-h-[44px]"
+              >
+                {resetting ? 'Resetting...' : 'Yes, reset all'}
+              </button>
+            </div>
           </div>
         </div>
       )}
