@@ -53,13 +53,22 @@ export const AdminRepertoire = () => {
   const [statusMap, setStatusMap] = useState<Map<string, 'learned' | 'learning' | 'not_started'>>(new Map());
   const [loadAll, setLoadAll] = useState(false);
   const [activeActionMenu, setActiveActionMenu] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
 
   // Close action menu on any outside click
   useEffect(() => {
-    const close = () => setActiveActionMenu(null);
+    const close = () => { setActiveActionMenu(null); setMenuPosition(null); };
     document.addEventListener('click', close);
     return () => document.removeEventListener('click', close);
   }, []);
+
+  // Compute fixed-position coordinates from the trigger element
+  const handleMenuOpen = (e: React.MouseEvent, songId: string) => {
+    e.stopPropagation();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setMenuPosition({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    setActiveActionMenu(activeActionMenu === songId ? null : songId);
+  };
 
   const isSuperAdmin = user?.is_super_admin === true;
 
@@ -508,55 +517,18 @@ export const AdminRepertoire = () => {
                 {song.learning_status === 'learned' ? '\u2705' : song.learning_status === 'learning' ? '\uD83D\uDCDA' : '\u23F3'}
               </button>
 
-              {/* 3-dot menu \u2014 super admin only */}
-              {isSuperAdmin && (
-                <div className="relative flex-shrink-0">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveActionMenu(activeActionMenu === song.id ? null : song.id);
-                    }}
-                    className="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-300 hover:text-gray-500"
-                    aria-label="Song options"
-                  >
-                    <svg width="4" height="16" viewBox="0 0 4 16" fill="currentColor">
-                      <circle cx="2" cy="2" r="1.5" />
-                      <circle cx="2" cy="8" r="1.5" />
-                      <circle cx="2" cy="14" r="1.5" />
-                    </svg>
-                  </button>
-                  {activeActionMenu === song.id && (
-                    <div
-                      className="absolute right-0 top-full mt-1 bg-white border border-gray-100 rounded-2xl shadow-xl z-50 overflow-hidden min-w-[180px]"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        onClick={() => { setActiveActionMenu(null); navigate(`${song.id}/edit`); }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 min-h-[44px] text-left"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
-                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                        </svg>
-                        Edit song
-                      </button>
-                      <button
-                        onClick={(e) => { handleDelete(song.id, e); setActiveActionMenu(null); }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-500 hover:bg-red-50 min-h-[44px] text-left border-t border-gray-100"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="3,6 5,6 21,6" />
-                          <path d="M19,6l-1,14a2,2,0,0,1-2,2H8a2,2,0,0,1-2-2L5,6" />
-                          <path d="M10,11v6" />
-                          <path d="M14,11v6" />
-                          <path d="M9,6V4a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1v2" />
-                        </svg>
-                        Delete
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* 3-dot menu trigger \u2014 visible to all (dropdown contents role-gated) */}
+              <button
+                onClick={(e) => handleMenuOpen(e, song.id)}
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-300 hover:text-gray-500 flex-shrink-0"
+                aria-label="Song options"
+              >
+                <svg width="4" height="16" viewBox="0 0 4 16" fill="currentColor">
+                  <circle cx="2" cy="2" r="1.5" />
+                  <circle cx="2" cy="8" r="1.5" />
+                  <circle cx="2" cy="14" r="1.5" />
+                </svg>
+              </button>
             </div>
           );
         })}
@@ -635,6 +607,68 @@ export const AdminRepertoire = () => {
         />
       </div>
     )}
+
+    {/* Song actions dropdown — fixed position, escapes overflow:hidden parents */}
+    {activeActionMenu && menuPosition && (() => {
+      const currentSong = songs.find(s => s.id === activeActionMenu);
+      if (!currentSong) return null;
+      const isFav = favorites.has(activeActionMenu);
+      return (
+        <div
+          className="fixed bg-white border border-gray-100 rounded-2xl shadow-xl py-1 overflow-hidden"
+          style={{ top: menuPosition.top, right: menuPosition.right, zIndex: 9999, minWidth: '200px' }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={(e) => { toggleFavorite(activeActionMenu, e); setActiveActionMenu(null); setMenuPosition(null); }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 min-h-[44px] text-left"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill={isFav ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} className={isFav ? 'text-amber-400' : 'text-gray-400'}>
+              <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+            </svg>
+            {isFav ? 'Remove favorite' : 'Add to favorites'}
+          </button>
+
+          <button
+            onClick={(e) => { handleStatusCycle(activeActionMenu, currentSong.learning_status, e); setActiveActionMenu(null); setMenuPosition(null); }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 min-h-[44px] text-left border-t border-gray-100"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
+              <polyline points="20,6 9,17 4,12" />
+            </svg>
+            Cycle status
+          </button>
+
+          {isSuperAdmin && (
+            <>
+              <button
+                onClick={() => { const id = activeActionMenu; setActiveActionMenu(null); setMenuPosition(null); navigate(`${id}/edit`); }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 min-h-[44px] text-left border-t border-gray-100"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+                Edit song
+              </button>
+              <button
+                onClick={(e) => { handleDelete(activeActionMenu, e); setActiveActionMenu(null); setMenuPosition(null); }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-500 hover:bg-red-50 min-h-[44px] text-left border-t border-gray-100"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3,6 5,6 21,6" />
+                  <path d="M19,6l-1,14a2,2,0,0,1-2,2H8a2,2,0,0,1-2-2L5,6" />
+                  <path d="M10,11v6" />
+                  <path d="M14,11v6" />
+                  <path d="M9,6V4a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1v2" />
+                </svg>
+                Delete
+              </button>
+            </>
+          )}
+        </div>
+      );
+    })()}
   </>
   );
 };
