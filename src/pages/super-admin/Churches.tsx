@@ -33,6 +33,7 @@ export const Churches = () => {
       const { data, error } = await supabase
         .from('churches')
         .select('*')
+        .eq('is_active', true)
         .order('name');
 
       if (error) throw error;

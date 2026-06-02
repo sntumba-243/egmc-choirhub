@@ -79,6 +79,7 @@ import { ChurchForm } from "./pages/super-admin/ChurchForm";
 import { ChurchDetail } from "./pages/super-admin/ChurchDetail";
 import { GlobalEvents } from "./pages/super-admin/GlobalEvents";
 import { SuperAdminEventDetail } from "./pages/super-admin/EventDetail";
+import SuperAdminSettings from "./pages/super-admin/Settings";
 
 // Super Admin
 
@@ -181,7 +182,7 @@ function AppRoutes() {
         <Route path="members/new" element={<MemberForm />} />
         <Route path="members/:id/edit" element={<MemberForm />} />
         <Route path="events/new" element={<EventForm />} />
-        <Route path="settings" element={<AdminSettings />} />
+        <Route path="settings" element={<SuperAdminSettings />} />
         <Route path="theme" element={<Suspense fallback={<div className="flex items-center justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>}><ChurchThemeSettings /></Suspense>} />
       </Route>
 
