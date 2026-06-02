@@ -31,8 +31,9 @@ export async function getEventAttendanceWithMembers(
 ): Promise<MemberAttendanceRow[]> {
   const { data: members, error: membersError } = await supabase
     .from('members')
-    .select('id, first_name, last_name, email, voice_part, role')
+    .select('id, first_name, last_name, email, voice_part, role, status')
     .eq('church_id', churchId)
+    .eq('status', 'active')
     .in('role', ['admin', 'member', 'section_leader'])
     .order('last_name', { ascending: true });
 
