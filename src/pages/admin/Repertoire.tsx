@@ -483,17 +483,25 @@ export const AdminRepertoire = () => {
               key={song.id}
               className={`flex items-center gap-3 px-3 py-3 border-b border-gray-100 last:border-b-0 transition ${isSel ? 'bg-indigo-50' : ''}`}
             >
-              {/* Checkbox \u2014 admin only */}
-              <input
-                type="checkbox"
-                checked={isSel}
-                onChange={() => toggleSongSelection(song.id)}
+              {/* Checkbox \u2014 admin only, 44x44 tap target */}
+              <label
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center cursor-pointer flex-shrink-0"
                 onClick={(e) => e.stopPropagation()}
-                className="w-4 h-4 flex-shrink-0 accent-indigo-600"
-              />
+              >
+                <input
+                  type="checkbox"
+                  checked={isSel}
+                  onChange={() => toggleSongSelection(song.id)}
+                  className="w-4 h-4 accent-indigo-600"
+                />
+              </label>
 
-              {/* Star/favorite \u2014 matches member portal */}
-              <button onClick={(e) => toggleFavorite(song.id, e)} className="flex-shrink-0 text-base leading-none">
+              {/* Star/favorite \u2014 44x44 tap target */}
+              <button
+                onClick={(e) => toggleFavorite(song.id, e)}
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center flex-shrink-0 text-base leading-none"
+                aria-label={isFav ? 'Remove favorite' : 'Add favorite'}
+              >
                 <span className={isFav ? 'text-yellow-500' : 'text-gray-300'}>{isFav ? '\u2605' : '\u2606'}</span>
               </button>
 

@@ -101,7 +101,7 @@ export const SuperAdminDashboard = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {statCards.map((stat) => {
           const Icon = stat.icon;
           return (
@@ -127,7 +127,7 @@ export const SuperAdminDashboard = () => {
           </h2>
           <button
             onClick={() => navigate('/super-admin/churches/new')}
-            className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 text-white rounded-lg text-sm font-medium hover:bg-slate-700"
+            className="flex items-center gap-1 px-4 py-1.5 bg-slate-800 text-white rounded-lg text-sm font-medium hover:bg-slate-700 min-h-[44px]"
           >
             <Plus className="w-4 h-4" /> Add Church
           </button>
