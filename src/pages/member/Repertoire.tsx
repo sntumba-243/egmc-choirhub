@@ -260,7 +260,7 @@ export const MemberRepertoire = () => {
           { key: 'not_started' as const, label: '\u23F3', value: songStats.notStarted, cls: 'bg-gray-50' },
         ].map(s => (
           <button key={s.key} onClick={() => { setStatusFilter(s.key); setCurrentPage(1); }}
-            className={`flex-1 rounded-lg border p-1.5 text-center transition ${s.cls} ${statusFilter === s.key ? 'ring-2 ring-orange-500' : 'border-gray-200'}`}>
+            className={`flex-1 rounded-lg border p-1.5 min-h-[44px] text-center transition ${s.cls} ${statusFilter === s.key ? 'ring-2 ring-orange-500' : 'border-gray-200'}`}>
             <div className="text-base font-bold">{s.value}</div>
             <div className="text-xs text-gray-500">{s.label}</div>
           </button>
@@ -279,12 +279,12 @@ export const MemberRepertoire = () => {
             className="w-full pl-8 pr-3 py-2.5 text-base border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
         </div>
         <button onClick={() => { setShowFavoritesOnly(!showFavoritesOnly); setCurrentPage(1); }}
-          className={`w-10 h-10 flex items-center justify-center rounded-lg border text-sm ${showFavoritesOnly ? 'bg-yellow-500 border-yellow-500 text-white' : 'bg-white border-gray-200'}`}>
-          <Star className={`w-3.5 h-3.5 ${showFavoritesOnly ? 'fill-white' : 'text-gray-400'}`} />
+          className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg border text-sm ${showFavoritesOnly ? 'bg-yellow-500 border-yellow-500 text-white' : 'bg-white border-gray-200'}`}>
+          <Star className={`w-4 h-4 ${showFavoritesOnly ? 'fill-white' : 'text-gray-400'}`} />
         </button>
         <button onClick={() => setShowFilters(!showFilters)}
-          className={`w-10 h-10 flex items-center justify-center rounded-lg border transition ${showFilters ? 'bg-purple-600 border-purple-600 text-white' : 'bg-white border-gray-200 text-gray-400'}`}>
-          <SlidersHorizontal className="w-3.5 h-3.5" />
+          className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg border transition ${showFilters ? 'bg-purple-600 border-purple-600 text-white' : 'bg-white border-gray-200 text-gray-400'}`}>
+          <SlidersHorizontal className="w-4 h-4" />
         </button>
       </div>
 
@@ -341,7 +341,7 @@ export const MemberRepertoire = () => {
           return (
             <div key={song.id}
               className={`flex items-center gap-3 px-3 py-3 ${i !== songs.length - 1 ? 'border-b border-gray-100' : ''}`}>
-              <button onClick={(e) => toggleFavorite(song.id, e)} className="flex-shrink-0 text-base leading-none">
+              <button onClick={(e) => toggleFavorite(song.id, e)} className="flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center text-base leading-none" aria-label={isFav ? 'Remove favorite' : 'Add favorite'}>
                 <span className={isFav ? 'text-yellow-500' : 'text-gray-300'}>{isFav ? '\u2605' : '\u2606'}</span>
               </button>
               <div className="flex-1 min-w-0 cursor-pointer" onClick={() => song.sheet_music_url && handleViewPDF(song)}>

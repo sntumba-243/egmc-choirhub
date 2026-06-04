@@ -203,7 +203,7 @@ export const MemberMessages = () => {
       <div className="flex gap-2">
         <button
           onClick={() => setFilter('all')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+          className={`px-4 py-2 min-h-[44px] rounded-lg text-sm font-medium transition-all ${
             filter === 'all'
               ? 'bg-orange-500 text-white'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -213,7 +213,7 @@ export const MemberMessages = () => {
         </button>
         <button
           onClick={() => setFilter('unread')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all relative ${
+          className={`px-4 py-2 min-h-[44px] rounded-lg text-sm font-medium transition-all relative ${
             filter === 'unread'
               ? 'bg-orange-500 text-white'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'

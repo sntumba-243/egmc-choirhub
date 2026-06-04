@@ -329,9 +329,9 @@ export function VocalCoach() {
 
         {/* Filter tabs */}
         <div className="flex bg-gray-100/80 rounded-xl p-0.5 mb-3">
-          {([['all', 'All'], ['breathing', '💨 Breathing'], ['tone', '🎵 Tone'], ['rhythm', '🥁 Rhythm'], ['range', '🎤 Range']] as const).map(([key, label]) => (
+          {([['all', 'All'], ['breathing', 'Breathing'], ['tone', 'Tone'], ['rhythm', 'Rhythm'], ['range', 'Range']] as const).map(([key, label]) => (
             <button key={key} onClick={() => setExerciseTab(key)}
-              className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              className={`flex-1 min-h-[44px] px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${
                 exerciseTab === key ? 'bg-white shadow-sm text-gray-900 font-semibold' : 'text-gray-500'
               }`}>
               {label}

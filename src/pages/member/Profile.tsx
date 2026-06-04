@@ -149,10 +149,11 @@ export const MemberProfile: React.FC = () => {
             <button
               onClick={() => setShowAvatarMenu(!showAvatarMenu)}
               disabled={uploading}
-              className="absolute -bottom-1 -right-1 w-7 h-7 text-white rounded-full flex items-center justify-center shadow-md disabled:opacity-50"
+              aria-label="Change avatar"
+              className="absolute -bottom-1 -right-1 min-w-[44px] min-h-[44px] w-11 h-11 text-white rounded-full flex items-center justify-center shadow-md disabled:opacity-50"
               style={{ background: 'linear-gradient(135deg, #FF8C42, #E85D26)' }}
             >
-              <Camera className="w-3 h-3" />
+              <Camera className="w-4 h-4" />
             </button>
             {showAvatarMenu && (
               <>
@@ -210,13 +211,14 @@ export const MemberProfile: React.FC = () => {
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
                 placeholder="Enter phone number"
-                className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-300 focus:border-gray-300 outline-none"
+                className="w-full pl-8 pr-3 py-2 min-h-[44px] text-base border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-300 focus:border-gray-300 outline-none"
+                style={{ fontSize: '16px' }}
               />
             </div>
             <button
               onClick={handleSaveProfile}
               disabled={saving}
-              className="px-3.5 py-2 rounded-lg text-white text-xs font-semibold disabled:opacity-50 flex items-center gap-1.5"
+              className="px-4 py-2 min-h-[44px] rounded-lg text-white text-xs font-semibold disabled:opacity-50 flex items-center gap-1.5"
               style={{ background: 'linear-gradient(135deg, #FF8C42, #E85D26)' }}
             >
               <Save className="w-3 h-3" />
