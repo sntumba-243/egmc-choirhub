@@ -58,6 +58,9 @@ export const ChurchDetail = () => {
   const [memberMenuPos, setMemberMenuPos] = useState<{ top: number; right: number } | null>(null);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
   const [headerMenuPos, setHeaderMenuPos] = useState<{ top: number; right: number } | null>(null);
+  const [activeTab, setActiveTab] = useState<'events' | 'members' | 'songs' | 'settings'>('events');
+  const [memberPage, setMemberPage] = useState(1);
+  const MEMBER_PAGE_SIZE = 10;
 
   useEffect(() => {
     const close = () => {
@@ -363,6 +366,19 @@ export const ChurchDetail = () => {
 
   if (!church) return <p>Church not found</p>;
 
+  const TABS = ['events', 'members', 'songs', 'settings'] as const;
+  const TAB_LABELS: Record<typeof TABS[number], string> = {
+    events: 'Events',
+    members: 'Members',
+    songs: 'Songs',
+    settings: 'Settings',
+  };
+  const totalMemberPages = Math.max(1, Math.ceil(members.length / MEMBER_PAGE_SIZE));
+  const paginatedMembers = members.slice(
+    (memberPage - 1) * MEMBER_PAGE_SIZE,
+    memberPage * MEMBER_PAGE_SIZE
+  );
+
   const isPast = (date: string) => new Date(date + 'T23:59:59') < new Date();
   const upcomingEvents = churchEvents.filter(e => !isPast(e.date));
   const pastEvents = churchEvents.filter(e => isPast(e.date));
@@ -460,8 +476,25 @@ export const ChurchDetail = () => {
         </div>
       </div>
 
+      {/* Mobile tab bar */}
+      <div className="md:hidden flex border-b border-gray-100 bg-white overflow-x-auto scrollbar-hide -mt-2">
+        {TABS.map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`flex-shrink-0 px-5 py-3 text-sm font-medium min-h-[44px] border-b-2 transition-colors ${
+              activeTab === tab
+                ? 'text-blue-600 border-blue-600'
+                : 'text-gray-400 border-transparent'
+            }`}
+          >
+            {TAB_LABELS[tab]}
+          </button>
+        ))}
+      </div>
+
       {/* Church Events */}
-      <div id="church-events" className="bg-white rounded-lg border border-gray-200 p-6">
+      <div id="church-events" className={`bg-white rounded-lg border border-gray-200 p-6 ${activeTab === 'events' ? '' : 'hidden md:block'}`}>
         <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
           <Calendar className="w-5 h-5" /> Church Events
         </h2>
@@ -526,7 +559,7 @@ export const ChurchDetail = () => {
       </div>
 
       {/* Song Progress */}
-      <div id="church-songs" className="bg-white rounded-lg border border-gray-200 p-6">
+      <div id="church-songs" className={`bg-white rounded-lg border border-gray-200 p-6 ${activeTab === 'songs' ? '' : 'hidden md:block'}`}>
         <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
           <Music className="w-5 h-5" /> Song Progress
         </h2>
@@ -536,7 +569,7 @@ export const ChurchDetail = () => {
       </div>
 
       {/* Members */}
-      <div id="church-members" className="bg-white rounded-lg border border-gray-200 p-6">
+      <div id="church-members" className={`bg-white rounded-lg border border-gray-200 p-6 ${activeTab === 'members' ? '' : 'hidden md:block'}`}>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
           <h2 className="text-lg font-bold flex items-center gap-2">
             <Users className="w-5 h-5" /> Members ({members.length})
@@ -549,7 +582,7 @@ export const ChurchDetail = () => {
           </button>
         </div>
         <div className="space-y-2">
-          {members.map((member) => (
+          {paginatedMembers.map((member) => (
             <div key={member.id} className="flex items-center justify-between gap-2 p-3 rounded-lg hover:bg-gray-50 min-h-[60px]">
               <div className="min-w-0 flex-1">
                 <p className="font-medium text-sm">
@@ -613,10 +646,33 @@ export const ChurchDetail = () => {
             </div>
           ))}
         </div>
+
+        {/* Member pagination */}
+        {totalMemberPages > 1 && (
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+            <button
+              onClick={() => setMemberPage(p => Math.max(1, p - 1))}
+              disabled={memberPage === 1}
+              className="min-h-[44px] px-4 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              Previous
+            </button>
+            <span className="text-xs text-gray-500">
+              Page {memberPage} of {totalMemberPages}
+            </span>
+            <button
+              onClick={() => setMemberPage(p => Math.min(totalMemberPages, p + 1))}
+              disabled={memberPage === totalMemberPages}
+              className="min-h-[44px] px-4 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Danger Zone */}
-      <div className="mt-6 border border-red-200 rounded-2xl overflow-hidden">
+      <div className={`mt-6 border border-red-200 rounded-2xl overflow-hidden ${activeTab === 'settings' ? '' : 'hidden md:block'}`}>
         <div className="bg-red-50 px-6 py-4 border-b border-red-200">
           <h3 className="text-sm font-semibold text-red-700">Danger Zone</h3>
           <p className="text-xs text-red-500 mt-0.5">These actions are irreversible.</p>
@@ -635,6 +691,39 @@ export const ChurchDetail = () => {
             Reset attendance
           </button>
         </div>
+      </div>
+
+      {/* Mobile tab nav arrows */}
+      <div className="md:hidden flex items-center justify-between px-4 py-3 bg-white border-t border-gray-100">
+        <button
+          onClick={() => {
+            const idx = TABS.indexOf(activeTab);
+            if (idx > 0) setActiveTab(TABS[idx - 1]);
+          }}
+          disabled={activeTab === 'events'}
+          className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl border border-gray-200 text-gray-500 disabled:opacity-30 hover:bg-gray-50"
+          aria-label="Previous tab"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15,18 9,12 15,6" />
+          </svg>
+        </button>
+        <span className="text-xs font-medium text-gray-400">
+          {TAB_LABELS[activeTab]} · {TABS.indexOf(activeTab) + 1} of {TABS.length}
+        </span>
+        <button
+          onClick={() => {
+            const idx = TABS.indexOf(activeTab);
+            if (idx < TABS.length - 1) setActiveTab(TABS[idx + 1]);
+          }}
+          disabled={activeTab === 'settings'}
+          className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl border border-gray-200 text-gray-500 disabled:opacity-30 hover:bg-gray-50"
+          aria-label="Next tab"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9,18 15,12 9,6" />
+          </svg>
+        </button>
       </div>
 
       {/* Add Admin Modal */}
