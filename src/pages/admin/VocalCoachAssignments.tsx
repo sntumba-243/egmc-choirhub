@@ -363,7 +363,7 @@ export default function VocalCoachAssignments() {
           <h1 className="text-xl font-bold text-gray-900">Vocal Coach</h1>
           <p className="text-xs text-gray-500">Assign songs & exercises · Review submissions</p>
         </div>
-        <button onClick={() => setShowAssignModal(true)} className="flex items-center justify-center gap-1 px-4 py-2 bg-blue-500 text-white rounded-xl text-[12px] font-semibold hover:bg-blue-600 shadow-sm transition-all active:scale-[0.98] whitespace-nowrap">
+        <button onClick={() => setShowAssignModal(true)} className="flex items-center justify-center gap-1 px-4 py-2 bg-blue-500 text-white rounded-xl text-[12px] font-semibold hover:bg-blue-600 shadow-sm transition-all active:scale-[0.98] whitespace-nowrap min-h-[44px]">
           <Plus className="w-4 h-4" />
           Assign
         </button>
@@ -376,20 +376,24 @@ export default function VocalCoachAssignments() {
           <div className="text-xl font-bold text-gray-900">{totalAssignments}</div>
         </div>
         <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-2.5">
-          <div className="text-xs text-gray-400">To Review 🔴</div>
+          <div className="text-xs text-gray-400">To Review</div>
           <div className="text-xl font-bold text-orange-500">{pendingReview}</div>
         </div>
         <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-2.5">
-          <div className="text-xs text-gray-400">Completed ✅</div>
+          <div className="text-xs text-gray-400">Completed</div>
           <div className="text-xl font-bold text-green-600">{completedCount}</div>
         </div>
       </div>
 
       {/* Tabs */}
       <div className="flex bg-gray-100/80 rounded-xl p-0.5">
-        {([['all', 'All Members'], ['pending', '🔴 To Review'], ['completed', '✅ Completed']] as const).map(([key, label]) => (
+        {([
+          { key: 'all' as const, label: <>All Members</> },
+          { key: 'pending' as const, label: <><span className="w-2 h-2 rounded-full bg-red-500 inline-block mr-1.5" />To Review</> },
+          { key: 'completed' as const, label: <><span className="w-2 h-2 rounded-full bg-green-500 inline-block mr-1.5" />Completed</> },
+        ]).map(({ key, label }) => (
           <button key={key} onClick={() => setTab(key)}
-            className={`flex-1 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all ${tab === key ? 'bg-white shadow-sm text-gray-900 font-semibold' : 'text-gray-500'}`}>
+            className={`flex-1 min-h-[44px] px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all inline-flex items-center justify-center ${tab === key ? 'bg-white shadow-sm text-gray-900 font-semibold' : 'text-gray-500'}`}>
             {label}
           </button>
         ))}

@@ -176,7 +176,7 @@ export const AdminMessages = () => {
         </div>
         <button
           onClick={() => navigate('/admin/messages/new')}
-          className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-500 text-white rounded-xl text-[13px] font-semibold hover:bg-blue-600 shadow-sm transition-all"
+          className="flex items-center gap-1.5 px-4 py-2 bg-blue-500 text-white rounded-xl text-[13px] font-semibold hover:bg-blue-600 shadow-sm transition-all min-h-[44px]"
         >
           <Plus className="w-5 h-5" />
           New Message
@@ -191,7 +191,7 @@ export const AdminMessages = () => {
             <p className="text-gray-600 mb-6">Send your first message to the choir</p>
             <button
               onClick={() => navigate('/admin/messages/new')}
-              className="px-4 py-2 bg-blue-500 text-white rounded-xl text-sm font-semibold hover:bg-blue-600 shadow-sm"
+              className="px-4 py-2 bg-blue-500 text-white rounded-xl text-sm font-semibold hover:bg-blue-600 shadow-sm min-h-[44px]"
             >
               Send Message
             </button>

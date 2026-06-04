@@ -209,7 +209,7 @@ export const AdminEvents = () => {
               <List className="w-4 h-4" /><span className="text-sm">List</span>
             </button>
           </div>
-          <button onClick={() => navigate('/admin/events/new')} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors whitespace-nowrap">
+          <button onClick={() => navigate('/admin/events/new')} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors whitespace-nowrap min-h-[44px]">
             <Plus className="w-5 h-5" /><span className="text-sm font-medium">Add Event</span>
           </button>
         </div>
@@ -344,7 +344,7 @@ export const AdminEvents = () => {
           <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4 sm:mb-6"><Calendar className="w-8 h-8 sm:w-10 sm:h-10 text-blue-600" /></div>
           <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">{timelineFilter === 'upcoming' && 'No upcoming events'}{timelineFilter === 'past' && 'No past events'}{timelineFilter === 'all' && 'No events yet'}</h3>
           <p className="text-sm sm:text-base text-gray-600 mb-6">Get started by creating your first event</p>
-          <button onClick={() => navigate('/admin/events/new')} className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"><Plus className="w-4 h-4" />Add Event</button>
+          <button onClick={() => navigate('/admin/events/new')} className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors min-h-[44px]"><Plus className="w-4 h-4" />Add Event</button>
         </div>
       )}
     </div>
