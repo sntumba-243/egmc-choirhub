@@ -56,9 +56,16 @@ export const ChurchDetail = () => {
   const [resetting, setResetting] = useState(false);
   const [memberMenuId, setMemberMenuId] = useState<string | null>(null);
   const [memberMenuPos, setMemberMenuPos] = useState<{ top: number; right: number } | null>(null);
+  const [showHeaderMenu, setShowHeaderMenu] = useState(false);
+  const [headerMenuPos, setHeaderMenuPos] = useState<{ top: number; right: number } | null>(null);
 
   useEffect(() => {
-    const close = () => { setMemberMenuId(null); setMemberMenuPos(null); };
+    const close = () => {
+      setMemberMenuId(null);
+      setMemberMenuPos(null);
+      setShowHeaderMenu(false);
+      setHeaderMenuPos(null);
+    };
     document.addEventListener('click', close);
     return () => document.removeEventListener('click', close);
   }, []);
@@ -367,57 +374,87 @@ export const ChurchDetail = () => {
       </button>
 
       {/* Church Header */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-xl flex items-center justify-center text-white font-bold text-lg flex-shrink-0"
-              style={{ background: `linear-gradient(135deg, ${church.primary_color}, ${church.secondary_color})` }}>
-              {church.short_name.substring(0, 2)}
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-bold truncate">{church.name}</h1>
-              <p className="text-sm text-gray-500 truncate">
-                {church.city}{church.country ? `, ${church.country}` : ''}
-                {church.pastor_name ? ` • Pastor: ${church.pastor_name}` : ''}
-              </p>
-            </div>
+      <div className="bg-white rounded-lg border border-gray-200 p-4 md:p-6">
+        <div className="flex items-center gap-3 mb-4">
+          {/* Logo */}
+          <div
+            className="w-11 h-11 md:w-14 md:h-14 rounded-xl flex items-center justify-center text-white font-bold text-sm md:text-lg flex-shrink-0"
+            style={{ background: `linear-gradient(135deg, ${church.primary_color}, ${church.secondary_color})` }}
+          >
+            {church.short_name.substring(0, 2)}
           </div>
+
+          {/* Name + meta */}
+          <div className="flex-1 min-w-0">
+            <h1 className="text-base md:text-xl font-semibold text-gray-900 truncate leading-tight">
+              {church.name}
+            </h1>
+            <p className="text-xs text-gray-400 mt-0.5 truncate hidden sm:block">
+              {church.city}{church.country ? `, ${church.country}` : ''}
+              {church.pastor_name ? ` · Pastor: ${church.pastor_name}` : ''}
+            </p>
+            <p className="text-xs text-gray-400 mt-0.5 truncate sm:hidden">
+              {church.city}
+            </p>
+          </div>
+
+          {/* Actions: full buttons on md+, single 3-dot on mobile */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button onClick={() => navigate(`/super-admin/churches/${id}/edit`)}
-              className="flex items-center gap-1 px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 min-h-[44px]">
+            <button
+              onClick={() => navigate(`/super-admin/churches/${id}/edit`)}
+              className="hidden md:flex items-center gap-1.5 min-h-[44px] px-4 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
               <Edit className="w-4 h-4" /> Edit
             </button>
-            <button onClick={handleDelete}
-              className="flex items-center gap-1 px-4 py-2 border border-red-300 text-red-600 rounded-lg text-sm hover:bg-red-50 min-h-[44px]">
+            <button
+              onClick={handleDelete}
+              className="hidden md:flex items-center gap-1.5 min-h-[44px] px-4 border border-red-200 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50"
+            >
               <Trash2 className="w-4 h-4" /> Delete
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                setHeaderMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+                setShowHeaderMenu(true);
+              }}
+              className="md:hidden min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-gray-600"
+              aria-label="Church actions"
+            >
+              <svg width="4" height="16" viewBox="0 0 4 16" fill="currentColor">
+                <circle cx="2" cy="2" r="1.5" />
+                <circle cx="2" cy="8" r="1.5" />
+                <circle cx="2" cy="14" r="1.5" />
+              </svg>
             </button>
           </div>
         </div>
 
         {/* Clickable Stat Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-2 md:gap-4">
           <button
             onClick={() => document.getElementById('church-members')?.scrollIntoView({ behavior: 'smooth' })}
-            className="bg-blue-50 rounded-lg p-3 text-center hover:bg-blue-100 transition-colors cursor-pointer"
+            className="bg-blue-50 rounded-lg p-3 md:p-5 text-center hover:bg-blue-100 transition-colors cursor-pointer"
           >
             <Users className="w-5 h-5 text-blue-600 mx-auto mb-1" />
-            <p className="text-xl font-bold">{stats.members}</p>
+            <p className="text-xl md:text-3xl font-bold">{stats.members}</p>
             <p className="text-xs text-gray-600">Members</p>
           </button>
           <button
             onClick={() => document.getElementById('church-events')?.scrollIntoView({ behavior: 'smooth' })}
-            className="bg-green-50 rounded-lg p-3 text-center hover:bg-green-100 transition-colors cursor-pointer"
+            className="bg-green-50 rounded-lg p-3 md:p-5 text-center hover:bg-green-100 transition-colors cursor-pointer"
           >
             <Calendar className="w-5 h-5 text-green-600 mx-auto mb-1" />
-            <p className="text-xl font-bold">{stats.events}</p>
+            <p className="text-xl md:text-3xl font-bold">{stats.events}</p>
             <p className="text-xs text-gray-600">Events</p>
           </button>
           <button
             onClick={() => document.getElementById('church-songs')?.scrollIntoView({ behavior: 'smooth' })}
-            className="bg-purple-50 rounded-lg p-3 text-center hover:bg-purple-100 transition-colors cursor-pointer"
+            className="bg-purple-50 rounded-lg p-3 md:p-5 text-center hover:bg-purple-100 transition-colors cursor-pointer"
           >
             <Music className="w-5 h-5 text-purple-600 mx-auto mb-1" />
-            <p className="text-xl font-bold">{stats.songsLearned}</p>
+            <p className="text-xl md:text-3xl font-bold">{stats.songsLearned}</p>
             <p className="text-xs text-gray-600">Songs Learned</p>
           </button>
         </div>
@@ -692,6 +729,36 @@ export const ChurchDetail = () => {
               Done
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Mobile header action menu (Edit / Delete church) */}
+      {showHeaderMenu && headerMenuPos && (
+        <div
+          className="fixed bg-white border border-gray-100 rounded-2xl shadow-xl py-1 z-[9999]"
+          style={{ top: headerMenuPos.top, right: headerMenuPos.right, minWidth: '180px' }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => {
+              setShowHeaderMenu(false);
+              setHeaderMenuPos(null);
+              navigate(`/super-admin/churches/${id}/edit`);
+            }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 min-h-[44px] text-left"
+          >
+            <Edit className="w-4 h-4" /> Edit church
+          </button>
+          <button
+            onClick={() => {
+              setShowHeaderMenu(false);
+              setHeaderMenuPos(null);
+              handleDelete();
+            }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-500 hover:bg-red-50 min-h-[44px] text-left border-t border-gray-100"
+          >
+            <Trash2 className="w-4 h-4" /> Delete church
+          </button>
         </div>
       )}
 
