@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { offlineStorage, OfflineSong } from '../../lib/offlineStorage';
 import { practiceLogService, PracticeLog } from '../../lib/practiceLog';
+import { computeOfflineStatus, downloadAllNow, subscribeCacheProgress } from '../../lib/backgroundCache';
 import toast from 'react-hot-toast';
 
 export const MemberProfile: React.FC = () => {
@@ -27,12 +28,41 @@ export const MemberProfile: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [showAvatarMenu, setShowAvatarMenu] = useState(false);
   const [showOffline, setShowOffline] = useState(false);
+  const [songCache, setSongCache] = useState({ total: 0, cached: 0 });
+  const [downloadingAll, setDownloadingAll] = useState(false);
 
   useEffect(() => {
     loadOfflineData();
     loadPracticeData();
     loadProfileData();
   }, [user]);
+
+  // Offline sheet-music status: show current count, then track live progress
+  // while the background cacher (or "Download all now") is running.
+  useEffect(() => {
+    let unsub = () => {};
+    const cacheOpts = { userId: user?.id, churchId: (user as any)?.church_id };
+    computeOfflineStatus(cacheOpts).then((s) => setSongCache(s)).catch(() => {});
+    unsub = subscribeCacheProgress((p) => {
+      if (p.total > 0) setSongCache({ total: p.total, cached: p.cached });
+      setDownloadingAll(p.downloading);
+    });
+    return () => unsub();
+  }, [user?.id]);
+
+  const handleDownloadAll = async () => {
+    setDownloadingAll(true);
+    try {
+      await downloadAllNow({ userId: user?.id, churchId: (user as any)?.church_id });
+      const s = await computeOfflineStatus({ userId: user?.id, churchId: (user as any)?.church_id });
+      setSongCache(s);
+      toast.success('Songs saved for offline use');
+    } catch {
+      toast.error('Could not download all songs');
+    } finally {
+      setDownloadingAll(false);
+    }
+  };
 
   const loadProfileData = async () => {
     if (!user?.id) return;
@@ -247,6 +277,33 @@ export const MemberProfile: React.FC = () => {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Offline songs (auto sheet-music pre-cache) */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center flex-shrink-0">
+            <Download className="w-3.5 h-3.5 text-gray-500" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-gray-900">Offline songs</p>
+            <p className="text-xs text-gray-400">
+              {songCache.cached} of {songCache.total} songs available offline
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={handleDownloadAll}
+          disabled={downloadingAll || songCache.total === 0 || songCache.cached >= songCache.total}
+          className="px-4 min-h-[44px] rounded-lg text-white text-xs font-semibold disabled:opacity-50 flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg, #FF8C42, #E85D26)' }}
+        >
+          {downloadingAll
+            ? 'Downloading…'
+            : songCache.total > 0 && songCache.cached >= songCache.total
+            ? 'All saved'
+            : 'Download all now'}
+        </button>
       </div>
 
       {/* Offline Downloads - Collapsible */}

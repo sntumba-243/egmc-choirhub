@@ -1,0 +1,108 @@
+MIGRATION DRY-RUN REPORT — songs.sheet_music_url → Supabase Storage
+Generated for 482 songs. No DB writes.
+======================================================================
+Songs (with sheet_music_url): 482  (Drive: 482)
+Bucket objects:               497
+MATCHED TOTAL:                481  (T1:365 T2:20 T3:72 T4-drive:24)
+Ambiguous (skipped):          0
+Still unmatched (skipped):    1
+Orphan objects:               18
+Duplicate-spelling songs:     11
+Orphan keys referenced by DB: 0  (expected 0)
+
+── 10 SAMPLE MAPPINGS (old → new) ──
+• A celui qui sera vainqueur  [Tier 1]
+    old: https://drive.google.com/file/d/1uY5Jyil7obCa60C6A5brbGLHl4TFhwzq/preview
+    new: https://lpcepycxqfqzwwszmpks.supabase.co/storage/v1/object/public/choirhub_partitions/A_celui_qui_sera_vainqueur.pdf
+• A Jésus je m'abandonne  [Tier 1]
+    old: https://drive.google.com/file/d/1APFk9Wbgvh374FWpRfsqzhqnAB9GnlNT/preview
+    new: https://lpcepycxqfqzwwszmpks.supabase.co/storage/v1/object/public/choirhub_partitions/A_Jesus_je_m'abandonne.pdf
+• À la croix, à la croix  [Tier 1]
+    old: https://drive.google.com/file/d/1cXlzQliipAk6Mx_ClGtXieJTJioonHJc/preview
+    new: https://lpcepycxqfqzwwszmpks.supabase.co/storage/v1/object/public/choirhub_partitions/A_la_croix,_a_la_croix.pdf
+• A moi les coeurs braves  [Tier 1]
+    old: https://drive.google.com/file/d/14dS6RTtOh35gfbi_fkHOt-76kM5aqnG7/preview
+    new: https://lpcepycxqfqzwwszmpks.supabase.co/storage/v1/object/public/choirhub_partitions/A_moi_les_coeurs_braves.pdf
+• À toi la gloire  [Tier 1]
+    old: https://drive.google.com/file/d/1V1Sh_fWvKHJiTgT3jCkP6QdbMktbWBGs/view?usp=drivesdk
+    new: https://lpcepycxqfqzwwszmpks.supabase.co/storage/v1/object/public/choirhub_partitions/A_toi_la_gloire.pdf
+• Adorable Mystère  [Tier 1]
+    old: https://drive.google.com/file/d/1bAfkc7BSoS0g9_vV-dNf9g0ZaXg8XYha/preview
+    new: https://lpcepycxqfqzwwszmpks.supabase.co/storage/v1/object/public/choirhub_partitions/Adorable_Mystere.pdf
+• Agneau de Dieu v1  [Tier 1]
+    old: https://drive.google.com/file/d/19XEtLkLP-ibwARfGdgwnp7-dylnL_TEh/preview
+    new: https://lpcepycxqfqzwwszmpks.supabase.co/storage/v1/object/public/choirhub_partitions/Agneau_de_Dieu_v1.pdf
+• Ah qu'il est beau de voir des freres  [Tier 1]
+    old: https://drive.google.com/file/d/1TfbRNsA4uQHsl2fw8noTuRJQXoTtSWkS/preview
+    new: https://lpcepycxqfqzwwszmpks.supabase.co/storage/v1/object/public/choirhub_partitions/Ah_qu'il_est_beau_de_voir_des_freres.pdf
+• Ah! que je ne sois pas  [Tier 1]
+    old: https://drive.google.com/file/d/16zGOWLdRrGQmj5sINjhLojiwnHj2QxP-/preview
+    new: https://lpcepycxqfqzwwszmpks.supabase.co/storage/v1/object/public/choirhub_partitions/Ah!_que_je_ne_sois_pas.pdf
+• Ami de Jésus  [Tier 1]
+    old: https://drive.google.com/file/d/1N0WImU3ee-sDV7UcwTumWnJmFOwlUg5O/preview
+    new: https://lpcepycxqfqzwwszmpks.supabase.co/storage/v1/object/public/choirhub_partitions/Ami_de_Jesus.pdf
+
+── TIER 4 DRIVE-RESOLVED (24)  title | Drive filename | key ──
+• A La croix où mourut non Sauveur  |  A La Croix Où Mourut Mon Sauveur.pdf  |  A_La_Croix_Ou_Mourut_Mon_Sauveur.pdf [via T1]
+• À la fin du voyage   |  A la fin de mon voyage.pdf  |  A_la_fin_de_mon_voyage.pdf [via T1]
+• A des nouveau combats  |  A des nouveaux combats.pdf  |  A_des_nouveaux_combats.pdf [via T1]
+• Amour de Dieu  |  L'Amour de Dieu.pdf  |  L'amour_de_Dieu.pdf [via T3]
+• Contempler mon Dieu sûr son trône v2  |  Comtempler mon Dieu sur son trone v2.pdf  |  Comtempler_mon_Dieu_sur_son_trone_v2.pdf [via T1]
+• Avançons-nous joyeux   |  Avançons-nous Toujours joyeux.pdf  |  Avancons-nous_Toujours_joyeux.pdf [via T1]
+• Crois, obéis  |  Crois, obéis - Trust and obey.pdf  |  Crois,_obeis_-_Trust_and_obey.pdf [via T1]
+• Invoque-moi  du fond de la détresse   |  Invoque-moi  .pdf  |  Invoque-moi__.pdf [via T1]
+• Je suis pèlerin, étranger   |  Je Suis Pèlerin.pdf  |  Je_Suis_Pelerin.pdf [via T1]
+• Jesus the sinner’s friend  |  Jesus the Sinner's Friend.pdf  |  Jesus_the_Sinner's_Friend.pdf [via T1]
+• Nous marching vers sion  |  Nous marchons vers sion.pdf  |  Nous_marchons_vers_sion.pdf [via T1]
+• Mon espoir ne se fonde   |  Mon Espoir Ne Se Fonde Que.pdf  |  Mon_Espoir_Ne_Se_Fonde_Que.pdf [via T1]
+• O, When I Shall See Him  |  O, When Shall I See.pdf  |  O,_When_Shall_I_See.pdf [via T1]
+• On frappe, on frappe entends  |  On frappe, on frappe entends-tu.pdf  |  On_frappe,_on_frappe_entends-tu.pdf [via T1]
+• Rends moi calme  |  Rends-moi Calme Seigneur.pdf  |  Rends-moi_Calme_Seigneur.pdf [via T1]
+• Rends-moi parfait dans l'amour  |  Rend moi parfait dans l'amour.pdf  |  Rend_moi_parfait_dans_l'amour.pdf [via T1]
+• Reste avec nous   |  Reste avec nous Seigneur.pdf  |  Reste_avec_nous_Seigneur.pdf [via T1]
+• Seigneur attire  |  Seigneur attire mon coeur à toi.pdf  |  Seigneur_attire_mon_coeur_a_toi.pdf [via T1]
+• Seigneur, donne-moi la pain  |  Seigneur donnes-moi la paix.pdf  |  Seigneur_donnes-moi_la_paix.pdf [via T1]
+• Seigneur, tu donne ta grâce   |  Seigneur, Tu donnes Ta grâce.pdf  |  Seigneur,_Tu_donnes_Ta_grace.pdf [via T1]
+• Sitting at feet of jesus  |  Sitting at feet.pdf  |  Sitting_at_feet.pdf [via T1]
+• Ton beau nom calme et consile  |  Ton beau nom calme et console.pdf  |  Ton_beau_nom_calme_et_console.pdf [via T1]
+• Totelemi Ngwi  |  Totelema Ngwi.pdf  |  Totelema_Ngwi.pdf [via T1]
+• Voici l'amour, vaste comme l'océan  |  Voici l'amour, Vaste Comme l'océan.pdf  |  Voici_l'amour,_Vaste_Comme_l'ocean.pdf [via T1]
+
+── AMBIGUOUS (0) ──
+  (none)
+
+── STILL UNMATCHED (1) ──
+• "Ou va cette foule empressée"  (id b21a962a-be10-46b4-84d9-76c62bf523cc)  drive: Ou va cette foule empressée.pdf
+
+── DUPLICATE-SPELLING (11) — canonical wins ──
+• "A Jésus je m'abandonne"  wins:A_Jesus_je_m'abandonne.pdf  orphan:A_Jesus_je_m_abandonne.pdf
+• "Ah qu'il est beau de voir des freres"  wins:Ah_qu'il_est_beau_de_voir_des_freres.pdf  orphan:Ah_qu_il_est_beau_de_voir_des_freres.pdf
+• "Appartiens-tu à l'épouse"  wins:Appartiens-tu_a_l'epouse.pdf  orphan:Appartiens-tu_a_l_epouse.pdf
+• "Ce n'est pas par des fables"  wins:Ce_n'est_pas_par_des_fables.pdf  orphan:Ce_n_est_pas_par_des_fables.pdf
+• "Entre tes mains j'abandonne"  wins:Entre_tes_mains_j'abandonne.pdf  orphan:Entre_tes_mains_j_abandonne.pdf
+• "J'ai trouve la paix profonde"  wins:J'ai_trouve_la_paix_profonde.pdf  orphan:J_ai_trouve_la_paix_profonde.pdf
+• "Jésus je m'abandonne"  wins:Jesus_je_m'abandonne.pdf  orphan:Jesus_je_m_abandonne.pdf
+• "Nous sommes plus qu'un millionnaire"  wins:Nous_sommes_plus_qu'un_millionnaire.pdf  orphan:Nous_sommes_plus_qu_un_millionnaire.pdf
+• "Qu'il fait bon à ton service"  wins:Qu'il_fait_bon_a_ton_service.pdf  orphan:Qu_il_fait_bon_a_ton_service.pdf
+• "Qu'on batte des mains"  wins:Qu'on_batte_des_mains.pdf  orphan:Qu_on_batte_des_mains.pdf
+• "Torrents d'amour et de Grâce"  wins:Torrents_d'amour_et_de_Grace.pdf  orphan:Torrents_d_amour_et_de_Grace.pdf
+
+── ORPHAN OBJECTS (18) ──
+• A_Jesus_je_m_abandonne.pdf
+• Ah_qu_il_est_beau_de_voir_des_freres.pdf
+• Appartiens-tu_a_l_epouse.pdf
+• C_est_toi_Jesus_Pain_de_vie.pdf
+• Ce_n_est_pas_par_des_fables.pdf
+• Entre_tes_mains_j_abandonne.pdf
+• Grande_est_sa_misirecorde.pdf
+• J_ai_trouve_la_paix_profonde.pdf
+• Jesus_est_l'ami_supreme.pdf
+• Jesus_je_m_abandonne.pdf
+• Jesus_the_Sinner_s_Friend.pdf
+• Nous_sommes_plus_qu_un_millionnaire.pdf
+• Qu'elle_est_douce.pdf
+• Qu_il_fait_bon_a_ton_service.pdf
+• Qu_on_batte_des_mains.pdf
+• Seigneur_comme_autre_fois_a_la_pentecote.pdf
+• Torrents_d_amour_et_de_Grace.pdf
+• Voici_l'amour,_Vaste_Comme_l_ocean.pdf
