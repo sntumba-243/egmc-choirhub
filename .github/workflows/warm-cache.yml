@@ -1,0 +1,17 @@
+name: Warm PDF Cache
+on:
+  schedule:
+    - cron: '0 11 * * 6'  # Saturday 6 AM Central
+  workflow_dispatch:      # manual trigger button
+jobs:
+  warm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm ci
+      - run: node scripts/warm-pdf-cache.mjs
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}

@@ -5,6 +5,7 @@ import { useChurch } from '../contexts/ChurchContext';
 import { useActivityTracker } from '../hooks/useActivityTracker';
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { startBackgroundCache } from '../lib/backgroundCache';
 
 export default function MemberLayout() {
   const location = useLocation();
@@ -15,6 +16,14 @@ export default function MemberLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => { setSidebarOpen(false); }, [location]);
+
+  // Quietly pre-cache song PDFs for offline use once the member is authed
+  // (member portal only). Runs at most once per session.
+  useEffect(() => {
+    if (user?.id) {
+      startBackgroundCache({ userId: user.id, churchId: (user as any)?.church_id || church?.id });
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     const handleResize = () => { if (window.innerWidth >= 1024) setSidebarOpen(false); };

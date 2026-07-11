@@ -5,6 +5,7 @@ import { Music, Search, Star, Calendar, X, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { useChurch } from '../../contexts/ChurchContext';
+import SheetMusicViewer from '../../components/SheetMusicViewer';
 
 const PAGE_SIZE = 20;
 
@@ -15,6 +16,7 @@ interface Song {
   language: string;
   sheet_music_url?: string;
   created_at?: string;
+  updated_at?: string;
 }
 
 interface SongWithStatus extends Song {
@@ -598,22 +600,12 @@ export const AdminRepertoire = () => {
 
     {/* PDF Modal Overlay */}
     {viewingSong && viewingSong.sheet_music_url && (
-      <div className="fixed inset-0 z-[9999] bg-white">
-        <button onClick={() => setViewingSong(null)}
-          className="fixed top-3 left-3 z-[10000] px-4 py-2 text-sm font-semibold text-gray-700 bg-white/90 backdrop-blur border border-gray-200 rounded-full shadow-sm hover:bg-gray-100 transition">
-          &larr; Back
-        </button>
-        <iframe
-          src={(() => {
-            const url = viewingSong.sheet_music_url || '';
-            const match = url.match(/\/d\/([^/]+)/);
-            if (match) return `https://drive.google.com/file/d/${match[1]}/preview?rm=minimal`;
-            return url;
-          })()}
-          className="w-full h-full border-0"
-          allow="autoplay"
-        />
-      </div>
+      <SheetMusicViewer
+        url={viewingSong.sheet_music_url}
+        title={viewingSong.title}
+        version={viewingSong.updated_at}
+        onClose={() => setViewingSong(null)}
+      />
     )}
 
     {/* Song actions dropdown — fixed position, escapes overflow:hidden parents */}
