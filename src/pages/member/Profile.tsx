@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Music, Trash2, HardDrive, Download, Clock, Award, Target, Phone, Camera, Save, ChevronRight, Upload } from 'lucide-react';
+import { User, Music, Trash2, HardDrive, Download, Clock, Award, Target, Phone, Camera, Save, ChevronRight, Upload, Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { offlineStorage, OfflineSong } from '../../lib/offlineStorage';
 import { practiceLogService, PracticeLog } from '../../lib/practiceLog';
-import { computeOfflineStatus, downloadAllNow, subscribeCacheProgress } from '../../lib/backgroundCache';
+import { getCacheStatus, downloadAllNow, subscribeCacheProgress } from '../../lib/backgroundCache';
 import toast from 'react-hot-toast';
 
 export const MemberProfile: React.FC = () => {
@@ -37,12 +37,12 @@ export const MemberProfile: React.FC = () => {
     loadProfileData();
   }, [user]);
 
-  // Offline sheet-music status: show current count, then track live progress
-  // while the background cacher (or "Download all now") is running.
+  // READ-ONLY on mount: just report how many songs are already cached, then
+  // track live progress. Opening this page NEVER starts a download — only the
+  // explicit "Download all now" button (or the layout's background cacher) does.
   useEffect(() => {
     let unsub = () => {};
-    const cacheOpts = { userId: user?.id, churchId: (user as any)?.church_id };
-    computeOfflineStatus(cacheOpts).then((s) => setSongCache(s)).catch(() => {});
+    getCacheStatus().then((s) => setSongCache(s)).catch(() => {});
     unsub = subscribeCacheProgress((p) => {
       if (p.total > 0) setSongCache({ total: p.total, cached: p.cached });
       setDownloadingAll(p.downloading);
@@ -54,7 +54,7 @@ export const MemberProfile: React.FC = () => {
     setDownloadingAll(true);
     try {
       await downloadAllNow({ userId: user?.id, churchId: (user as any)?.church_id });
-      const s = await computeOfflineStatus({ userId: user?.id, churchId: (user as any)?.church_id });
+      const s = await getCacheStatus();
       setSongCache(s);
       toast.success('Songs saved for offline use');
     } catch {
@@ -295,11 +295,12 @@ export const MemberProfile: React.FC = () => {
         <button
           onClick={handleDownloadAll}
           disabled={downloadingAll || songCache.total === 0 || songCache.cached >= songCache.total}
-          className="px-4 min-h-[44px] rounded-lg text-white text-xs font-semibold disabled:opacity-50 flex-shrink-0"
+          className="px-4 min-h-[44px] rounded-lg text-white text-xs font-semibold disabled:opacity-50 flex-shrink-0 flex items-center gap-1.5"
           style={{ background: 'linear-gradient(135deg, #FF8C42, #E85D26)' }}
         >
+          {downloadingAll && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
           {downloadingAll
-            ? 'Downloading…'
+            ? `Downloading… ${songCache.cached}/${songCache.total}`
             : songCache.total > 0 && songCache.cached >= songCache.total
             ? 'All saved'
             : 'Download all now'}

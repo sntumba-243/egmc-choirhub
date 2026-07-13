@@ -180,7 +180,10 @@ async function buildQueue(
   return { p12: priority, p3 };
 }
 
-async function countCached(cache: Cache, songs: Song[]): Promise<number> {
+async function countCached(
+  cache: Cache,
+  songs: Array<{ sheet_music_url: string | null; updated_at?: string | null }>
+): Promise<number> {
   let n = 0;
   for (const s of songs) {
     if (s.sheet_music_url && (await cache.match(cacheUrl(s.sheet_music_url, s.updated_at)))) n++;
@@ -268,15 +271,17 @@ export async function downloadAllNow(opts: BackgroundCacheOpts = {}): Promise<vo
 }
 
 /**
- * Compute how many queued songs are already available offline, without
- * downloading anything. Used by the Profile "X of Y" display.
+ * READ-ONLY offline status: how many songs are already in the PDF cache, out of
+ * the total that have a sheet. Opens the cache and runs cache.match only — ZERO
+ * fetches, ZERO downloads. Safe to call on page mount (e.g. the Profile page).
  */
-export async function computeOfflineStatus(
-  opts: BackgroundCacheOpts = {}
-): Promise<{ total: number; cached: number }> {
-  if (!CACHES_OK) return { total: 0, cached: 0 };
-  const { p12, p3 } = await buildQueue(opts);
-  const all = [...p12, ...p3];
+export async function getCacheStatus(): Promise<{ cached: number; total: number }> {
+  if (!CACHES_OK) return { cached: 0, total: 0 };
+  const { data } = await supabase
+    .from('songs')
+    .select('sheet_music_url, updated_at')
+    .not('sheet_music_url', 'is', null);
+  const withSheet = (data || []).filter((s: any) => s.sheet_music_url && String(s.sheet_music_url).trim());
   const cache = await getPdfCache();
-  return { total: all.length, cached: await countCached(cache, all) };
+  return { cached: await countCached(cache, withSheet), total: withSheet.length };
 }
