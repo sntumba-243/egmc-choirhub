@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type TouchEvent as ReactTouchEvent } from 'react'
 import { createPortal } from 'react-dom'
 import * as pdfjsLib from 'pdfjs-dist'
 // NOTE: no pdf_viewer.css — we render to our own <canvas>, so pdf.js's
@@ -21,6 +21,10 @@ interface SheetMusicViewerProps {
 
 export default function SheetMusicViewer({ url, title, onClose, version }: SheetMusicViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  // Touch-gesture bookkeeping (mutable, no re-render needed)
+  const touchRef = useRef<{ x: number; y: number; scrollLeft: number } | null>(null)
+  const lastTapRef = useRef<{ t: number; x: number; y: number }>({ t: 0, x: 0, y: 0 })
   const [pdf, setPdf] = useState<any>(null)
   const [numPages, setNumPages] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
@@ -97,9 +101,11 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
       canvas.height = scaledViewport.height
       canvas.style.width = (scaledViewport.width / (window.devicePixelRatio || 1)) + 'px'
       canvas.style.height = (scaledViewport.height / (window.devicePixelRatio || 1)) + 'px'
-      canvas.style.maxWidth = '100%'
+      // No maxWidth cap: when zoomed the canvas must be allowed to exceed the
+      // container so both axes become scrollable (and the aspect stays correct).
       canvas.style.display = 'block'
       canvas.style.margin = '0 auto'
+      canvas.style.touchAction = 'manipulation' // pan/scroll ok; we own double-tap
 
       const ctx = canvas.getContext('2d')!
       await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise
@@ -111,6 +117,51 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
     render()
     return () => { cancelled = true }
   }, [pdf, currentPage, scale])
+
+  // Change page and reset the scroll position to the top-left.
+  const goToPage = (p: number) => {
+    if (p < 1 || p > numPages) return
+    setCurrentPage(p)
+    const el = scrollRef.current
+    if (el) { el.scrollTop = 0; el.scrollLeft = 0 }
+  }
+
+  const onTouchStart = (e: ReactTouchEvent<HTMLDivElement>) => {
+    const t = e.touches[0]
+    touchRef.current = { x: t.clientX, y: t.clientY, scrollLeft: scrollRef.current?.scrollLeft ?? 0 }
+  }
+
+  const onTouchEnd = (e: ReactTouchEvent<HTMLDivElement>) => {
+    const start = touchRef.current
+    touchRef.current = null
+    if (!start) return
+    const t = e.changedTouches[0]
+    const dx = t.clientX - start.x
+    const dy = t.clientY - start.y
+    const adx = Math.abs(dx)
+    const ady = Math.abs(dy)
+    const el = scrollRef.current
+    // At fit scale there is no horizontal overflow → a horizontal swipe is free
+    // for page nav. When zoomed in, horizontal panning wins and we do nothing.
+    const noHorizontalOverflow = el ? el.scrollWidth <= el.clientWidth + 4 : true
+
+    if (adx > 60 && adx > 2 * ady && noHorizontalOverflow) {
+      goToPage(currentPage + (dx < 0 ? 1 : -1)) // swipe left → next, right → prev
+      return
+    }
+
+    // Double-tap (two stationary taps < 300ms apart) toggles zoom 1 ↔ 1.75.
+    if (adx < 10 && ady < 10) {
+      const now = Date.now()
+      const prev = lastTapRef.current
+      if (now - prev.t < 300 && Math.abs(t.clientX - prev.x) < 30 && Math.abs(t.clientY - prev.y) < 30) {
+        setScale(s => (s > 1 ? 1 : 1.75))
+        lastTapRef.current = { t: 0, x: 0, y: 0 } // consume, so a 3rd tap doesn't retrigger
+      } else {
+        lastTapRef.current = { t: now, x: t.clientX, y: t.clientY }
+      }
+    }
+  }
 
   // CORS fallback — show Google's viewer if direct fetch blocked
   if (error === 'cors') {
@@ -149,7 +200,13 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
       </div>
 
       {/* Canvas area */}
-      <div className='flex-1 overflow-auto bg-gray-800 flex items-start justify-center p-2'>
+      <div
+        ref={scrollRef}
+        className='flex-1 overflow-auto bg-gray-800 flex items-start justify-center p-2'
+        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
         {loading ? (
           <div className='flex flex-col items-center justify-center h-full text-gray-400 gap-3'>
             <div className='w-8 h-8 border-2 border-gray-600 border-t-white rounded-full animate-spin'></div>
@@ -165,14 +222,14 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
         <div className='flex items-center justify-between px-4 py-2 bg-gray-900 flex-shrink-0'
           style={{ paddingBottom: 'calc(8px + env(safe-area-inset-bottom, 0px))' }}>
           <button
-            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            onClick={() => goToPage(currentPage - 1)}
             disabled={currentPage === 1}
             className='min-w-[44px] min-h-[44px] flex items-center justify-center text-white disabled:opacity-30 rounded-xl'>
             <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round'><polyline points='15,18 9,12 15,6'/></svg>
           </button>
           <span className='text-xs text-gray-400 font-medium'>{currentPage} / {numPages}</span>
           <button
-            onClick={() => setCurrentPage(p => Math.min(numPages, p + 1))}
+            onClick={() => goToPage(currentPage + 1)}
             disabled={currentPage === numPages}
             className='min-w-[44px] min-h-[44px] flex items-center justify-center text-white disabled:opacity-30 rounded-xl'>
             <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round'><polyline points='9,18 15,12 9,6'/></svg>
