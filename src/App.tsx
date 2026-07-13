@@ -21,7 +21,6 @@ import { requestNotificationPermission, setupMessageListener, storeDeviceToken }
 // Auth Pages
 
 // PDF Viewer
-import { PDFViewerPage } from './components/PDFViewer';
 import { Login } from './pages/Login';
 
 // Layouts
@@ -49,7 +48,6 @@ import { VocalCoach } from './pages/member/VocalCoach';
 // Admin Pages
 import { AdminDashboard } from './pages/admin/Dashboard';
 import { AdminRepertoire } from './pages/admin/Repertoire';
-import { ChurchRepertoire } from './pages/admin/ChurchRepertoire';
 import { AdminFavorites } from './pages/admin/Favorites';
 import { AdminMembers } from './pages/admin/Members';
 import { AdminEvents } from './pages/admin/Events';
@@ -159,7 +157,6 @@ function AppRoutes() {
       <Route path="/login" element={!user ? <Login /> : <Navigate to={user.is_super_admin ? '/super-admin' : user.role === 'admin' ? '/admin' : '/member'} />} />
 
       {/* PDF Viewer */}
-      <Route path="/pdf-viewer" element={<ProtectedRoute requiredRole="member"><PDFViewerPage /></ProtectedRoute>} />
 
       {/* Super Admin Routes */}
       <Route path="/super-admin" element={

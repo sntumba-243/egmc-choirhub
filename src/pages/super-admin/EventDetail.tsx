@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Calendar, Clock, MapPin, Music, Eye, Trash2, Search, X, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
+import SheetMusicViewer from '../../components/SheetMusicViewer';
 
 interface Event {
   id: string;
@@ -46,6 +47,7 @@ export const SuperAdminEventDetail = () => {
   const [showSongPicker, setShowSongPicker] = useState(false);
   const [allSongs, setAllSongs] = useState<any[]>([]);
   const [songSearch, setSongSearch] = useState('');
+  const [viewingSong, setViewingSong] = useState<any>(null);
 
   useEffect(() => {
     fetchEventAndRsvps();
@@ -85,7 +87,8 @@ export const SuperAdminEventDetail = () => {
             title,
             composer,
             language,
-            sheet_music_url
+            sheet_music_url,
+            updated_at
           )
         `)
         .eq('event_id', id)
@@ -158,7 +161,7 @@ export const SuperAdminEventDetail = () => {
 
   const viewPDF = (song: any) => {
     if (song.sheet_music_url) {
-      navigate('/pdf-viewer', { state: { url: song.sheet_music_url, title: song.title } });
+      setViewingSong(song);
     } else {
       toast.error('No PDF available');
     }
@@ -459,6 +462,8 @@ export const SuperAdminEventDetail = () => {
           </div>
         </div>
       )}
+
+      {viewingSong && <SheetMusicViewer url={viewingSong.sheet_music_url} title={viewingSong.title} version={viewingSong.updated_at} onClose={() => setViewingSong(null)} />}
     </div>
   );
 };

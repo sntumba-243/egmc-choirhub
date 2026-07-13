@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { Star, Music, Calendar, Plus, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
+import SheetMusicViewer from '../../components/SheetMusicViewer';
 
 interface Song {
   id: string;
@@ -28,6 +29,7 @@ export const AdminFavorites = () => {
   const [loading, setLoading] = useState(true);
   const [selectedSongs, setSelectedSongs] = useState<Set<string>>(new Set());
   const [showEventModal, setShowEventModal] = useState(false);
+  const [viewingSong, setViewingSong] = useState<any>(null);
 
   useEffect(() => {
     fetchFavorites();
@@ -141,12 +143,7 @@ export const AdminFavorites = () => {
 
   const viewPDF = (song: Song) => {
     if (song.sheet_music_url) {
-      navigate('/pdf-viewer', {
-        state: {
-          url: song.sheet_music_url,
-          title: song.title,
-        },
-      });
+      setViewingSong(song);
     }
   };
 
@@ -317,6 +314,15 @@ export const AdminFavorites = () => {
             </button>
           </div>
         </div>
+      )}
+
+      {viewingSong && (
+        <SheetMusicViewer
+          url={viewingSong.sheet_music_url}
+          title={viewingSong.title}
+          version={viewingSong.updated_at}
+          onClose={() => setViewingSong(null)}
+        />
       )}
     </div>
   );

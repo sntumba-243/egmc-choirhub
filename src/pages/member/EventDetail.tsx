@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Calendar, Clock, MapPin, Music, Eye, Users } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import SheetMusicViewer from '../../components/SheetMusicViewer';
 import toast from 'react-hot-toast';
 
 interface Event {
@@ -38,6 +39,7 @@ export const EventDetail = () => {
   const [rsvpStatus, setRsvpStatus] = useState<string | null>(null);
   const [rsvpCount, setRsvpCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [viewingSong, setViewingSong] = useState<any>(null);
 
   useEffect(() => {
     if (eventId) {
@@ -78,7 +80,8 @@ export const EventDetail = () => {
             title,
             composer,
             language,
-            sheet_music_url
+            sheet_music_url,
+            updated_at
           )
         `)
         .eq('event_id', eventId)
@@ -162,7 +165,7 @@ export const EventDetail = () => {
 
   const viewPDF = (song: any) => {
     if (song.sheet_music_url) {
-      navigate('/pdf-viewer', { state: { url: song.sheet_music_url, title: song.title } });
+      setViewingSong(song);
     } else {
       toast.error('No PDF available');
     }
@@ -323,6 +326,8 @@ export const EventDetail = () => {
           )}
         </div>
       </div>
+
+      {viewingSong && <SheetMusicViewer url={viewingSong.sheet_music_url} title={viewingSong.title} version={viewingSong.updated_at} onClose={() => setViewingSong(null)} />}
     </div>
   );
 };

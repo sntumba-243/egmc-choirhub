@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Maximize, Minimize, Download, Check, FileText, Music2, Youtube, ExternalLink, Play, Pause, Clock } from 'lucide-react';
 import { offlineStorage } from '../../lib/offlineStorage';
 import { practiceLogService } from '../../lib/practiceLog';
 import { useAuth } from '../../contexts/AuthContext';
 import { songsService, type Song } from '../../lib/database';
+import SheetMusicViewer from '../../components/SheetMusicViewer';
 
 interface SongDetailProps {
   songId: string;
@@ -14,7 +15,6 @@ interface SongDetailProps {
 export const SongDetail = () => {
   const { id: songId } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const [song, setSong] = useState<Song | null>(null);
   const [loading, setLoading] = useState(true);
@@ -26,17 +26,11 @@ export const SongDetail = () => {
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [practiceNotes, setPracticeNotes] = useState('');
   const [currentSpeed, setCurrentSpeed] = useState('1.0x');
+  const [viewingSong, setViewingSong] = useState<any>(null);
 
   useEffect(() => {
     loadSong();
   }, [songId]);
-
-  // Removed fullscreen auto-open - now using PDF viewer route
-  useEffect(() => {
-    if (false) {
-      navigate("/pdf-viewer", { state: { url: song.sheet_music_url, title: song.title } });
-    }
-  }, [song, searchParams]);
 
   const loadSong = async () => {
     try {
@@ -226,7 +220,7 @@ export const SongDetail = () => {
             <button
               onClick={() => {
                 if (isOnline || isDownloaded) {
-                  navigate("/pdf-viewer", { state: { url: song.sheet_music_url, title: song.title } });
+                  setViewingSong(song);
                 } else {
                   alert('This resource is not available offline');
                 }
@@ -422,6 +416,7 @@ export const SongDetail = () => {
         </div>
       )}
 
+      {viewingSong && <SheetMusicViewer url={viewingSong.sheet_music_url} title={viewingSong.title} version={viewingSong.updated_at} onClose={() => setViewingSong(null)} />}
 
     </div>
   );

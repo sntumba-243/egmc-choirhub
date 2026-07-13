@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -8,6 +7,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { SongRecorder } from '../../components/SongRecorder';
+import SheetMusicViewer from '../../components/SheetMusicViewer';
 
 interface Exercise {
   id: string;
@@ -61,7 +61,6 @@ const typeEmojis: Record<string, string> = {
 };
 
 export function VocalCoach() {
-  const navigate = useNavigate();
   const { user } = useAuth();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -72,6 +71,7 @@ export function VocalCoach() {
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [showRecorder, setShowRecorder] = useState(false);
   const [selectedSong, setSelectedSong] = useState<{ id: string; title: string; assignmentId?: string } | null>(null);
+  const [viewingSong, setViewingSong] = useState<any>(null);
   const [exerciseTab, setExerciseTab] = useState<'all' | 'breathing' | 'tone' | 'rhythm' | 'range'>('all');
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -100,7 +100,7 @@ export function VocalCoach() {
           }
           if (a.song_id) {
             const { data } = await supabase.from('songs')
-              .select('id, title, sheet_music_url').eq('id', a.song_id).single();
+              .select('id, title, sheet_music_url, updated_at').eq('id', a.song_id).single();
             song = data;
           }
           return { ...a, exercise, song };
@@ -292,7 +292,7 @@ export function VocalCoach() {
                         {isSong ? (
                           <button onClick={async () => {
                             if (a.song?.sheet_music_url) {
-                              navigate('/pdf-viewer', { state: { url: a.song.sheet_music_url, title: a.song.title, songId: a.song.id, assignmentId: a.id } });
+                              setViewingSong(a.song);
                             } else {
                               setSelectedSong({ id: a.song!.id, title: a.song!.title, assignmentId: a.id });
                               setShowRecorder(true);
@@ -462,6 +462,8 @@ export function VocalCoach() {
           onClose={() => { setShowRecorder(false); setSelectedSong(null); loadData(); }}
         />
       )}
+
+      {viewingSong && <SheetMusicViewer url={viewingSong.sheet_music_url} title={viewingSong.title} version={viewingSong.updated_at} onClose={() => setViewingSong(null)} />}
     </div>
   );
 }
