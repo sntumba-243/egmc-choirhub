@@ -10,6 +10,9 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   import.meta.url
 ).toString()
 
+const touchDist = (a: { clientX: number; clientY: number }, b: { clientX: number; clientY: number }) =>
+  Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
+
 interface SheetMusicViewerProps {
   url: string
   title?: string
@@ -36,6 +39,12 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
   const hideTimerRef = useRef<number | null>(null)
   const tapTimeoutRef = useRef<number | null>(null)
   const lastTouchEndRef = useRef(0)
+  // Controlled pinch-zoom bookkeeping
+  const pinchRef = useRef<{ startDist: number; startScale: number } | null>(null)
+  const isMultiTouchRef = useRef(false)
+  const rafRef = useRef<number | null>(null)
+  const pendingScaleRef = useRef<number | null>(null)
+  const [resizeTick, setResizeTick] = useState(0) // bump forces a re-fit
 
   // Convert Google Drive URLs to route through the server-side PDF proxy
   // (avoids browser CORS + Drive virus-scan interstitial on direct fetch)
@@ -108,7 +117,10 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
       if (cancelled) return
 
       const container = containerRef.current!
-      const containerWidth = container.clientWidth
+      // Measure the ACTUAL full-viewport scroll container (inset-0), not a
+      // bar-reduced box, so the page fills the width with no reserved band.
+      const scrollEl = scrollRef.current
+      const containerWidth = scrollEl ? scrollEl.clientWidth : container.clientWidth
 
       const viewport = page.getViewport({ scale: 1 })
       const fitScale = (containerWidth / viewport.width) * scale
@@ -134,7 +146,18 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
     }
     render()
     return () => { cancelled = true }
-  }, [pdf, currentPage, scale])
+  }, [pdf, currentPage, scale, resizeTick])
+
+  // Re-fit the page to the viewport on resize / orientation change.
+  useEffect(() => {
+    const onResize = () => setResizeTick(t => t + 1)
+    window.addEventListener('resize', onResize)
+    window.addEventListener('orientationchange', onResize)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      window.removeEventListener('orientationchange', onResize)
+    }
+  }, [])
 
   // Mirror chrome visibility into a ref for use inside timers/handlers.
   useEffect(() => { chromeVisibleRef.current = chromeVisible }, [chromeVisible])
@@ -142,10 +165,11 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
   // On open (and whenever a new document loads): show chrome, auto-hide after 3s.
   useEffect(() => { showChrome() }, [url, version])
 
-  // Clear timers on unmount.
+  // Clear timers / animation frames on unmount.
   useEffect(() => () => {
     if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current)
     if (tapTimeoutRef.current) window.clearTimeout(tapTimeoutRef.current)
+    if (rafRef.current != null) window.cancelAnimationFrame(rafRef.current)
   }, [])
 
   // Change page and reset the scroll position to the top-left.
@@ -157,11 +181,46 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
   }
 
   const onTouchStart = (e: ReactTouchEvent<HTMLDivElement>) => {
+    if (e.touches.length >= 2) {
+      // Pinch begins → suppress swipe/tap/double-tap for the whole sequence.
+      isMultiTouchRef.current = true
+      touchRef.current = null
+      if (tapTimeoutRef.current) { window.clearTimeout(tapTimeoutRef.current); tapTimeoutRef.current = null }
+      pinchRef.current = { startDist: touchDist(e.touches[0], e.touches[1]), startScale: scale }
+      return
+    }
+    if (isMultiTouchRef.current) return // still finishing a multi-touch sequence
     const t = e.touches[0]
     touchRef.current = { x: t.clientX, y: t.clientY, scrollLeft: scrollRef.current?.scrollLeft ?? 0 }
   }
 
+  // Controlled pinch: setScale from the finger-distance ratio, rAF-throttled, so
+  // the PDF re-renders sharp (native pinch would blur the raster canvas).
+  const onTouchMove = (e: ReactTouchEvent<HTMLDivElement>) => {
+    if (e.touches.length < 2 || !pinchRef.current) return
+    const ratio = touchDist(e.touches[0], e.touches[1]) / pinchRef.current.startDist
+    pendingScaleRef.current = Math.min(3, Math.max(0.5, pinchRef.current.startScale * ratio))
+    if (rafRef.current == null) {
+      rafRef.current = window.requestAnimationFrame(() => {
+        rafRef.current = null
+        if (pendingScaleRef.current != null) setScale(pendingScaleRef.current)
+      })
+    }
+  }
+
   const onTouchEnd = (e: ReactTouchEvent<HTMLDivElement>) => {
+    if (isMultiTouchRef.current) {
+      // Keep gestures suppressed until EVERY finger has lifted.
+      if (e.touches.length === 0) {
+        isMultiTouchRef.current = false
+        pinchRef.current = null
+        if (rafRef.current != null) { window.cancelAnimationFrame(rafRef.current); rafRef.current = null }
+        if (pendingScaleRef.current != null) { setScale(pendingScaleRef.current); pendingScaleRef.current = null }
+        lastTouchEndRef.current = Date.now()
+      }
+      touchRef.current = null
+      return
+    }
     const start = touchRef.current
     touchRef.current = null
     if (!start) return
@@ -246,9 +305,10 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
       {/* Canvas area — fills the whole viewer; chrome overlays it (no reflow on hide) */}
       <div
         ref={scrollRef}
-        className='absolute inset-0 overflow-auto bg-gray-800 flex items-start justify-center p-2'
+        className='absolute inset-0 overflow-auto bg-gray-800 flex items-start justify-center'
         style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}
         onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
         onClick={onCanvasClick}
       >
