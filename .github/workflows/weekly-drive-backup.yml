@@ -1,0 +1,19 @@
+name: Weekly Drive Backup
+on:
+  schedule:
+    - cron: '0 9 * * 1'   # Monday 4 AM Central
+  workflow_dispatch:
+jobs:
+  drive-backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm ci
+      - run: node scripts/backup-bucket-to-drive.mjs
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          DRIVE_BACKUP_FOLDER_ID: ${{ secrets.DRIVE_BACKUP_FOLDER_ID }}
