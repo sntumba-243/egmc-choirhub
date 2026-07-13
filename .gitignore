@@ -46,3 +46,7 @@ coverage/
 neon-server.js
 export_supabase_to_neon.js
 backups/
+
+# Backup snapshots (generated; GitHub artifacts hold them, not the repo)
+scripts/backup-*.json
+scripts/url-backup-*.json

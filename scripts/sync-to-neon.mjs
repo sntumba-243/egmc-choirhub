@@ -16,19 +16,13 @@
 
 import dotenv from 'dotenv';
 import pg from 'pg';
+import { pathToFileURL } from 'node:url';
 
 dotenv.config({ path: '.env.local' });
 
-const SRC_URL = process.env.SUPABASE_DB_URL;
-const TGT_URL = process.env.NEON_DB_URL;
-if (!SRC_URL || !TGT_URL) {
-  console.error('❌ Need SUPABASE_DB_URL and NEON_DB_URL in .env.local');
-  process.exit(1);
-}
-
 const READ_BATCH = 500;
 const VERIFY_TABLES = ['songs', 'churches', 'events'];
-const EXPECT = { songs: 482 };
+const EXPECT = {}; // src↔tgt count match is the real check; no hardcoded totals
 
 const qIdent = (n) => '"' + String(n).replace(/"/g, '""') + '"';
 
@@ -102,7 +96,10 @@ async function count(client, table) {
   return r.rows[0].n;
 }
 
-async function main() {
+export async function syncToNeon() {
+  const SRC_URL = process.env.SUPABASE_DB_URL;
+  const TGT_URL = process.env.NEON_DB_URL;
+  if (!SRC_URL || !TGT_URL) throw new Error('SUPABASE_DB_URL and NEON_DB_URL are required');
   const src = new pg.Client({ connectionString: SRC_URL, ssl: { rejectUnauthorized: false }, statement_timeout: 120000 });
   const tgt = new pg.Client({ connectionString: TGT_URL, ssl: { rejectUnauthorized: false }, statement_timeout: 300000 });
   await src.connect();
@@ -178,13 +175,15 @@ async function main() {
     console.log(`\nResult: ${allMatch ? 'ALL MATCH ✅' : 'MISMATCH ⚠️'}`);
   } catch (err) {
     if (!committed) { try { await tgt.query('ROLLBACK'); console.error('\nROLLED BACK — Neon left unchanged.'); } catch {} }
-    console.error('Fatal:', err.message);
     await src.end(); await tgt.end();
-    process.exit(1);
+    throw err; // let the caller decide (direct run → exit 1; backup-all → log + continue)
   }
 
   await src.end();
   await tgt.end();
 }
 
-main();
+// Auto-run only when invoked directly (node scripts/sync-to-neon.mjs).
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  syncToNeon().catch((e) => { console.error('Fatal:', e.message); process.exit(1); });
+}
