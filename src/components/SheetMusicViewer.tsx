@@ -31,6 +31,11 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [scale, setScale] = useState(1)
+  const [chromeVisible, setChromeVisible] = useState(true)
+  const chromeVisibleRef = useRef(true)
+  const hideTimerRef = useRef<number | null>(null)
+  const tapTimeoutRef = useRef<number | null>(null)
+  const lastTouchEndRef = useRef(0)
 
   // Convert Google Drive URLs to route through the server-side PDF proxy
   // (avoids browser CORS + Drive virus-scan interstitial on direct fetch)
@@ -44,6 +49,19 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
       return v ? base + '&v=' + encodeURIComponent(v) : base
     }
     return u
+  }
+
+  // ── Auto-hiding chrome (forScore/Apple Books pattern) ──
+  const scheduleHide = () => {
+    if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current)
+    hideTimerRef.current = window.setTimeout(() => setChromeVisible(false), 3000)
+  }
+  const showChrome = () => { setChromeVisible(true); scheduleHide() } // reveal + restart timer
+  const toggleChrome = () => {
+    const next = !chromeVisibleRef.current
+    setChromeVisible(next)
+    if (next) scheduleHide()
+    else if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current)
   }
 
   useEffect(() => {
@@ -118,6 +136,18 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
     return () => { cancelled = true }
   }, [pdf, currentPage, scale])
 
+  // Mirror chrome visibility into a ref for use inside timers/handlers.
+  useEffect(() => { chromeVisibleRef.current = chromeVisible }, [chromeVisible])
+
+  // On open (and whenever a new document loads): show chrome, auto-hide after 3s.
+  useEffect(() => { showChrome() }, [url, version])
+
+  // Clear timers on unmount.
+  useEffect(() => () => {
+    if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current)
+    if (tapTimeoutRef.current) window.clearTimeout(tapTimeoutRef.current)
+  }, [])
+
   // Change page and reset the scroll position to the top-left.
   const goToPage = (p: number) => {
     if (p < 1 || p > numPages) return
@@ -135,6 +165,7 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
     const start = touchRef.current
     touchRef.current = null
     if (!start) return
+    lastTouchEndRef.current = Date.now() // so the synthesized click is ignored (desktop guard)
     const t = e.changedTouches[0]
     const dx = t.clientX - start.x
     const dy = t.clientY - start.y
@@ -146,21 +177,33 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
     const noHorizontalOverflow = el ? el.scrollWidth <= el.clientWidth + 4 : true
 
     if (adx > 60 && adx > 2 * ady && noHorizontalOverflow) {
+      if (tapTimeoutRef.current) { window.clearTimeout(tapTimeoutRef.current); tapTimeoutRef.current = null }
       goToPage(currentPage + (dx < 0 ? 1 : -1)) // swipe left → next, right → prev
       return
     }
 
-    // Double-tap (two stationary taps < 300ms apart) toggles zoom 1 ↔ 1.75.
+    // Tap: a double-tap (< 300ms apart) zooms; a lone tap toggles chrome after a
+    // 300ms wait — cancelled if a second tap arrives, so the two never collide.
     if (adx < 10 && ady < 10) {
       const now = Date.now()
       const prev = lastTapRef.current
-      if (now - prev.t < 300 && Math.abs(t.clientX - prev.x) < 30 && Math.abs(t.clientY - prev.y) < 30) {
+      const isDouble = now - prev.t < 300 && Math.abs(t.clientX - prev.x) < 30 && Math.abs(t.clientY - prev.y) < 30
+      if (isDouble) {
+        if (tapTimeoutRef.current) { window.clearTimeout(tapTimeoutRef.current); tapTimeoutRef.current = null }
         setScale(s => (s > 1 ? 1 : 1.75))
-        lastTapRef.current = { t: 0, x: 0, y: 0 } // consume, so a 3rd tap doesn't retrigger
+        lastTapRef.current = { t: 0, x: 0, y: 0 } // consume
       } else {
         lastTapRef.current = { t: now, x: t.clientX, y: t.clientY }
+        if (tapTimeoutRef.current) window.clearTimeout(tapTimeoutRef.current)
+        tapTimeoutRef.current = window.setTimeout(() => { tapTimeoutRef.current = null; toggleChrome() }, 300)
       }
     }
+  }
+
+  // Desktop: a real mouse click (not a touch-synthesized one) toggles chrome.
+  const onCanvasClick = () => {
+    if (Date.now() - lastTouchEndRef.current < 700) return
+    toggleChrome()
   }
 
   // CORS fallback — show Google's viewer if direct fetch blocked
@@ -185,27 +228,29 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
   }
 
   return createPortal(
-    <div className='fixed inset-0 z-[10050] bg-gray-950 flex flex-col'>
-      {/* Header */}
-      <div className='flex items-center justify-between px-4 py-2 bg-gray-900 flex-shrink-0'
+    <div className='fixed inset-0 z-[10050] bg-gray-950'>
+      {/* Top chrome — absolute overlay so hiding it gives the partition full height */}
+      <div
+        className={`absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-2 bg-gray-900 transition-all duration-200 ${chromeVisible ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'}`}
         style={{ paddingTop: 'calc(8px + env(safe-area-inset-top, 0px))' }}>
         <button onClick={onClose} className='min-w-[44px] min-h-[44px] flex items-center justify-center text-white'>
           <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round'><polyline points='15,18 9,12 15,6'/></svg>
         </button>
         <span className='text-sm font-medium text-white truncate flex-1 text-center px-2'>{title || 'Sheet Music'}</span>
         <div className='flex items-center'>
-          <button onClick={() => setScale(s => Math.max(0.5, s - 0.25))} className='min-w-[44px] min-h-[44px] flex items-center justify-center text-white text-lg'>−</button>
-          <button onClick={() => setScale(s => Math.min(3, s + 0.25))} className='min-w-[44px] min-h-[44px] flex items-center justify-center text-white text-lg'>+</button>
+          <button onClick={() => { setScale(s => Math.max(0.5, s - 0.25)); showChrome() }} className='min-w-[44px] min-h-[44px] flex items-center justify-center text-white text-lg'>−</button>
+          <button onClick={() => { setScale(s => Math.min(3, s + 0.25)); showChrome() }} className='min-w-[44px] min-h-[44px] flex items-center justify-center text-white text-lg'>+</button>
         </div>
       </div>
 
-      {/* Canvas area */}
+      {/* Canvas area — fills the whole viewer; chrome overlays it (no reflow on hide) */}
       <div
         ref={scrollRef}
-        className='flex-1 overflow-auto bg-gray-800 flex items-start justify-center p-2'
+        className='absolute inset-0 overflow-auto bg-gray-800 flex items-start justify-center p-2'
         style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
+        onClick={onCanvasClick}
       >
         {loading ? (
           <div className='flex flex-col items-center justify-center h-full text-gray-400 gap-3'>
@@ -217,19 +262,20 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
         )}
       </div>
 
-      {/* Page navigation */}
+      {/* Bottom chrome — absolute overlay */}
       {numPages > 1 && (
-        <div className='flex items-center justify-between px-4 py-2 bg-gray-900 flex-shrink-0'
+        <div
+          className={`absolute bottom-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-2 bg-gray-900 transition-all duration-200 ${chromeVisible ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}
           style={{ paddingBottom: 'calc(8px + env(safe-area-inset-bottom, 0px))' }}>
           <button
-            onClick={() => goToPage(currentPage - 1)}
+            onClick={() => { goToPage(currentPage - 1); showChrome() }}
             disabled={currentPage === 1}
             className='min-w-[44px] min-h-[44px] flex items-center justify-center text-white disabled:opacity-30 rounded-xl'>
             <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round'><polyline points='15,18 9,12 15,6'/></svg>
           </button>
           <span className='text-xs text-gray-400 font-medium'>{currentPage} / {numPages}</span>
           <button
-            onClick={() => goToPage(currentPage + 1)}
+            onClick={() => { goToPage(currentPage + 1); showChrome() }}
             disabled={currentPage === numPages}
             className='min-w-[44px] min-h-[44px] flex items-center justify-center text-white disabled:opacity-30 rounded-xl'>
             <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round'><polyline points='9,18 15,12 9,6'/></svg>
