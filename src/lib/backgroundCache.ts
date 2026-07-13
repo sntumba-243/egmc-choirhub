@@ -1,14 +1,12 @@
 // Background PDF pre-caching for ChoirHub member portal.
 //
-// Quietly downloads song sheet-music PDFs (via /api/pdf-proxy) into the
-// service worker's PDF cache while the member is online, so previously
-// unopened songs still work offline. Invisible during normal use — the only
-// surface is the "Offline songs" row on the member Profile page.
+// Quietly downloads song sheet-music PDFs (directly from their Supabase Storage
+// URL) into the service worker's PDF cache while the member is online, so
+// previously unopened songs still work offline. Invisible during normal use —
+// the only surface is the "Offline songs" row on the member Profile page.
 //
-// NOTE: the service worker does not have a dedicated /api/pdf-proxy caching
-// rule (its generic branch would store proxy responses in the app cache, not
-// egmc-pdfs), so this module writes responses into the egmc-pdfs-* cache
-// itself. The SW's generic branch serves them back offline via caches.match().
+// The cache key MUST match SheetMusicViewer.getDirectUrl exactly (Storage URL +
+// version param) so the entries this writes are the ones the viewer requests.
 
 import { supabase } from './supabase';
 
@@ -33,7 +31,6 @@ export interface BackgroundCacheOpts {
 }
 
 // ── Constants ──
-const DRIVE_RE = /drive\.google\.com\/file\/d\/([^/]+)/;
 // Fallback must track SW_VERSION in public/service-worker.js; getPdfCache()
 // prefers any existing egmc-pdfs-* cache so a version bump doesn't orphan data.
 const PDF_CACHE_FALLBACK = 'egmc-pdfs-2.0.0';
@@ -67,17 +64,10 @@ export function subscribeCacheProgress(fn: (p: CacheProgress) => void): () => vo
 }
 
 // ── Helpers ──
-function fileIdOf(url: string | null | undefined): string | null {
-  if (!url) return null;
-  const m = url.match(DRIVE_RE);
-  return m ? m[1] : null;
-}
-
 // Must match SheetMusicViewer.getDirectUrl exactly so the pre-cached key is the
-// one the viewer later requests (append version only when present).
-function proxyUrl(fileId: string, version?: string | null): string {
-  const base = '/api/pdf-proxy?fileId=' + fileId;
-  return version ? base + '&v=' + encodeURIComponent(version) : base;
+// one the viewer later requests (Storage URL + version param).
+function cacheUrl(sheetUrl: string, version?: string | null): string {
+  return sheetUrl + (sheetUrl.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(version || '');
 }
 
 async function getPdfCache(): Promise<Cache> {
@@ -152,8 +142,8 @@ async function buildQueue(
     .order('created_at', { ascending: false }); // Priority 3: newest first
   if (error || !allSongs) return { p12: [], p3: [] };
 
-  const withDrive = (allSongs as Song[]).filter((s) => fileIdOf(s.sheet_music_url));
-  const byId = new Map(withDrive.map((s) => [s.id, s]));
+  const withSheet = (allSongs as Song[]).filter((s) => !!(s.sheet_music_url && s.sheet_music_url.trim()));
+  const byId = new Map(withSheet.map((s) => [s.id, s]));
 
   const seen = new Set<string>();
   const priority: Song[] = [];
@@ -186,15 +176,14 @@ async function buildQueue(
   }
 
   // Priority 3 — everything else (already newest-first)
-  const p3 = withDrive.filter((s) => !seen.has(s.id));
+  const p3 = withSheet.filter((s) => !seen.has(s.id));
   return { p12: priority, p3 };
 }
 
 async function countCached(cache: Cache, songs: Song[]): Promise<number> {
   let n = 0;
   for (const s of songs) {
-    const id = fileIdOf(s.sheet_music_url);
-    if (id && (await cache.match(proxyUrl(id, s.updated_at)))) n++;
+    if (s.sheet_music_url && (await cache.match(cacheUrl(s.sheet_music_url, s.updated_at)))) n++;
   }
   return n;
 }
@@ -211,8 +200,7 @@ async function runQueue(queue: Song[]): Promise<void> {
     const pending: Song[] = [];
     let cached = 0;
     for (const song of queue) {
-      const id = fileIdOf(song.sheet_music_url)!;
-      if (await cache.match(proxyUrl(id, song.updated_at))) cached++;
+      if (await cache.match(cacheUrl(song.sheet_music_url!, song.updated_at))) cached++;
       else pending.push(song);
     }
     setProgress({ total: queue.length, cached, downloading: pending.length > 0 });
@@ -222,8 +210,7 @@ async function runQueue(queue: Song[]): Promise<void> {
       const batch = pending.slice(i, i + BATCH_SIZE);
       await Promise.all(
         batch.map(async (song) => {
-          const id = fileIdOf(song.sheet_music_url)!;
-          const url = proxyUrl(id, song.updated_at);
+          const url = cacheUrl(song.sheet_music_url!, song.updated_at);
           try {
             if (await cache.match(url)) {
               setProgress({ cached: progress.cached + 1 });

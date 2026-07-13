@@ -1,6 +1,6 @@
 // EGMC Choir App - Service Worker for Offline Support
 // IMPORTANT: Bump this version string on every deploy
-const SW_VERSION = '2.0.0';
+const SW_VERSION = '2.1.0';
 const CACHE_NAME = `egmc-choir-${SW_VERSION}`;
 const SUPABASE_CACHE = `egmc-supabase-${SW_VERSION}`;
 const PDF_CACHE = `egmc-pdfs-${SW_VERSION}`;
@@ -50,6 +50,25 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // Sheet-music PDFs in Supabase Storage: Cache first (immutable content; the
+  // ?v= version param busts the key when a sheet is replaced). Must come BEFORE
+  // the Supabase network-first branch so sheets are served offline from PDF_CACHE.
+  if (url.pathname.includes('/storage/v1/object/public/choirhub_partitions')) {
+    event.respondWith(
+      caches.match(request).then(cached => {
+        if (cached) return cached;
+        return fetch(request).then(response => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(PDF_CACHE).then(cache => cache.put(request, clone));
+          }
+          return response;
+        });
+      })
+    );
+    return;
+  }
+
   // Supabase API: Network first
   if (url.hostname.includes('supabase')) {
     event.respondWith(
@@ -69,23 +88,6 @@ self.addEventListener('fetch', (event) => {
             );
           });
         })
-    );
-    return;
-  }
-
-  // PDFs / storage: Cache first (these don't change)
-  if (request.url.endsWith('.pdf') || url.pathname.includes('/storage/')) {
-    event.respondWith(
-      caches.match(request).then(cached => {
-        if (cached) return cached;
-        return fetch(request).then(response => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(PDF_CACHE).then(cache => cache.put(request, clone));
-          }
-          return response;
-        });
-      })
     );
     return;
   }

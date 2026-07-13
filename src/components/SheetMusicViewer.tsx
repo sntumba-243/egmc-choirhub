@@ -18,7 +18,7 @@ interface SheetMusicViewerProps {
   title?: string
   onClose?: () => void
   /** Cache-busting token (song.updated_at). Changing it forces a fresh fetch
-   *  everywhere — device SW cache, Vercel CDN — even if the Drive URL is reused. */
+   *  everywhere — device SW cache, Vercel CDN — even if the Storage URL is reused. */
   version?: string
 }
 
@@ -47,20 +47,12 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
   // After a pinch, re-center the scroll so the focal point stays under the fingers.
   const pinchFocusRef = useRef<{ f: number; vx: number; vy: number; sl: number; st: number } | null>(null)
   const [resizeTick, setResizeTick] = useState(0) // bump forces a re-fit
+  const [reloadTick, setReloadTick] = useState(0) // Retry re-triggers the load
 
-  // Convert Google Drive URLs to route through the server-side PDF proxy
-  // (avoids browser CORS + Drive virus-scan interstitial on direct fetch)
-  const getDirectUrl = (u: string, v?: string) => {
-    // https://drive.google.com/file/d/FILE_ID/preview or /view
-    const match = u.match(/drive\.google\.com\/file\/d\/([^/]+)/)
-    if (match) {
-      const base = '/api/pdf-proxy?fileId=' + match[1]
-      // Append the version only when present so unversioned songs keep a stable
-      // cache key (no needless cache miss / no behavior change when absent).
-      return v ? base + '&v=' + encodeURIComponent(v) : base
-    }
-    return u
-  }
+  // Songs serve directly from Supabase Storage. Append the version param so an
+  // edited sheet busts the SW/CDN cache (stable key while the version is stable).
+  const getDirectUrl = (u: string, v?: string) =>
+    u + (u.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(v || '')
 
   // ── Auto-hiding chrome (forScore/Apple Books pattern) ──
   const scheduleHide = () => {
@@ -101,14 +93,13 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
         setLoading(false)
       } catch (err: any) {
         if (cancelled) return
-        // Google Drive CORS fallback — use the gview embed as last resort
-        setError('cors')
+        setError('failed')
         setLoading(false)
       }
     }
     loadPdf()
     return () => { cancelled = true }
-  }, [url, version])
+  }, [url, version, reloadTick])
 
   // Render current page to canvas
   useEffect(() => {
@@ -298,22 +289,23 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
     toggleChrome()
   }
 
-  // CORS fallback — show Google's viewer if direct fetch blocked
-  if (error === 'cors') {
-    const match = url.match(/drive\.google\.com\/file\/d\/([^/]+)/)
-    const fileId = match ? match[1] : null
+  const retry = () => { setError(null); setReloadTick(t => t + 1) }
+
+  // Error state — clean message on the white surface; chrome (back button) stays.
+  if (error) {
     return createPortal(
-      <div className='fixed inset-0 z-[10050] bg-black flex flex-col'>
-        <div className='flex items-center justify-between px-4 py-3 bg-gray-900 text-white'
-          style={{ paddingTop: 'calc(12px + env(safe-area-inset-top, 0px))' }}>
-          <span className='text-sm font-medium truncate'>{title || 'Sheet Music'}</span>
-          <button onClick={onClose} className='min-w-[44px] min-h-[44px] flex items-center justify-center text-white'>✕</button>
+      <div className='fixed inset-0 z-[10050] bg-white flex flex-col'>
+        <div className='flex items-center px-4 py-2 bg-gray-900 shadow-lg flex-shrink-0'
+          style={{ paddingTop: 'calc(8px + env(safe-area-inset-top, 0px))' }}>
+          <button onClick={onClose} className='min-w-[44px] min-h-[44px] flex items-center justify-center text-white'>
+            <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round'><polyline points='15,18 9,12 15,6'/></svg>
+          </button>
+          <span className='text-sm font-medium text-white truncate flex-1 text-center px-2 pr-11'>{title || 'Sheet Music'}</span>
         </div>
-        <iframe
-          src={'https://drive.google.com/file/d/' + fileId + '/preview'}
-          className='flex-1 w-full border-0'
-          allow='autoplay'
-        />
+        <div className='flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center text-gray-600'>
+          <span className='text-base font-medium'>Sheet unavailable</span>
+          <button onClick={retry} className='min-h-[44px] px-5 rounded-xl bg-gray-900 text-white text-sm font-medium'>Retry</button>
+        </div>
       </div>,
       document.body
     )
