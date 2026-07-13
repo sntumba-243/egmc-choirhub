@@ -81,13 +81,6 @@ async function getPdfCache(): Promise<Cache> {
   }
 }
 
-function isCellular(): boolean {
-  // navigator.connection is absent on iOS Safari — treat unknown as non-cellular
-  // and proceed (the Capacitor native build can refine this later).
-  const c = (navigator as any).connection;
-  return !!(c && c.type === 'cellular');
-}
-
 function waitWhileOffline(): Promise<void> {
   if (navigator.onLine) return Promise.resolve();
   return new Promise((resolve) => {
@@ -241,9 +234,10 @@ async function runQueue(queue: Song[]): Promise<void> {
 let autoStarted = false;
 
 /**
- * Auto background caching. Starts 8s after app load, online only. On cellular
- * connections it caches only priority tiers 1–2 (upcoming events + favorites)
- * and stops before tier 3. Safe to call repeatedly — runs at most once/session.
+ * Auto background caching. Starts 8s after app load, online only. Caches ONLY
+ * priority tiers 1–2 (upcoming-event setlist + favorites), regardless of
+ * connection type — the full library is opt-in via the Profile "Download all
+ * now" button. Safe to call repeatedly — runs at most once/session.
  */
 export function startBackgroundCache(opts: BackgroundCacheOpts = {}): void {
   if (autoStarted || !CACHES_OK) return;
@@ -251,9 +245,8 @@ export function startBackgroundCache(opts: BackgroundCacheOpts = {}): void {
   window.setTimeout(async () => {
     if (!navigator.onLine) return; // try again on the next app load
     try {
-      const { p12, p3 } = await buildQueue(opts);
-      const queue = isCellular() ? p12 : [...p12, ...p3];
-      await runQueue(queue);
+      const { p12 } = await buildQueue(opts);
+      await runQueue(p12); // tiers 1-2 only
     } catch {
       /* never surface background errors to the user */
     }
@@ -275,13 +268,16 @@ export async function downloadAllNow(opts: BackgroundCacheOpts = {}): Promise<vo
  * the total that have a sheet. Opens the cache and runs cache.match only — ZERO
  * fetches, ZERO downloads. Safe to call on page mount (e.g. the Profile page).
  */
-export async function getCacheStatus(): Promise<{ cached: number; total: number }> {
-  if (!CACHES_OK) return { cached: 0, total: 0 };
-  const { data } = await supabase
-    .from('songs')
-    .select('sheet_music_url, updated_at')
-    .not('sheet_music_url', 'is', null);
-  const withSheet = (data || []).filter((s: any) => s.sheet_music_url && String(s.sheet_music_url).trim());
+export async function getCacheStatus(
+  opts: BackgroundCacheOpts = {}
+): Promise<{ priority: { cached: number; total: number }; full: { cached: number; total: number } }> {
+  const empty = { priority: { cached: 0, total: 0 }, full: { cached: 0, total: 0 } };
+  if (!CACHES_OK) return empty;
+  const { p12, p3 } = await buildQueue(opts); // read-only (DB reads); no fetches
+  const all = [...p12, ...p3];
   const cache = await getPdfCache();
-  return { cached: await countCached(cache, withSheet), total: withSheet.length };
+  return {
+    priority: { cached: await countCached(cache, p12), total: p12.length }, // Sunday-ready (tiers 1-2)
+    full: { cached: await countCached(cache, all), total: all.length },     // whole library
+  };
 }

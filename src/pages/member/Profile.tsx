@@ -28,8 +28,10 @@ export const MemberProfile: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [showAvatarMenu, setShowAvatarMenu] = useState(false);
   const [showOffline, setShowOffline] = useState(false);
-  const [songCache, setSongCache] = useState({ total: 0, cached: 0 });
+  const [status, setStatus] = useState({ priority: { cached: 0, total: 0 }, full: { cached: 0, total: 0 } });
+  const [progress, setProgress] = useState({ cached: 0, total: 0 }); // live count of the running download
   const [downloadingAll, setDownloadingAll] = useState(false);
+  const prevDownloadingRef = useRef(false);
 
   useEffect(() => {
     loadOfflineData();
@@ -42,10 +44,16 @@ export const MemberProfile: React.FC = () => {
   // explicit "Download all now" button (or the layout's background cacher) does.
   useEffect(() => {
     let unsub = () => {};
-    getCacheStatus().then((s) => setSongCache(s)).catch(() => {});
+    const opts = { userId: user?.id, churchId: (user as any)?.church_id };
+    getCacheStatus(opts).then(setStatus).catch(() => {});
     unsub = subscribeCacheProgress((p) => {
-      if (p.total > 0) setSongCache({ total: p.total, cached: p.cached });
+      setProgress({ cached: p.cached, total: p.total });
       setDownloadingAll(p.downloading);
+      // When any download (button or background) finishes, refresh the counts.
+      if (prevDownloadingRef.current && !p.downloading) {
+        getCacheStatus(opts).then(setStatus).catch(() => {});
+      }
+      prevDownloadingRef.current = p.downloading;
     });
     return () => unsub();
   }, [user?.id]);
@@ -54,8 +62,7 @@ export const MemberProfile: React.FC = () => {
     setDownloadingAll(true);
     try {
       await downloadAllNow({ userId: user?.id, churchId: (user as any)?.church_id });
-      const s = await getCacheStatus();
-      setSongCache(s);
+      setStatus(await getCacheStatus({ userId: user?.id, churchId: (user as any)?.church_id }));
       toast.success('Songs saved for offline use');
     } catch {
       toast.error('Could not download all songs');
@@ -288,20 +295,20 @@ export const MemberProfile: React.FC = () => {
           <div className="min-w-0">
             <p className="text-sm font-semibold text-gray-900">Offline songs</p>
             <p className="text-xs text-gray-400">
-              {songCache.cached} of {songCache.total} songs available offline
+              Sunday-ready: {status.priority.cached}/{status.priority.total} · Full library: {status.full.cached}/{status.full.total}
             </p>
           </div>
         </div>
         <button
           onClick={handleDownloadAll}
-          disabled={downloadingAll || songCache.total === 0 || songCache.cached >= songCache.total}
+          disabled={downloadingAll || status.full.total === 0 || status.full.cached >= status.full.total}
           className="px-4 min-h-[44px] rounded-lg text-white text-xs font-semibold disabled:opacity-50 flex-shrink-0 flex items-center gap-1.5"
           style={{ background: 'linear-gradient(135deg, #FF8C42, #E85D26)' }}
         >
           {downloadingAll && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
           {downloadingAll
-            ? `Downloading… ${songCache.cached}/${songCache.total}`
-            : songCache.total > 0 && songCache.cached >= songCache.total
+            ? `Downloading… ${progress.cached}/${progress.total}`
+            : status.full.total > 0 && status.full.cached >= status.full.total
             ? 'All saved'
             : 'Download all now'}
         </button>
