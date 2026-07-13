@@ -40,10 +40,12 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
   const tapTimeoutRef = useRef<number | null>(null)
   const lastTouchEndRef = useRef(0)
   // Controlled pinch-zoom bookkeeping
-  const pinchRef = useRef<{ startDist: number; startScale: number } | null>(null)
+  const pinchRef = useRef<{ startDist: number; startScale: number; vx: number; vy: number; sl: number; st: number } | null>(null)
   const isMultiTouchRef = useRef(false)
-  const rafRef = useRef<number | null>(null)
   const pendingScaleRef = useRef<number | null>(null)
+  const canvasElRef = useRef<HTMLCanvasElement | null>(null)
+  // After a pinch, re-center the scroll so the focal point stays under the fingers.
+  const pinchFocusRef = useRef<{ f: number; vx: number; vy: number; sl: number; st: number } | null>(null)
   const [resizeTick, setResizeTick] = useState(0) // bump forces a re-fit
 
   // Convert Google Drive URLs to route through the server-side PDF proxy
@@ -81,6 +83,7 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
     setNumPages(0)
     setCurrentPage(1)
     if (containerRef.current) containerRef.current.innerHTML = ''
+    canvasElRef.current = null
     setLoading(true)
     setError(null)
 
@@ -134,7 +137,7 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
       // No maxWidth cap: when zoomed the canvas must be allowed to exceed the
       // container so both axes become scrollable (and the aspect stays correct).
       canvas.style.display = 'block'
-      canvas.style.margin = '0 auto'
+      canvas.style.margin = 'auto' // center on BOTH axes (auto margins → 0 on overflow, no clip)
       canvas.style.touchAction = 'manipulation' // pan/scroll ok; we own double-tap
 
       const ctx = canvas.getContext('2d')!
@@ -143,6 +146,15 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
 
       container.innerHTML = ''
       container.appendChild(canvas)
+      canvasElRef.current = canvas
+
+      // After a pinch re-render, restore the focal point (zoom-to-point).
+      const focus = pinchFocusRef.current
+      if (focus && scrollEl) {
+        scrollEl.scrollLeft = Math.max(0, (focus.sl + focus.vx) * focus.f - focus.vx)
+        scrollEl.scrollTop = Math.max(0, (focus.st + focus.vy) * focus.f - focus.vy)
+        pinchFocusRef.current = null
+      }
     }
     render()
     return () => { cancelled = true }
@@ -165,11 +177,10 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
   // On open (and whenever a new document loads): show chrome, auto-hide after 3s.
   useEffect(() => { showChrome() }, [url, version])
 
-  // Clear timers / animation frames on unmount.
+  // Clear timers on unmount.
   useEffect(() => () => {
     if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current)
     if (tapTimeoutRef.current) window.clearTimeout(tapTimeoutRef.current)
-    if (rafRef.current != null) window.cancelAnimationFrame(rafRef.current)
   }, [])
 
   // Change page and reset the scroll position to the top-left.
@@ -186,7 +197,24 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
       isMultiTouchRef.current = true
       touchRef.current = null
       if (tapTimeoutRef.current) { window.clearTimeout(tapTimeoutRef.current); tapTimeoutRef.current = null }
-      pinchRef.current = { startDist: touchDist(e.touches[0], e.touches[1]), startScale: scale }
+      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2
+      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2
+      const el = scrollRef.current
+      const contRect = el?.getBoundingClientRect()
+      const canvas = canvasElRef.current
+      if (canvas) {
+        const r = canvas.getBoundingClientRect() // untransformed at gesture start
+        canvas.style.transformOrigin = `${midX - r.left}px ${midY - r.top}px`
+        canvas.style.willChange = 'transform'
+      }
+      pinchRef.current = {
+        startDist: touchDist(e.touches[0], e.touches[1]),
+        startScale: scale,
+        vx: midX - (contRect?.left ?? 0),
+        vy: midY - (contRect?.top ?? 0),
+        sl: el?.scrollLeft ?? 0,
+        st: el?.scrollTop ?? 0,
+      }
       return
     }
     if (isMultiTouchRef.current) return // still finishing a multi-touch sequence
@@ -194,28 +222,33 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
     touchRef.current = { x: t.clientX, y: t.clientY, scrollLeft: scrollRef.current?.scrollLeft ?? 0 }
   }
 
-  // Controlled pinch: setScale from the finger-distance ratio, rAF-throttled, so
-  // the PDF re-renders sharp (native pinch would blur the raster canvas).
+  // Controlled pinch, phase 1: cheap GPU CSS-transform PREVIEW on the existing
+  // canvas (slight blur is fine). The sharp PDF re-render happens once on release.
   const onTouchMove = (e: ReactTouchEvent<HTMLDivElement>) => {
-    if (e.touches.length < 2 || !pinchRef.current) return
-    const ratio = touchDist(e.touches[0], e.touches[1]) / pinchRef.current.startDist
-    pendingScaleRef.current = Math.min(3, Math.max(0.5, pinchRef.current.startScale * ratio))
-    if (rafRef.current == null) {
-      rafRef.current = window.requestAnimationFrame(() => {
-        rafRef.current = null
-        if (pendingScaleRef.current != null) setScale(pendingScaleRef.current)
-      })
-    }
+    const p = pinchRef.current
+    if (e.touches.length < 2 || !p) return
+    const ratio = touchDist(e.touches[0], e.touches[1]) / p.startDist
+    const finalScale = Math.min(3, Math.max(0.5, p.startScale * ratio))
+    pendingScaleRef.current = finalScale
+    const canvas = canvasElRef.current
+    if (canvas) canvas.style.transform = `scale(${finalScale / p.startScale})`
   }
 
   const onTouchEnd = (e: ReactTouchEvent<HTMLDivElement>) => {
     if (isMultiTouchRef.current) {
       // Keep gestures suppressed until EVERY finger has lifted.
       if (e.touches.length === 0) {
+        const p = pinchRef.current
+        const canvas = canvasElRef.current
+        if (canvas) { canvas.style.transform = ''; canvas.style.transformOrigin = ''; canvas.style.willChange = '' }
+        // Phase 2: one sharp re-render at the final scale, preserving focal point.
+        if (p && pendingScaleRef.current != null && pendingScaleRef.current !== p.startScale) {
+          pinchFocusRef.current = { f: pendingScaleRef.current / p.startScale, vx: p.vx, vy: p.vy, sl: p.sl, st: p.st }
+          setScale(pendingScaleRef.current)
+        }
         isMultiTouchRef.current = false
         pinchRef.current = null
-        if (rafRef.current != null) { window.cancelAnimationFrame(rafRef.current); rafRef.current = null }
-        if (pendingScaleRef.current != null) { setScale(pendingScaleRef.current); pendingScaleRef.current = null }
+        pendingScaleRef.current = null
         lastTouchEndRef.current = Date.now()
       }
       touchRef.current = null
@@ -290,7 +323,7 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
     <div className='fixed inset-0 z-[10050] bg-gray-950'>
       {/* Top chrome — absolute overlay so hiding it gives the partition full height */}
       <div
-        className={`absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-2 bg-gray-900 transition-all duration-200 ${chromeVisible ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'}`}
+        className={`absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-2 bg-gray-900 shadow-lg transition-all duration-200 ${chromeVisible ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'}`}
         style={{ paddingTop: 'calc(8px + env(safe-area-inset-top, 0px))' }}>
         <button onClick={onClose} className='min-w-[44px] min-h-[44px] flex items-center justify-center text-white'>
           <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round'><polyline points='15,18 9,12 15,6'/></svg>
@@ -305,7 +338,7 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
       {/* Canvas area — fills the whole viewer; chrome overlays it (no reflow on hide) */}
       <div
         ref={scrollRef}
-        className='absolute inset-0 overflow-auto bg-gray-800 flex items-start justify-center'
+        className='absolute inset-0 overflow-auto bg-white'
         style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
@@ -313,19 +346,20 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
         onClick={onCanvasClick}
       >
         {loading ? (
-          <div className='flex flex-col items-center justify-center h-full text-gray-400 gap-3'>
-            <div className='w-8 h-8 border-2 border-gray-600 border-t-white rounded-full animate-spin'></div>
+          <div className='flex flex-col items-center justify-center h-full text-gray-500 gap-3'>
+            <div className='w-8 h-8 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin'></div>
             <span className='text-sm'>Loading sheet music...</span>
           </div>
         ) : (
-          <div ref={containerRef} className='w-full' />
+          // min-h-full + flex so the canvas (with margin:auto) centers on both axes
+          <div ref={containerRef} className='w-full min-h-full flex' />
         )}
       </div>
 
       {/* Bottom chrome — absolute overlay */}
       {numPages > 1 && (
         <div
-          className={`absolute bottom-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-2 bg-gray-900 transition-all duration-200 ${chromeVisible ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}
+          className={`absolute bottom-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-2 bg-gray-900 shadow-lg transition-all duration-200 ${chromeVisible ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}
           style={{ paddingBottom: 'calc(8px + env(safe-area-inset-bottom, 0px))' }}>
           <button
             onClick={() => { goToPage(currentPage - 1); showChrome() }}
