@@ -142,9 +142,11 @@ async function main() {
       await syncToNeon();
       console.log('Neon refresh: done ✅');
     } catch (e) {
-      // The JSON export is the primary guarantee; a Neon failure is logged loudly
-      // but does NOT fail the job (so the JSON artifact still uploads).
-      console.error('⚠ Neon sync FAILED (JSON backup still succeeded):', e.message);
+      // A Neon failure IS a backup failure — exit non-zero for the red X + email.
+      // The JSON export already wrote to disk, so the artifact still uploads via
+      // the workflow's `if: always()` upload step.
+      console.error('❌ Neon sync FAILED — exiting non-zero:', e.message);
+      process.exit(1);
     }
   } else {
     console.log('\nNeon sync skipped (no credentials)');
