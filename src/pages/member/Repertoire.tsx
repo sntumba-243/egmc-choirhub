@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { useChurch } from '../../contexts/ChurchContext';
 import SheetMusicViewer from '../../components/SheetMusicViewer';
+import { createSongSearcher } from '../../lib/songSearch';
 
 const PAGE_SIZE = 20;
 
@@ -125,9 +126,9 @@ export const MemberRepertoire = () => {
       }
 
       const search = debouncedSearch.trim();
-      if (search) {
-        query = query.or(`title.ilike.%${search}%,composer.ilike.%${search}%`);
-      }
+      // Fuzzy search is client-side (accent/typo-tolerant) — no server ilike here.
+      // When search is active, pagination is off below, so ALL songs are fetched
+      // for Fuse to rank.
 
       const shouldPaginate = !search && statusFilter === 'all' && !showFavoritesOnly;
       if (shouldPaginate) {
@@ -146,6 +147,12 @@ export const MemberRepertoire = () => {
         ...song,
         learning_status: sm.get(song.id) || 'not_started',
       }));
+
+      // Fuzzy search first (relevance-ranked, best match first), then the
+      // existing filters on its output. Empty search keeps the server sort order.
+      if (search) {
+        result = createSongSearcher(result)(search);
+      }
 
       if (statusFilter !== 'all') {
         result = result.filter(s => s.learning_status === statusFilter);

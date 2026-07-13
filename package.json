@@ -33,6 +33,7 @@
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "firebase": "^12.6.0",
+    "fuse.js": "^7.4.2",
     "lucide-react": "^0.344.0",
     "pdfjs-dist": "^5.4.394",
     "pg": "^8.18.0",
