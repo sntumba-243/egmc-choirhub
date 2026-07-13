@@ -97,7 +97,7 @@ export async function getOfflineMeta() {
 
 async function preCachePDFs(songs) {
   const pdfUrls = songs
-    .filter(s => s.sheet_music_url && s.sheet_music_url.includes('drive.google.com'))
+    .filter(s => s.sheet_music_url) // any sheet URL (Supabase Storage or legacy Drive)
     .map(s => s.sheet_music_url)
     .slice(0, 50); // Limit to 50 PDFs to avoid excessive storage
   

@@ -169,11 +169,11 @@ export const SongForm: React.FC = () => {
             type="url"
             value={sheetMusicUrl}
             onChange={(e) => setSheetMusicUrl(e.target.value)}
-            placeholder="https://drive.google.com/..."
+            placeholder="https://…/sheet-music.pdf"
             className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500"
           />
           <p className="text-sm text-gray-500 mt-1">
-            Link to Google Drive PDF or other sheet music file
+            Sheet music PDF URL
           </p>
 
           {/* PDF Preview */}

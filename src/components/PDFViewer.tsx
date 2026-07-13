@@ -31,18 +31,28 @@ export function PDFViewer({ url: googleDriveUrl, title: songTitle, songId, assig
     return '';
   }
 
+  // Resolve the URL to display. Google Drive links are converted to the /preview
+  // embed; any other URL (Supabase Storage, a direct PDF, …) is used as-is.
+  // Returns '' only when there is no usable URL at all.
+  function resolveViewerUrl(inputUrl: string): string {
+    if (!inputUrl || !inputUrl.trim()) return '';
+    if (/drive\.google\.com/i.test(inputUrl)) {
+      const fileId = extractFileId(inputUrl);
+      return fileId ? `https://drive.google.com/file/d/${fileId}/preview?rm=minimal` : '';
+    }
+    return inputUrl;
+  }
+
   // On native, open PDF in Capacitor Browser and navigate back
   useEffect(() => {
     if (!isNative) return;
 
-    const fileId = extractFileId(googleDriveUrl);
-    if (!fileId) {
+    const pdfUrl = resolveViewerUrl(googleDriveUrl);
+    if (!pdfUrl) {
       setHasError(true);
       setIsLoading(false);
       return;
     }
-
-    const pdfUrl = `https://drive.google.com/file/d/${fileId}/preview?rm=minimal`;
 
     Browser.open({
       url: pdfUrl,
@@ -64,24 +74,12 @@ export function PDFViewer({ url: googleDriveUrl, title: songTitle, songId, assig
   useEffect(() => {
     if (isNative) return;
 
-    function convertToIframeUrl(inputUrl: string): string {
-      const extractedFileId = extractFileId(inputUrl);
-
-      if (!extractedFileId) {
-        console.error('❌ Could not extract Google Drive file ID from:', inputUrl);
-        return '';
-      }
-
-      // Create embed URL with rm=minimal for minimal controls
-      const finalUrl = `https://drive.google.com/file/d/${extractedFileId}/preview?rm=minimal`;
-      return finalUrl;
-    }
-
-    const converted = convertToIframeUrl(googleDriveUrl);
+    const converted = resolveViewerUrl(googleDriveUrl);
     if (converted) {
       setIframeUrl(converted);
       setHasError(false);
     } else {
+      console.error('❌ No usable sheet music URL:', googleDriveUrl);
       setHasError(true);
     }
     setIsLoading(false);
@@ -149,9 +147,9 @@ export function PDFViewer({ url: googleDriveUrl, title: songTitle, songId, assig
       <div className="fixed inset-0 bg-red-600 z-[9999] flex items-center justify-center">
         <div className="text-center text-white p-6 max-w-md">
           <div className="text-4xl mb-4">⚠️</div>
-          <div className="text-xl font-bold mb-2">Invalid Google Drive URL</div>
+          <div className="text-xl font-bold mb-2">Sheet unavailable</div>
           <div className="text-sm mb-6 opacity-90">
-            Could not extract file ID from the URL
+            No sheet music URL was provided for this song
           </div>
           <button
             onClick={goBack}
@@ -182,19 +180,22 @@ export function PDFViewer({ url: googleDriveUrl, title: songTitle, songId, assig
         <ArrowLeft className="w-4 h-4 text-gray-600" strokeWidth={2.5} />
       </button>
 
-      {/* Google Drive iframe */}
+      {/* Sheet iframe. Drive embeds get the 110%/scale crop to hide Drive's
+          chrome; direct PDFs (Supabase Storage) render full-size, no crop. */}
       <iframe
         src={iframeUrl}
         title={songTitle || 'Sheet Music'}
         allow="autoplay"
         className="border-0 transition-all origin-top-left"
-        style={{
+        style={iframeUrl.includes('drive.google.com') ? {
           width: '110%',
           height: showRecorder ? 'calc(110% - 70px)' : '110%',
           transform: 'scale(0.909)',
           transformOrigin: 'top left',
+        } : {
+          width: '100%',
+          height: showRecorder ? 'calc(100% - 70px)' : '100%',
         }}
-        onLoad={() => {}}
       />
 
       {/* Thin top-edge tap zone to show controls - invisible, doesn't block PDF scrolling */}
