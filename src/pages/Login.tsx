@@ -9,10 +9,10 @@ interface LoginProps {
 
 export const Login: React.FC<LoginProps> = ({ onNavigateToRegister }) => {
   const { login } = useAuth();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => localStorage.getItem('choirhub_saved_email') || '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => localStorage.getItem('choirhub_remember_me') !== 'false'); // default true
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -56,6 +56,13 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister }) => {
     e.preventDefault();
     setError('');
     setLoading(true);
+
+    // Remember-me: pick persistent vs session-only storage for the auth token
+    // (consulted by the supabase client's storage adapter), and prefill email
+    // next time when enabled.
+    localStorage.setItem('choirhub_remember_me', String(rememberMe));
+    if (rememberMe) localStorage.setItem('choirhub_saved_email', email.trim());
+    else localStorage.removeItem('choirhub_saved_email');
 
     try {
       await login(email.trim(), password);
@@ -296,7 +303,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister }) => {
 
             {/* Remember / Forgot */}
             <div className="flex items-center justify-between mb-4">
-              <label className="flex items-center cursor-pointer" style={{ gap: '6px', fontSize: '0.72rem', color: '#5a6e88' }}>
+              <label className="flex items-center cursor-pointer min-h-[44px]" style={{ gap: '6px', fontSize: '0.72rem', color: '#5a6e88' }}>
                 <input
                   type="checkbox"
                   checked={rememberMe}

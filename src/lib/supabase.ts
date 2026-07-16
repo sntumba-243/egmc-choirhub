@@ -25,8 +25,22 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('❌ Missing Supabase credentials!');
 }
 
+// Remember-me: when enabled the auth token lives in localStorage (survives
+// browser/app close → offline access persists); when disabled it lives in
+// sessionStorage (cleared on close). Flag defaults to true. The adapter is the
+// single source the supabase client reads/writes the session through, so both
+// online session-restore and the offline auth path honor the choice.
+const REMEMBER_KEY = 'choirhub_remember_me';
+const rememberMe = () => localStorage.getItem(REMEMBER_KEY) !== 'false'; // default true
+const authStorage = {
+  getItem: (k: string) => (rememberMe() ? localStorage : sessionStorage).getItem(k),
+  setItem: (k: string, v: string) => (rememberMe() ? localStorage : sessionStorage).setItem(k, v),
+  removeItem: (k: string) => { localStorage.removeItem(k); sessionStorage.removeItem(k); },
+};
+
 const supabaseClient = createClient(supabaseUrl || '', supabaseAnonKey || '', {
   auth: {
+    storage: authStorage,
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
