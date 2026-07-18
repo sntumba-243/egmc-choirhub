@@ -2,31 +2,23 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { sentryVitePlugin } from '@sentry/vite-plugin';
 import path from 'path';
-import { writeFileSync, readFileSync } from 'fs';
+import { writeFileSync } from 'fs';
 
-// Auto-generate version.json with timestamp on each build
+// One build version, written to version.json AND baked into the bundle so they
+// always match. A later deploy writes a NEWER version.json than the running
+// bundle's baked value — that mismatch is exactly the "update available" signal.
+const BUILD_VERSION = Date.now().toString();
 const versionPlugin = {
   name: 'version-json',
   buildStart() {
-    const version = Date.now().toString();
-    writeFileSync('public/version.json', JSON.stringify({ version, timestamp: version }));
-    console.log(`📦 Generated version.json: ${version}`);
+    writeFileSync('public/version.json', JSON.stringify({ version: BUILD_VERSION, timestamp: BUILD_VERSION }));
+    console.log(`📦 Generated version.json: ${BUILD_VERSION}`);
   }
 };
 
-// Read current version.json to bake into the build
-function getBuildVersion(): string {
-  try {
-    const data = JSON.parse(readFileSync('public/version.json', 'utf-8'));
-    return data.version || '0';
-  } catch {
-    return '0';
-  }
-}
-
 export default defineConfig({
   define: {
-    __APP_BUILD_VERSION__: JSON.stringify(getBuildVersion()),
+    __APP_BUILD_VERSION__: JSON.stringify(BUILD_VERSION),
   },
   plugins: [
     react(),

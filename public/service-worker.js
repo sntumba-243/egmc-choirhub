@@ -1,6 +1,6 @@
 // EGMC Choir App - Service Worker for Offline Support
 // IMPORTANT: Bump this version string on every deploy
-const SW_VERSION = '2.2.0';
+const SW_VERSION = '2.3.0';
 const CACHE_NAME = `egmc-choir-${SW_VERSION}`;
 const SUPABASE_CACHE = `egmc-supabase-${SW_VERSION}`;
 const PDF_CACHE = `egmc-pdfs-${SW_VERSION}`;
@@ -11,7 +11,10 @@ const STATIC_ASSETS = [
   '/manifest.json',
 ];
 
-// Install - cache static assets and skip waiting
+// Install - cache static assets. Do NOT skipWaiting here: a new SW now WAITS so
+// the app can prompt the user; it activates only on SKIP_WAITING (Update button)
+// or when all tabs close. (First-ever install still activates immediately since
+// there is no controller to replace.)
 self.addEventListener('install', (event) => {
   console.log(`[SW ${SW_VERSION}] Installing...`);
   event.waitUntil(
@@ -23,7 +26,6 @@ self.addEventListener('install', (event) => {
       });
     })
   );
-  self.skipWaiting();
 });
 
 // Activate - delete ALL old caches and claim clients

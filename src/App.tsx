@@ -11,7 +11,7 @@ import toast from 'react-hot-toast';
 // PWA Components
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import IOSInstallPrompt from './components/IOSInstallPrompt';
-import PWAUpdateNotification from './components/PWAUpdateNotification';
+import UpdateBanner from './components/UpdateBanner';
 import EnhancedOfflineIndicator from './components/EnhancedOfflineIndicator';
 import { NativeUpdateBanner } from './components/NativeUpdateBanner';
 
@@ -124,7 +124,7 @@ function App() {
       />
       <PWAInstallPrompt />
       <IOSInstallPrompt />
-      <PWAUpdateNotification />
+      <UpdateBanner />
       <EnhancedOfflineIndicator />
       <NativeUpdateBanner />
     </ChurchProvider>
