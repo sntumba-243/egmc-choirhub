@@ -1,6 +1,6 @@
 // EGMC Choir App - Service Worker for Offline Support
 // IMPORTANT: Bump this version string on every deploy
-const SW_VERSION = '2.1.0';
+const SW_VERSION = '2.2.0';
 const CACHE_NAME = `egmc-choir-${SW_VERSION}`;
 const SUPABASE_CACHE = `egmc-supabase-${SW_VERSION}`;
 const PDF_CACHE = `egmc-pdfs-${SW_VERSION}`;
@@ -50,21 +50,25 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Sheet-music PDFs in Supabase Storage: Cache first (immutable content; the
-  // ?v= version param busts the key when a sheet is replaced). Must come BEFORE
-  // the Supabase network-first branch so sheets are served offline from PDF_CACHE.
+  // Sheet-music PDFs in Supabase Storage: NETWORK-FIRST. Storage serves these
+  // with `cache-control: no-cache`, and an edited/replaced sheet must show fresh
+  // on the next online open — so we fetch from the network (the browser HTTP
+  // cache revalidates via etag: cheap 304 when unchanged, fresh 200 when changed)
+  // and update PDF_CACHE for offline. Only when the network fails (offline) do we
+  // fall back to the cached copy. (CacheFirst here served stale bytes whenever the
+  // ?v= key hadn't changed — the cause of "edited song shows the old PDF".)
+  // Must come BEFORE the general Supabase branch so it wins for storage PDFs.
   if (url.pathname.includes('/storage/v1/object/public/choirhub_partitions')) {
     event.respondWith(
-      caches.match(request).then(cached => {
-        if (cached) return cached;
-        return fetch(request).then(response => {
+      fetch(request)
+        .then(response => {
           if (response.ok) {
             const clone = response.clone();
             caches.open(PDF_CACHE).then(cache => cache.put(request, clone));
           }
           return response;
-        });
-      })
+        })
+        .catch(() => caches.match(request))
     );
     return;
   }
