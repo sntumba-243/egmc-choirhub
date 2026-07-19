@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
 import { useChurch } from '../../contexts/ChurchContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { getAuthUid } from '../../lib/authUid';
 import { Mail, Send, Plus, Trash2, X, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -14,7 +14,6 @@ interface Message {
   recipients: string;
   is_important: boolean;
   created_at: string;
-  is_read: boolean;
 }
 
 export const AdminMessages = () => {
@@ -22,7 +21,6 @@ export const AdminMessages = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
-  const { user } = useAuth();
   const { church } = useChurch();
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
 
@@ -63,19 +61,21 @@ export const AdminMessages = () => {
   };
 
   const fetchReadStatus = async () => {
-    if (!user?.id) return;
+    const authId = await getAuthUid();
+    if (!authId) return;
     const { data } = await supabase
-      .from('message_reads')
+      .from('read_messages')
       .select('message_id')
-      .eq('user_id', user.id);
+      .eq('user_id', authId);
     setReadIds(new Set(data?.map(r => r.message_id) || []));
   };
 
   const markAsRead = async (messageId: string) => {
-    if (!user?.id) return;
+    const authId = await getAuthUid();
+    if (!authId) return;
     await supabase
-      .from('message_reads')
-      .upsert({ message_id: messageId, user_id: user.id }, { onConflict: 'message_id,user_id' });
+      .from('read_messages')
+      .upsert({ message_id: messageId, user_id: authId }, { onConflict: 'message_id,user_id' });
     setReadIds(prev => new Set([...prev, messageId]));
   };
 

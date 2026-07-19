@@ -2,14 +2,13 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Send } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { getAuthUid } from '../../lib/authUid';
 import toast from 'react-hot-toast';
 import { useChurch } from '../../contexts/ChurchContext';
-import { useAuth } from '../../contexts/AuthContext';
 
 export const MessageForm: React.FC = () => {
   const navigate = useNavigate();
   const { church } = useChurch();
-  const { user } = useAuth();
   const [subject, setSubject] = useState('');
   const [content, setContent] = useState('');
   const [recipientType, setRecipientType] = useState('all');
@@ -21,6 +20,7 @@ export const MessageForm: React.FC = () => {
     setLoading(true);
 
     try {
+      const authId = await getAuthUid();
       const { error } = await supabase
         .from('messages')
         .insert([{
@@ -29,10 +29,10 @@ export const MessageForm: React.FC = () => {
           send_to: recipientType,
           recipients: recipientType,
           is_important: isImportant,
-          is_read: false,
+          sender_id: authId,
+          church_id: church?.id,
           created_at: new Date().toISOString(),
           sent_date: new Date().toISOString(),
-          church_id: church?.id
         }]);
 
       if (error) throw error;

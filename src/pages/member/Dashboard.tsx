@@ -41,10 +41,18 @@ export const MemberDashboard = () => {
           setFavoritesCount(favs || 0);
         }
 
-        // Unread messages
-        const { data: allMsgs } = await supabase.from('messages').select('id, send_to, is_read').eq('church_id', user?.church_id);
-        const myMsgs = (allMsgs || []).filter(m => m.send_to === 'all' || m.send_to === user.id);
-        setMessagesCount(myMsgs.filter(m => !m.is_read).length);
+        // Unread messages: broadcasts to 'all', to their voice part, or addressed
+        // to them individually (send_to = member id). Read state lives in
+        // read_messages (keyed by auth.uid()).
+        const { data: allMsgs } = await supabase.from('messages').select('id, send_to').eq('church_id', user?.church_id);
+        const voice = (user.voice_part || '').toLowerCase();
+        const myMsgs = (allMsgs || []).filter(m => m.send_to === 'all' || m.send_to === voice || m.send_to === user.id);
+        let readSet = new Set<string>();
+        if (authUid) {
+          const { data: reads } = await supabase.from('read_messages').select('message_id').eq('user_id', authUid);
+          readSet = new Set((reads || []).map(r => r.message_id));
+        }
+        setMessagesCount(myMsgs.filter(m => !readSet.has(m.id)).length);
 
         // Assignments use members.id
         const { count: assigns } = await supabase.from('exercise_assignments').select('*', { count: 'exact', head: true }).eq('member_id', user.id);

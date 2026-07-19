@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { getAuthUid } from '../../lib/authUid';
 import { useAuth } from '../../contexts/AuthContext';
 import { Music, Calendar, MessageSquare, Heart, Mic, ChevronRight } from 'lucide-react';
 
@@ -43,9 +44,16 @@ export const MemberDashboard = () => {
         const { count: favs } = await supabase.from('user_favorites').select('*', { count: 'exact', head: true }).eq('user_id', user.id);
         setFavoritesCount(favs || 0);
 
-        const { data: allMsgs } = await supabase.from('messages').select('id, send_to, is_read');
-        const myMsgs = (allMsgs || []).filter(m => m.send_to === 'all' || m.send_to === user.id);
-        setMessagesCount(myMsgs.filter(m => !m.is_read).length);
+        const { data: allMsgs } = await supabase.from('messages').select('id, send_to');
+        const voice = (user.voice_part || '').toLowerCase();
+        const myMsgs = (allMsgs || []).filter(m => m.send_to === 'all' || m.send_to === voice || m.send_to === user.id);
+        const authUid = await getAuthUid();
+        let readSet = new Set<string>();
+        if (authUid) {
+          const { data: reads } = await supabase.from('read_messages').select('message_id').eq('user_id', authUid);
+          readSet = new Set((reads || []).map(r => r.message_id));
+        }
+        setMessagesCount(myMsgs.filter(m => !readSet.has(m.id)).length);
 
         const { count: assigns } = await supabase.from('exercise_assignments').select('*', { count: 'exact', head: true }).eq('member_id', user.id).eq('completed', false);
         setAssignmentsCount(assigns || 0);

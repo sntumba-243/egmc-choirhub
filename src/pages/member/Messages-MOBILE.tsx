@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { getAuthUid } from '../../lib/authUid';
 import { Mail, AlertCircle, Send, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -17,6 +18,7 @@ interface Message {
 export const MemberMessages = () => {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
+  const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [loading, setLoading] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
@@ -29,14 +31,30 @@ export const MemberMessages = () => {
 
   const fetchMessages = async () => {
     try {
+      // RLS already scopes rows to this member's church + targeting. Client filter
+      // narrows to the inbox: broadcasts to 'all', to their voice part, or
+      // individually addressed (send_to = their member id). Excludes their own
+      // outbound send_to='admin' messages.
       const { data, error } = await supabase
         .from('messages')
         .select('*')
         .order('sent_date', { ascending: false });
 
       if (error) throw error;
-      const filtered = (data || []).filter(m => m.send_to === 'all' || m.send_to === user?.id);
+      const voice = (user?.voice_part || '').toLowerCase();
+      const filtered = (data || []).filter(
+        m => m.send_to === 'all' || m.send_to === voice || m.send_to === user?.id
+      );
       setMessages(filtered);
+
+      const authId = await getAuthUid();
+      if (authId) {
+        const { data: reads } = await supabase
+          .from('read_messages')
+          .select('message_id')
+          .eq('user_id', authId);
+        setReadIds(new Set((reads || []).map(r => r.message_id)));
+      }
     } catch (error) {
       console.error('Error:', error);
       toast.error('Failed to load messages');
@@ -47,11 +65,12 @@ export const MemberMessages = () => {
 
   const markAsRead = async (messageId: string) => {
     try {
+      const authId = await getAuthUid();
+      if (!authId) return;
       await supabase
-        .from('messages')
-        .update({ is_read: true })
-        .eq('id', messageId);
-      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, is_read: true } : m));
+        .from('read_messages')
+        .upsert({ message_id: messageId, user_id: authId }, { onConflict: 'message_id,user_id' });
+      setReadIds(prev => new Set([...prev, messageId]));
     } catch (error) {
       console.error('Error marking as read:', error);
     }
@@ -63,6 +82,7 @@ export const MemberMessages = () => {
 
     setSending(true);
     try {
+      const authId = await getAuthUid();
       const { error } = await supabase
         .from('messages')
         .insert([{
@@ -70,7 +90,8 @@ export const MemberMessages = () => {
           body: replyText,
           send_to: 'admin',
           recipients: 'admin',
-          sender_id: user?.id,
+          sender_id: authId,
+          church_id: user?.church_id,
           is_important: false
         }]);
 
@@ -205,17 +226,17 @@ export const MemberMessages = () => {
       </div>
 
       <div className="space-y-3">
-        {messages.filter(m => filter === 'all' || !m.is_read).length === 0 ? (
+        {messages.filter(m => filter === 'all' || !readIds.has(m.id)).length === 0 ? (
           <div className="bg-white rounded-xl p-8 text-center">
             <Mail className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No messages yet</h3>
             <p className="text-gray-600">You'll see messages from your choir here</p>
           </div>
         ) : (
-          messages.filter(m => filter === 'all' || !m.is_read).map((message) => (
+          messages.filter(m => filter === 'all' || !readIds.has(m.id)).map((message) => (
             <div
               key={message.id}
-              onClick={() => { setSelectedMessage(message); if (!message.is_read) markAsRead(message.id); }}
+              onClick={() => { setSelectedMessage(message); if (!readIds.has(message.id)) markAsRead(message.id); }}
               className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all"
             >
               <div className="flex items-start gap-3">

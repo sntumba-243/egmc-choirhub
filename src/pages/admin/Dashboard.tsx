@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { getAuthUid } from '../../lib/authUid';
 import { useAuth } from '../../contexts/AuthContext';
 import { 
   Users, Music, Calendar, MessageSquare, TrendingUp, TrendingDown, 
@@ -282,7 +283,8 @@ export const AdminDashboard = () => {
       );
       
       let remindersSent = 0;
-      
+      const authId = await getAuthUid();
+
       for (const event of events) {
         const { data: rsvps } = await supabase
           .from("rsvps")
@@ -301,7 +303,8 @@ export const AdminDashboard = () => {
               subject: reminderSubject,
               body: `Hi ${member.first_name}, please RSVP for ${event.title} on ${new Date(event.date + 'T00:00:00').toLocaleDateString()}. Your response helps us plan better!`,
               is_important: false,
-              is_read: false,
+              sender_id: authId,
+              church_id: user?.church_id,
               created_at: new Date().toISOString(),
               sent_date: new Date().toISOString(),
               recipients: memberName

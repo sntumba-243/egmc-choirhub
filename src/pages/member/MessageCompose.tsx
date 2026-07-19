@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Send } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { getAuthUid } from '../../lib/authUid';
 import toast from 'react-hot-toast';
 
 export const MessageCompose = () => {
@@ -26,6 +27,7 @@ export const MessageCompose = () => {
         .single();
 
       const senderName = member ? `${member.first_name} ${member.last_name}` : 'Member';
+      const authId = await getAuthUid();
 
       const { error } = await supabase
         .from('messages')
@@ -35,10 +37,10 @@ export const MessageCompose = () => {
           send_to: 'admin',
           recipients: senderName,
           is_important: false,
-          is_read: false,
+          sender_id: authId,
+          church_id: user.church_id,
           created_at: new Date().toISOString(),
           sent_date: new Date().toISOString(),
-          admin_id: user.id,
         });
 
       if (error) throw error;
