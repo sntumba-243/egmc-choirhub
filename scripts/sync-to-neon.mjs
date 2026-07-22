@@ -21,10 +21,35 @@ import { pathToFileURL } from 'node:url';
 dotenv.config({ path: '.env.local' });
 
 const READ_BATCH = 500;
-const VERIFY_TABLES = ['songs', 'churches', 'events'];
+const VERIFY_TABLES = ['songs', 'churches', 'events', 'messages'];
 const EXPECT = {}; // src↔tgt count match is the real check; no hardcoded totals
 
 const qIdent = (n) => '"' + String(n).replace(/"/g, '""') + '"';
+
+// Robust pg-URL parse (password may contain @ and : and be %-encoded).
+function parsePgUrl(url) {
+  const rest = url.replace(/^postgres(ql)?:\/\//, '');
+  const at = rest.lastIndexOf('@');
+  const creds = rest.slice(0, at), hostpart = rest.slice(at + 1);
+  const ci = creds.indexOf(':');
+  const [hp, dbq] = hostpart.split('/');
+  const [host, port] = hp.split(':');
+  return {
+    user: decodeURIComponent(creds.slice(0, ci)),
+    password: decodeURIComponent(creds.slice(ci + 1)),
+    host, port: +port || 5432,
+    database: (dbq || 'postgres').split('?')[0],
+  };
+}
+// Supabase's db.<ref>.supabase.co host is IPv6-only (unreachable here) — rewrite
+// to the IPv4 session pooler with the postgres.<ref> user. Returns a discrete-
+// field pg config (never a connectionString, since the password has @/:).
+function supabaseClientConfig(url) {
+  const c = parsePgUrl(url);
+  const m = c.host.match(/^db\.([a-z0-9]+)\.supabase\.co$/);
+  if (m) return { user: `postgres.${m[1]}`, password: c.password, host: 'aws-1-us-east-2.pooler.supabase.com', port: 5432, database: c.database, ssl: { rejectUnauthorized: false } };
+  return { ...c, ssl: { rejectUnauthorized: false } };
+}
 
 const BUILTINS = new Set([
   'uuid', 'text', 'character varying', 'varchar', 'character', 'char', 'bpchar', 'name',
@@ -66,7 +91,7 @@ async function getColumns(src, table) {
             format_type(a.atttypid, a.atttypmod) AS type,
             a.attnotnull AS notnull
      FROM pg_attribute a
-     WHERE a.attrelid = format('public.%I', $1)::regclass
+     WHERE a.attrelid = format('public.%I', $1::text)::regclass
        AND a.attnum > 0 AND NOT a.attisdropped
      ORDER BY a.attnum`,
     [table]
@@ -100,13 +125,14 @@ export async function syncToNeon() {
   const SRC_URL = process.env.SUPABASE_DB_URL;
   const TGT_URL = process.env.NEON_DB_URL;
   if (!SRC_URL || !TGT_URL) throw new Error('SUPABASE_DB_URL and NEON_DB_URL are required');
-  const src = new pg.Client({ connectionString: SRC_URL, ssl: { rejectUnauthorized: false }, statement_timeout: 120000 });
+  const src = new pg.Client({ ...supabaseClientConfig(SRC_URL), statement_timeout: 120000 });
   const tgt = new pg.Client({ connectionString: TGT_URL, ssl: { rejectUnauthorized: false }, statement_timeout: 300000 });
   await src.connect();
   await tgt.connect();
   console.log('Connected. Supabase = READ-ONLY, Neon = full refresh (single transaction).\n');
 
   let committed = false;
+  let currentTable = null;
   try {
     const tables = await getTables(src);
     console.log(`Public tables to refresh (${tables.length}): ${tables.join(', ')}\n`);
@@ -115,6 +141,7 @@ export async function syncToNeon() {
 
     const perTable = [];
     for (const table of tables) {
+      currentTable = table;
       const cols = await getColumns(src, table);
       if (!cols.length) { console.log(`- ${table}: no columns, skipped`); continue; }
 
@@ -174,7 +201,8 @@ export async function syncToNeon() {
     console.log('─'.repeat(78));
     console.log(`\nResult: ${allMatch ? 'ALL MATCH ✅' : 'MISMATCH ⚠️'}`);
   } catch (err) {
-    if (!committed) { try { await tgt.query('ROLLBACK'); console.error('\nROLLED BACK — Neon left unchanged.'); } catch {} }
+    console.error(`\n✗ failed on table: ${currentTable}`);
+    if (!committed) { try { await tgt.query('ROLLBACK'); console.error('ROLLED BACK — Neon left unchanged.'); } catch {} }
     await src.end(); await tgt.end();
     throw err; // let the caller decide (direct run → exit 1; backup-all → log + continue)
   }
