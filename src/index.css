@@ -5,6 +5,17 @@
 
 html, body { overflow-x: hidden; max-width: 100vw; }
 
+/* Defensive shell clamp: nothing under #root may make the document wider than the
+   viewport (the classic "renders wider than screen, must pinch-zoom out" bug). */
+#root { max-width: 100vw; overflow-x: hidden; }
+
+/* Root cause of the only real width-overflow that survives the clamp: a long
+   UNBREAKABLE token in user data (a long email/member-id used as a name, a URL in
+   a message, a no-space church/event name) forces its box wider than the screen.
+   overflow-x:hidden would merely clip it while iOS still zooms out. Let such tokens
+   wrap. `anywhere` also lets flex/grid items shrink below their longest word. */
+body { overflow-wrap: anywhere; }
+
 @layer base {
   * {
     -webkit-tap-highlight-color: transparent;
