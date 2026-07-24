@@ -30,6 +30,12 @@ export default defineConfig({
     }),
   ],
   build: {
+    // Vite 7 defaults to 'baseline-widely-available' (~Chrome107/Safari16), which
+    // can leave the MAIN bundle one syntax feature away from breaking older,
+    // hardware-capped iPads entirely. Down-level to es2018/safari13 so the app
+    // shell runs there too (the PDF layer uses pdfjs' legacy build separately).
+    // Negligible bundle-size cost; a few transpiled helpers.
+    target: ['es2018', 'safari13'],
     sourcemap: true,
     rollupOptions: {
       output: {

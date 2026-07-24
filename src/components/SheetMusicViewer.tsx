@@ -1,14 +1,42 @@
 import { useEffect, useRef, useState, type TouchEvent as ReactTouchEvent } from 'react'
 import { createPortal } from 'react-dom'
-import * as pdfjsLib from 'pdfjs-dist'
+// LEGACY build: transpiled + polyfilled for several Safari versions further back
+// than the modern build (which requires recent Safari and white-screens the
+// PDF layer on older/hardware-capped iPads). Negligible size cost; same API.
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf'
 // NOTE: no pdf_viewer.css — we render to our own <canvas>, so pdf.js's
 // stylesheet is unused. (It's scoped to .pdfViewer/.textLayer and was not the
 // cause of the top gap, but importing it is dead weight.)
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
+  'pdfjs-dist/legacy/build/pdf.worker.min.mjs',
   import.meta.url
 ).toString()
+
+// If PDF.js fails once on this device (worker init / render — i.e. the browser
+// is too old for the canvas renderer), remember it for the session so every
+// subsequent song goes straight to the native fallback instead of re-failing.
+const PDFJS_NATIVE_KEY = 'sheet_viewer_native_fallback'
+const deviceNeedsNative = () => {
+  try { return sessionStorage.getItem(PDFJS_NATIVE_KEY) === '1' } catch { return false }
+}
+const rememberNativeVerdict = () => {
+  try { sessionStorage.setItem(PDFJS_NATIVE_KEY, '1') } catch { /* private mode */ }
+}
+
+// Distinguish a genuine network/HTTP failure (transient — offer Retry) from a
+// device-incompatibility failure (worker/syntax/render — degrade to native).
+const isNetworkError = (err: any) => {
+  const name = err?.name || ''
+  const msg = String(err?.message || '').toLowerCase()
+  return name === 'MissingPDFException' ||
+    name === 'UnexpectedResponseException' ||
+    name === 'InvalidPDFException' ||
+    msg.includes('failed to fetch') ||
+    msg.includes('networkerror') ||
+    msg.includes('load failed') ||
+    msg.includes('err_')
+}
 
 const touchDist = (a: { clientX: number; clientY: number }, b: { clientX: number; clientY: number }) =>
   Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
@@ -33,6 +61,7 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
   const [currentPage, setCurrentPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [nativeMode, setNativeMode] = useState(false) // fall back to native <object>/new-tab PDF
   const [scale, setScale] = useState(1)
   const [chromeVisible, setChromeVisible] = useState(true)
   const chromeVisibleRef = useRef(true)
@@ -78,6 +107,16 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
     canvasElRef.current = null
     setLoading(true)
     setError(null)
+    setNativeMode(false)
+
+    // Detection order: if PDF.js already failed on this device this session, skip
+    // it entirely and go straight to the native renderer. Modern devices never
+    // set this verdict → zero change for them.
+    if (deviceNeedsNative()) {
+      setNativeMode(true)
+      setLoading(false)
+      return () => { cancelled = true }
+    }
 
     const loadPdf = async () => {
       try {
@@ -93,8 +132,15 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
         setLoading(false)
       } catch (err: any) {
         if (cancelled) return
-        setError('failed')
+        // Log the ACTUAL error for diagnosis (worker init, getDocument, etc.).
+        console.error('[SheetMusicViewer] PDF.js getDocument failed:', err?.name, err?.message, err)
         setLoading(false)
+        if (isNetworkError(err)) {
+          setError('failed') // transient — modern device, offer Retry
+        } else {
+          rememberNativeVerdict() // device can't run PDF.js → native from now on
+          setNativeMode(true)
+        }
       }
     }
     loadPdf()
@@ -107,6 +153,7 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
     let cancelled = false
 
     const render = async () => {
+      try {
       const page = await pdf.getPage(currentPage)
       if (cancelled) return
 
@@ -145,6 +192,13 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
         scrollEl.scrollLeft = Math.max(0, (focus.sl + focus.vx) * focus.f - focus.vx)
         scrollEl.scrollTop = Math.max(0, (focus.st + focus.vy) * focus.f - focus.vy)
         pinchFocusRef.current = null
+      }
+      } catch (err: any) {
+        if (cancelled) return
+        // Canvas render can fail on old Safari even when getDocument succeeded.
+        console.error('[SheetMusicViewer] PDF.js render failed:', err?.name, err?.message, err)
+        rememberNativeVerdict()
+        setNativeMode(true)
       }
     }
     render()
@@ -305,6 +359,40 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
         <div className='flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center text-gray-600'>
           <span className='text-base font-medium'>Sheet unavailable</span>
           <button onClick={retry} className='min-h-[44px] px-5 rounded-xl bg-gray-900 text-white text-sm font-medium'>Retry</button>
+        </div>
+      </div>,
+      document.body
+    )
+  }
+
+  // Native fallback — older Safari that can't run PDF.js renders the PDF inline
+  // via <object>; if it can't render inline, the fallback children offer a
+  // full-page "Open sheet". The chrome bar + back button stay working above it,
+  // plus an always-present "open in new tab" escape hatch (covers Safari
+  // versions that render <object> blank instead of showing the fallback).
+  if (nativeMode) {
+    const nativeUrl = getDirectUrl(url, version)
+    return createPortal(
+      <div className='fixed inset-0 z-[10050] bg-white flex flex-col'>
+        <div className='flex items-center px-4 py-2 bg-gray-900 shadow-lg flex-shrink-0'
+          style={{ paddingTop: 'calc(8px + env(safe-area-inset-top, 0px))' }}>
+          <button onClick={onClose} className='min-w-[44px] min-h-[44px] flex items-center justify-center text-white'>
+            <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round'><polyline points='15,18 9,12 15,6'/></svg>
+          </button>
+          <span className='text-sm font-medium text-white truncate flex-1 text-center px-2'>{title || 'Sheet Music'}</span>
+          <button onClick={() => window.open(nativeUrl, '_blank')} aria-label='Open sheet in new tab'
+            className='min-w-[44px] min-h-[44px] flex items-center justify-center text-white'>
+            <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round'><path d='M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6'/><polyline points='15 3 21 3 21 9'/><line x1='10' y1='14' x2='21' y2='3'/></svg>
+          </button>
+        </div>
+        <div className='flex-1 relative bg-gray-100'>
+          <object data={nativeUrl} type='application/pdf' className='absolute inset-0 w-full h-full'>
+            <div className='absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center'>
+              <span className='text-base font-medium text-gray-700'>This device uses the basic sheet viewer</span>
+              <button onClick={() => window.open(nativeUrl, '_blank')}
+                className='min-h-[44px] px-6 rounded-xl bg-gray-900 text-white text-sm font-medium'>Open sheet</button>
+            </div>
+          </object>
         </div>
       </div>,
       document.body
