@@ -1,5 +1,5 @@
-import { initializeApp } from 'firebase/app';
-import { getMessaging, getToken, onMessage } from 'firebase/messaging';
+import { initializeApp, type FirebaseApp } from 'firebase/app';
+import { getMessaging, getToken, onMessage, type Messaging } from 'firebase/messaging';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -11,15 +11,36 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Firebase Cloud Messaging is OPTIONAL. If the VITE_FIREBASE_* config is absent
+// (e.g. local dev, or a misconfigured deploy) or init fails, the app must still
+// render — push notifications simply no-op. getMessaging() throws on missing
+// projectId, which previously white-screened the whole app at import time.
+const hasFirebaseConfig = Boolean(firebaseConfig.projectId && firebaseConfig.apiKey);
 
-// Get messaging instance
-export const messaging = getMessaging(app);
+let app: FirebaseApp | null = null;
+let messagingInstance: Messaging | null = null;
+
+if (hasFirebaseConfig) {
+  try {
+    app = initializeApp(firebaseConfig);
+    messagingInstance = getMessaging(app);
+  } catch (error) {
+    console.warn('[firebase] initialization failed — push notifications disabled:', error);
+    app = null;
+    messagingInstance = null;
+  }
+} else {
+  console.warn('[firebase] VITE_FIREBASE_* config missing — push notifications disabled.');
+}
+
+export const messaging = messagingInstance;
 
 // Request notification permission
 export async function requestNotificationPermission() {
   try {
+    // No messaging instance (config missing/init failed) → nothing to do.
+    if (!messaging) return null;
+
     // Check if notifications are supported
     if (!('Notification' in window)) {
       return null;
@@ -55,6 +76,7 @@ export async function requestNotificationPermission() {
 
 // Listen for incoming messages
 export function setupMessageListener(callback: (payload: any) => void) {
+  if (!messaging) return;
   onMessage(messaging, (payload) => {
     callback(payload);
     
@@ -69,8 +91,9 @@ export function setupMessageListener(callback: (payload: any) => void) {
   });
 }
 
-// Register service worker and pass Firebase config
-if ('serviceWorker' in navigator) {
+// Register the FCM service worker and pass config — only when Firebase is
+// configured, so a missing config never triggers import-time side effects/errors.
+if (hasFirebaseConfig && 'serviceWorker' in navigator) {
   navigator.serviceWorker.register('/firebase-messaging-sw.js').then((registration) => {
     registration.active?.postMessage({
       type: 'FIREBASE_CONFIG',
@@ -87,7 +110,7 @@ if ('serviceWorker' in navigator) {
         }
       });
     });
-  });
+  }).catch((e) => console.warn('[firebase] messaging SW registration failed:', e));
 }
 
 // Store device token in database
