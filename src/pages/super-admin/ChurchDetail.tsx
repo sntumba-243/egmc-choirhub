@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getDbClient, supabase } from '../../lib/supabase';
-import { Church, Users, Music, Calendar, ArrowLeft, Edit, Shield, ShieldOff, Trash2, Clock, MapPin, Plus, UserPlus, X, KeyRound } from 'lucide-react';
+import { createSearcher, MEMBER_KEYS } from '../../lib/smartSearch';
+import { Church, Users, Music, Calendar, ArrowLeft, Edit, Shield, ShieldOff, Trash2, Clock, MapPin, Plus, UserPlus, X, KeyRound, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { generateMemorablePassword } from '../../lib/passwordUtils';
 
@@ -60,6 +61,17 @@ export const ChurchDetail = () => {
   const [headerMenuPos, setHeaderMenuPos] = useState<{ top: number; right: number } | null>(null);
   const [activeTab, setActiveTab] = useState<'events' | 'members' | 'songs' | 'settings'>('events');
   const [memberPage, setMemberPage] = useState(1);
+  const [memberSearch, setMemberSearch] = useState('');
+  const [debouncedMemberSearch, setDebouncedMemberSearch] = useState('');
+
+  // Debounce, and reset to page 1 so results aren't hidden behind stale paging.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedMemberSearch(memberSearch);
+      setMemberPage(1);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [memberSearch]);
   const MEMBER_PAGE_SIZE = 10;
 
   useEffect(() => {
@@ -373,8 +385,11 @@ export const ChurchDetail = () => {
     songs: 'Songs',
     settings: 'Settings',
   };
-  const totalMemberPages = Math.max(1, Math.ceil(members.length / MEMBER_PAGE_SIZE));
-  const paginatedMembers = members.slice(
+  // Fuzzy search first (ranked), then the existing pagination on its output.
+  const memberSearcher = useMemo(() => createSearcher(members, MEMBER_KEYS), [members]);
+  const searchedMembers = memberSearcher(debouncedMemberSearch);
+  const totalMemberPages = Math.max(1, Math.ceil(searchedMembers.length / MEMBER_PAGE_SIZE));
+  const paginatedMembers = searchedMembers.slice(
     (memberPage - 1) * MEMBER_PAGE_SIZE,
     memberPage * MEMBER_PAGE_SIZE
   );
@@ -581,7 +596,20 @@ export const ChurchDetail = () => {
             <UserPlus className="w-3.5 h-3.5" /> Add Admin
           </button>
         </div>
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search members by name, email, or voice part..."
+            value={memberSearch}
+            onChange={(e) => setMemberSearch(e.target.value)}
+            className="w-full min-h-[44px] pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+          />
+        </div>
         <div className="space-y-2">
+          {debouncedMemberSearch.trim() && searchedMembers.length === 0 && (
+            <p className="py-8 text-center text-sm text-gray-500">No members match your search</p>
+          )}
           {paginatedMembers.map((member) => (
             <div key={member.id} className="flex items-center justify-between gap-2 p-3 rounded-lg hover:bg-gray-50 min-h-[60px]">
               <div className="min-w-0 flex-1">

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, X, Music, Calendar, Mail } from 'lucide-react';
 import { songsService, eventsService, messagesService, directMessagesService } from '../lib/database';
+import { createSearcher, SONG_KEYS, EVENT_KEYS, MESSAGE_KEYS } from '../lib/smartSearch';
 
 interface SearchResult {
   type: 'song' | 'event' | 'message';
@@ -15,6 +16,7 @@ interface GlobalSearchProps {
 
 export const GlobalSearch: React.FC<GlobalSearchProps> = ({ onNavigate }) => {
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -31,8 +33,15 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ onNavigate }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Debounce — this fires four network fetches per run.
   useEffect(() => {
-    if (query.length < 2) {
+    const timer = setTimeout(() => setDebouncedQuery(query), 200);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
+    const q = debouncedQuery.trim();
+    if (q.length < 2) {
       setResults([]);
       return;
     }
@@ -47,67 +56,38 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ onNavigate }) => {
           directMessagesService.getDirectMessages(),
         ]);
 
-        const searchResults: SearchResult[] = [];
-
-        songs.forEach(song => {
-          if (
-            song.title.toLowerCase().includes(query.toLowerCase()) ||
-            song.composer.toLowerCase().includes(query.toLowerCase())
-          ) {
-            searchResults.push({
-              type: 'song',
-              id: song.id,
-              title: song.title,
-              subtitle: song.composer,
-            });
-          }
-        });
-
-        events.forEach(event => {
-          if (
-            event.title.toLowerCase().includes(query.toLowerCase()) ||
-            event.location.toLowerCase().includes(query.toLowerCase())
-          ) {
-            searchResults.push({
-              type: 'event',
-              id: event.id,
-              title: event.title,
-              subtitle: new Date(event.date + 'T00:00:00').toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              }),
-            });
-          }
-        });
-
-        messages.forEach(message => {
-          if (
-            message.subject.toLowerCase().includes(query.toLowerCase()) ||
-            message.body.toLowerCase().includes(query.toLowerCase())
-          ) {
-            searchResults.push({
-              type: 'message',
-              id: message.id,
-              title: message.subject,
-              subtitle: `Message to ${message.send_to}`,
-            });
-          }
-        });
-
-        directMessages.forEach(message => {
-          if (
-            message.subject.toLowerCase().includes(query.toLowerCase()) ||
-            message.body.toLowerCase().includes(query.toLowerCase())
-          ) {
-            searchResults.push({
-              type: 'message',
-              id: message.id,
-              title: message.subject,
-              subtitle: 'Direct Message',
-            });
-          }
-        });
+        // Each entity type ranks independently (fuzzy, accent/typo-tolerant),
+        // then the ranked groups concatenate in songs → events → messages order.
+        const searchResults: SearchResult[] = [
+          ...createSearcher(songs as any[], SONG_KEYS)(q).map(song => ({
+            type: 'song' as const,
+            id: song.id,
+            title: song.title,
+            subtitle: song.composer,
+          })),
+          ...createSearcher(events as any[], EVENT_KEYS)(q).map(event => ({
+            type: 'event' as const,
+            id: event.id,
+            title: event.title,
+            subtitle: new Date(event.date + 'T00:00:00').toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            }),
+          })),
+          ...createSearcher(messages as any[], MESSAGE_KEYS)(q).map(message => ({
+            type: 'message' as const,
+            id: message.id,
+            title: message.subject,
+            subtitle: `Message to ${message.send_to}`,
+          })),
+          ...createSearcher(directMessages as any[], MESSAGE_KEYS)(q).map(message => ({
+            type: 'message' as const,
+            id: message.id,
+            title: message.subject,
+            subtitle: 'Direct Message',
+          })),
+        ];
 
         setResults(searchResults);
       } catch (error) {
@@ -119,7 +99,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ onNavigate }) => {
     };
 
     searchData();
-  }, [query]);
+  }, [debouncedQuery]);
 
   const handleResultClick = (result: SearchResult) => {
     onNavigate(result.type, result.id);

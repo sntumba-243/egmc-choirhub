@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { useChurch } from '../../contexts/ChurchContext';
 import SheetMusicViewer from '../../components/SheetMusicViewer';
-import { createSongSearcher } from '../../lib/songSearch';
+import { createSongSearcher } from '../../lib/smartSearch';
 
 const PAGE_SIZE = 20;
 

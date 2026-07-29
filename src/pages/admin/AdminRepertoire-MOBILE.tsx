@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
+import { createSearcher, SONG_KEYS } from '../../lib/smartSearch';
 import { isMobile } from '../../utils/mobile-helpers';
 import '../../styles/mobile-optimization.css';
 
@@ -164,15 +165,12 @@ export function AdminRepertoire() {
     return language === 'english' ? '🇬🇧' : '🇫🇷';
   }
 
-  // Filter songs
-  const filteredSongs = songs.filter(song => {
-    const matchesSearch = 
-      song.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (song.composer && song.composer.toLowerCase().includes(searchQuery.toLowerCase()));
-    
+  // Fuzzy search first (ranked), then the existing filters on its output.
+  const songSearcher = useMemo(() => createSearcher(songs, SONG_KEYS), [songs]);
+  const filteredSongs = songSearcher(searchQuery).filter(song => {
     const matchesLanguage = filterLanguage === 'all' || song.language === filterLanguage;
 
-    return matchesSearch && matchesLanguage;
+    return matchesLanguage;
   });
 
   const stats = {

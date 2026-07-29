@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getDbClient } from '../../lib/supabase';
+import { createSearcher, SONG_KEYS } from '../../lib/smartSearch';
 import { useAuth } from '../../contexts/AuthContext';
 import { Calendar, Plus, Clock, MapPin, Trash2, Edit, Globe, Music, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -183,6 +184,10 @@ export const GlobalEvents = () => {
   const upcoming = events.filter(e => !isPast(e.date));
   const past = events.filter(e => isPast(e.date));
 
+  // Setlist picker: fuzzy, accent/typo-tolerant, ranked; empty query = all songs.
+  const songSearcher = useMemo(() => createSearcher(allSongs, SONG_KEYS), [allSongs]);
+  const songPickerResults = songSearcher(songSearch).slice(0, 50);
+
   if (loading) {
     return (
       <div className="flex justify-center p-12">
@@ -282,9 +287,7 @@ export const GlobalEvents = () => {
               </div>
             )}
             <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg">
-              {allSongs
-                .filter(s => s.title.toLowerCase().includes(songSearch.toLowerCase()))
-                .slice(0, 50)
+              {songPickerResults
                 .map(song => (
                   <button type="button" key={song.id}
                     onClick={() => {

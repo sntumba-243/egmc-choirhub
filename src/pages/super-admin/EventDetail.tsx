@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { createSearcher, SONG_KEYS } from '../../lib/smartSearch';
 import { Calendar, Clock, MapPin, Music, Eye, Trash2, Search, X, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import SheetMusicViewer from '../../components/SheetMusicViewer';
@@ -48,6 +49,7 @@ export const SuperAdminEventDetail = () => {
   const [allSongs, setAllSongs] = useState<any[]>([]);
   const [songSearch, setSongSearch] = useState('');
   const [viewingSong, setViewingSong] = useState<any>(null);
+  const songSearcher = useMemo(() => createSearcher(allSongs, SONG_KEYS), [allSongs]);
 
   useEffect(() => {
     fetchEventAndRsvps();
@@ -420,12 +422,8 @@ export const SuperAdminEventDetail = () => {
             <div className="flex-1 overflow-y-auto p-2">
               {(() => {
                 const existingSongIds = new Set(eventSongs.map(es => es.song_id));
-                const filtered = allSongs.filter(s =>
-                  !existingSongIds.has(s.id) &&
-                  (songSearch === '' ||
-                    s.title?.toLowerCase().includes(songSearch.toLowerCase()) ||
-                    s.composer?.toLowerCase().includes(songSearch.toLowerCase()))
-                );
+                // Fuzzy rank first, then drop what's already in the setlist.
+                const filtered = songSearcher(songSearch).filter(s => !existingSongIds.has(s.id));
 
                 if (filtered.length === 0) {
                   return (

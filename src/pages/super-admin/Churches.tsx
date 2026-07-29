@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getDbClient } from '../../lib/supabase';
+import { createSearcher, CHURCH_KEYS } from '../../lib/smartSearch';
 import { Church, Plus, Search, Users, Edit, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -57,10 +58,9 @@ export const Churches = () => {
     }
   };
 
-  const filtered = churches.filter(c =>
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.short_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Fuzzy, accent/typo-tolerant, relevance-ranked; empty query keeps name order.
+  const searcher = useMemo(() => createSearcher(churches, CHURCH_KEYS), [churches]);
+  const filtered = searcher(searchTerm);
 
   if (loading) {
     return (

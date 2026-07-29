@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { createSearcher, MEMBER_KEYS } from '../../lib/smartSearch';
 import { User, Search, Plus, Edit, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
@@ -51,6 +52,7 @@ export const AdminMembers = () => {
   };
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterVoice, setFilterVoice] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterRole, setFilterRole] = useState('all');
@@ -58,6 +60,12 @@ export const AdminMembers = () => {
   useEffect(() => {
     fetchMembers();
   }, [user?.church_id, isSuperAdmin]);
+
+  // Debounce so the fuzzy pass doesn't re-rank the whole roster on every keypress.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 200);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   const fetchMembers = async () => {
     try {
@@ -99,18 +107,16 @@ export const AdminMembers = () => {
     }
   };
 
-  const filteredMembers = members.filter(member => {
-    const matchesSearch = 
-      member.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      member.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      member.email?.toLowerCase().includes(searchTerm.toLowerCase());
-    
+  // Fuzzy search first (relevance-ranked, best match first), then the existing
+  // filters on its output. Empty search keeps the server's last_name order.
+  const searcher = useMemo(() => createSearcher(members, MEMBER_KEYS), [members]);
+  const filteredMembers = useMemo(() => searcher(debouncedSearch).filter(member => {
     const matchesVoice = filterVoice === 'all' || member.voice_part === filterVoice;
     const matchesStatus = filterStatus === 'all' || member.status === filterStatus;
     const matchesRole = filterRole === 'all' || member.role === filterRole;
-    
-    return matchesSearch && matchesVoice && matchesStatus && matchesRole;
-  });
+
+    return matchesVoice && matchesStatus && matchesRole;
+  }), [searcher, debouncedSearch, filterVoice, filterStatus, filterRole]);
 
   const voicePartCounts = {
     Soprano: members.filter(m => m.voice_part === 'Soprano').length,
@@ -183,7 +189,7 @@ export const AdminMembers = () => {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
           <input
             type="text"
-            placeholder="Search by name or email..."
+            placeholder="Search by name, email, or voice part..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-9 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm min-h-[44px]"

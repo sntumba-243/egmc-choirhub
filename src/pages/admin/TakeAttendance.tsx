@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useChurch } from '../../contexts/ChurchContext';
+import { createSearcher } from '../../lib/smartSearch';
 import {
   getEventAttendanceWithMembers,
   markMemberAttendance,
@@ -308,14 +309,19 @@ export default function TakeAttendance() {
     return { yes: yesCount, no: noCount, nullCount, present, absent: noCount, checkLater: nullCount, total: rows.length };
   }, [rows, entries]);
 
-  const filteredRows = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter(r => {
-      const full = `${r.member.first_name || ''} ${r.member.last_name || ''}`.toLowerCase();
-      return full.includes(q);
-    });
-  }, [rows, search]);
+  // Rows wrap the member, so the shared keys read through `.member`.
+  const rowSearcher = useMemo(
+    () => createSearcher(rows, [
+      { name: 'name', weight: 0.7, get: (r: MemberAttendanceRow) => `${r.member.first_name || ''} ${r.member.last_name || ''}`.trim() },
+      { name: 'email', weight: 0.2, get: (r: MemberAttendanceRow) => r.member.email },
+      { name: 'voice_part', weight: 0.1, get: (r: MemberAttendanceRow) => r.member.voice_part },
+    ]),
+    [rows]
+  );
+
+  // Fuzzy, accent/typo-tolerant, ranked; empty query keeps the roster order,
+  // which is what the voice-part grouping below expects.
+  const filteredRows = useMemo(() => rowSearcher(search), [rowSearcher, search]);
 
   const grouped = useMemo(() => {
     const groups = new Map<string, MemberAttendanceRow[]>();

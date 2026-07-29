@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Search, Languages, Music, CheckSquare, Square, Download, Upload } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { createSearcher, SONG_KEYS } from '../../lib/smartSearch';
 import toast from 'react-hot-toast';
 
 interface Song {
@@ -203,15 +204,11 @@ export const BulkSongEditor: React.FC = () => {
     reader.readAsText(file);
   };
 
-  const filteredSongs = songs.filter(song => {
-    const matchesSearch = 
-      song.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (song.composer || '').toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesLanguage = filterLanguage === 'all' || song.language === filterLanguage;
-    
-    return matchesSearch && matchesLanguage;
-  });
+  // Fuzzy search first (ranked), then the language filter on its output.
+  const songSearcher = useMemo(() => createSearcher(songs, SONG_KEYS), [songs]);
+  const filteredSongs = songSearcher(searchTerm).filter(
+    song => filterLanguage === 'all' || song.language === filterLanguage
+  );
 
   const languageCounts = {
     all: songs.length,

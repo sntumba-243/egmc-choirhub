@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
+import { createSearcher, MEMBER_KEYS } from '../../lib/smartSearch';
 import { isMobile } from '../../utils/mobile-helpers';
 import '../../styles/mobile-optimization.css';
 
@@ -115,16 +116,13 @@ export function AdminMembers() {
       : 'bg-blue-100 text-blue-800';
   }
 
-  // Filter members
-  const filteredMembers = members.filter(member => {
-    const matchesSearch = 
-      member.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.email.toLowerCase().includes(searchQuery.toLowerCase());
-    
+  // Fuzzy search first (ranked), then the existing filters on its output.
+  const memberSearcher = useMemo(() => createSearcher(members, MEMBER_KEYS), [members]);
+  const filteredMembers = memberSearcher(searchQuery).filter(member => {
     const matchesRole = filterRole === 'all' || member.role === filterRole;
     const matchesVoicePart = filterVoicePart === 'all' || member.voice_part === filterVoicePart;
 
-    return matchesSearch && matchesRole && matchesVoicePart;
+    return matchesRole && matchesVoicePart;
   });
 
   // Stats

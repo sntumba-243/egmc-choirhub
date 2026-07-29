@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Calendar, Clock, MapPin, Music, X, Eye, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { createSearcher, MEMBER_KEYS, SONG_KEYS } from '../../lib/smartSearch';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { useChurch } from '../../contexts/ChurchContext';
@@ -288,18 +289,15 @@ export const EventForm: React.FC = () => {
   };
 
   const selectedSongs = availableSongs.filter(s => selectedSongIds.includes(s.id));
-  const filteredAvailableSongs = availableSongs.filter(s => 
-    !selectedSongIds.includes(s.id) &&
-    searchSong &&
-    ((s.title && s.title.toLowerCase().includes(searchSong.toLowerCase())) ||
-     (s.composer && s.composer.toLowerCase().includes(searchSong.toLowerCase())))
-  );
 
-  const filteredMembers = allMembers.filter(m =>
-    searchMember &&
-    (`${m.first_name} ${m.last_name}`.toLowerCase().includes(searchMember.toLowerCase()) ||
-     m.email.toLowerCase().includes(searchMember.toLowerCase()))
-  );
+  // Both pickers stay empty until you type (they are add-pickers, not lists),
+  // then rank fuzzily — accent- and typo-tolerant, best match first.
+  const unselectedSongs = availableSongs.filter(s => !selectedSongIds.includes(s.id));
+  const songSearcher = useMemo(() => createSearcher(unselectedSongs, SONG_KEYS), [unselectedSongs]);
+  const filteredAvailableSongs = searchSong.trim() ? songSearcher(searchSong) : [];
+
+  const memberSearcher = useMemo(() => createSearcher(allMembers, MEMBER_KEYS), [allMembers]);
+  const filteredMembers = searchMember.trim() ? memberSearcher(searchMember) : [];
 
   const selectedMembers = allMembers.filter(m => selectedMemberIds.includes(m.id));
 

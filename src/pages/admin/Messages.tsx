@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useChurch } from '../../contexts/ChurchContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { getAuthUid } from '../../lib/authUid';
-import { Mail, Send, Plus, Trash2, X, ArrowLeft } from 'lucide-react';
+import { createSearcher, MESSAGE_KEYS } from '../../lib/smartSearch';
+import { Mail, Send, Plus, Trash2, X, ArrowLeft, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Message {
@@ -23,11 +24,23 @@ export const AdminMessages = () => {
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const { church } = useChurch();
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
   useEffect(() => {
     fetchMessages();
     fetchReadStatus();
   }, [church?.id]);
+
+  // Debounce so the thread list doesn't re-render on every keypress.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 200);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Fuzzy, accent/typo-tolerant, relevance-ranked; empty query keeps newest-first.
+  const searcher = useMemo(() => createSearcher(messages, MESSAGE_KEYS), [messages]);
+  const visibleMessages = searcher(debouncedSearch);
 
   const fetchMessages = async () => {
     try {
@@ -183,22 +196,41 @@ export const AdminMessages = () => {
         </button>
       </div>
 
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+        <input
+          type="text"
+          placeholder="Search messages by subject or content..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full min-h-[44px] pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
+      </div>
+
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        {messages.length === 0 ? (
+        {visibleMessages.length === 0 ? (
           <div className="p-12 text-center">
             <Mail className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No messages yet</h3>
-            <p className="text-gray-600 mb-6">Send your first message to the choir</p>
-            <button
-              onClick={() => navigate('/admin/messages/new')}
-              className="px-4 py-2 bg-blue-500 text-white rounded-xl text-sm font-semibold hover:bg-blue-600 shadow-sm min-h-[44px]"
-            >
-              Send Message
-            </button>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              {debouncedSearch.trim() ? 'No messages match your search' : 'No messages yet'}
+            </h3>
+            {debouncedSearch.trim() ? (
+              <p className="text-gray-600 mb-6">Try a different search term</p>
+            ) : (
+              <>
+                <p className="text-gray-600 mb-6">Send your first message to the choir</p>
+                <button
+                  onClick={() => navigate('/admin/messages/new')}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-xl text-sm font-semibold hover:bg-blue-600 shadow-sm min-h-[44px]"
+                >
+                  Send Message
+                </button>
+              </>
+            )}
           </div>
         ) : (
           <div className="divide-y">
-            {messages.map((message) => (
+            {visibleMessages.map((message) => (
               <div
                 key={message.id}
                 onClick={() => { setSelectedMessage(message); markAsRead(message.id); }}

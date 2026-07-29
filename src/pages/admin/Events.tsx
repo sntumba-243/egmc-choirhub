@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { Calendar, Clock, MapPin, Users, Grid, List, ArrowUpDown, Plus, Edit, Trash2 } from 'lucide-react';
+import { createSearcher, EVENT_KEYS } from '../../lib/smartSearch';
+import { Calendar, Clock, MapPin, Users, Grid, List, ArrowUpDown, Plus, Edit, Trash2, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useChurch } from '../../contexts/ChurchContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -33,10 +34,18 @@ export const AdminEvents = () => {
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [timelineFilter, setTimelineFilter] = useState<'all' | 'upcoming' | 'past'>('upcoming');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
   useEffect(() => {
     fetchEvents();
   }, [user?.church_id]);
+
+  // Debounce so the card grid doesn't re-render on every keypress.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 200);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   const fetchEvents = async () => {
     try {
@@ -154,13 +163,22 @@ export const AdminEvents = () => {
     return eventDateTime < new Date();
   };
 
+  const searcher = useMemo(() => createSearcher(events, EVENT_KEYS), [events]);
+
   const getSortedEvents = () => {
-    let filtered = events;
+    // Fuzzy search first (relevance-ranked, best match first), then the existing
+    // timeline filter on its output — same order of operations as Repertoire.
+    const search = debouncedSearch.trim();
+    let filtered = search ? searcher(search) : events;
     if (timelineFilter === 'upcoming') {
-      filtered = events.filter(e => !isPast(e.date, e.time));
+      filtered = filtered.filter(e => !isPast(e.date, e.time));
     } else if (timelineFilter === 'past') {
-      filtered = events.filter(e => isPast(e.date, e.time));
+      filtered = filtered.filter(e => isPast(e.date, e.time));
     }
+
+    // While searching, relevance is the order; the sort control resumes when the
+    // box is empty (re-sorting here would throw the ranking away).
+    if (search) return filtered;
 
     return [...filtered].sort((a, b) => {
       let aVal: any = a[sortField];
@@ -213,6 +231,17 @@ export const AdminEvents = () => {
             <Plus className="w-5 h-5" /><span className="text-sm font-medium">Add Event</span>
           </button>
         </div>
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+        <input
+          type="text"
+          placeholder="Search events by title, location, or description..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full min-h-[44px] pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
       </div>
 
       <div className="flex gap-1.5 overflow-x-auto pb-2 -mt-1">
