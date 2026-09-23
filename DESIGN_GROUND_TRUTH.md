@@ -20,10 +20,10 @@
 `/member` Dashboard · `/member/repertoire` Repertoire · `/member/repertoire/:id` SongDetail · `/member/calendar` Calendar · `/member/calendar/:eventId` & `/member/events/:eventId` EventDetail · `/member/messages` Messages · `/member/messages/compose` MessageCompose · `/member/practice` Practice · `/member/profile` Profile · `/member/vocal-coach` VocalCoach (+ `/vocal-coach/practice/:id`, `/vocal-coach/progress`)
 
 **Admin** (`/admin`, `AdminLayout`):
-`/admin` Dashboard · `/admin/repertoire` Repertoire · `/admin/repertoire/new` & `/:id/edit` SongForm · `/admin/members` Members · `/admin/members/new` & `/:id/edit` MemberForm · `/admin/events` Events · `/admin/events/new` & `/:id/edit` EventForm · `/admin/events/:id` EventDetail · `/admin/attendance` AttendanceLanding · `/admin/attendance/stats` AttendanceStats · `/admin/attendance/take[/:eventId]` TakeAttendance · `/admin/submissions` Submissions · `/admin/messages` Messages · `/admin/messages/new` MessageForm · `/admin/settings` Settings · `/admin/theme` ChurchThemeSettings · `/admin/bulk-edit` BulkSongEditor · `/admin/vocal-coach` (redirect) → `/admin/vocal-coach/assignments` VocalCoachAssignments
+`/admin` Dashboard · `/admin/repertoire` Repertoire · `/admin/repertoire/new` & `/:id/edit` SongForm · `/admin/members` Members · `/admin/members/new` & `/:id/edit` MemberForm · `/admin/events` Events · `/admin/events/new` & `/:id/edit` EventForm · `/admin/events/:id` EventDetail · `/admin/attendance` AttendanceLanding · `/admin/attendance/stats` AttendanceStats · `/admin/attendance/take[/:eventId]` TakeAttendance · `/admin/submissions` Submissions · `/admin/messages` Messages · `/admin/messages/new` MessageForm · `/admin/settings` Settings · `/admin/theme` ChurchThemeSettings · `/admin/vocal-coach` (redirect) → `/admin/vocal-coach/assignments` VocalCoachAssignments
 
 **Super Admin** (`/super-admin`, `SuperAdminLayout`):
-`/super-admin` Dashboard · `/super-admin/churches` Churches · `/super-admin/churches/new` & `/:id/edit` ChurchForm · `/super-admin/churches/:id` ChurchDetail · `/super-admin/events` GlobalEvents · `/super-admin/events/:id` EventDetail · `/super-admin/settings` Settings · `/super-admin/theme` ChurchThemeSettings
+`/super-admin` Dashboard · `/super-admin/churches` Churches · `/super-admin/churches/new` & `/:id/edit` ChurchForm · `/super-admin/churches/:id` ChurchDetail · `/super-admin/events` GlobalEvents · `/super-admin/events/:id` EventDetail · `/super-admin/settings` SuperAdminSettings · `/super-admin/bulk-edit` BulkSongEditor · `/super-admin/theme` ChurchThemeSettings
 
 **Shared route (both member & non-member):** `/pdf-viewer` → `PDFViewerPage` (legacy Google-Drive iframe viewer; see §3.2).
 
@@ -33,7 +33,7 @@
 | `/admin/repertoire` **and** `/super-admin/repertoire` | `AdminRepertoire` (`admin/Repertoire.tsx`) | **Role-gated** — see §2 |
 | `/admin/members` **and** `/super-admin/members` | `AdminMembers` (`admin/Members.tsx`) | **Role-gated** — see §2 |
 | `/admin/favorites` **and** `/super-admin/favorites` | `AdminFavorites` (`admin/Favorites.tsx`) | **No gate — identical UI** |
-| `/admin/settings` **and** `/super-admin/settings` | `AdminSettings` (`admin/Settings.tsx`) | Only the theme-link target differs (path-based) |
+| `/admin/settings` | `AdminSettings` (`admin/Settings.tsx`) | Church Theme card only; `/super-admin/settings` is `SuperAdminSettings` (`super-admin/Settings.tsx`) |
 | `SongForm`, `MemberForm`, `ChurchThemeSettings` | used by both `/admin` & `/super-admin` | No element-level role gates |
 
 ---
@@ -57,7 +57,7 @@ There are exactly **two** page components with in-JSX `isSuperAdmin` show/hide g
 - Voice-part stats, search, filters, Delete button — identical for both.
 
 ### `AdminSettings` (`admin/Settings.tsx`) — **path-based** `isSuperAdmin = location.pathname.startsWith('/super-admin')` (line 10)
-- Only effect: `Church Theme` card links to `/super-admin/theme` vs `/admin/theme`. Both cards exist for both.
+- Only effect: `Church Theme` card links to `/super-admin/theme` vs `/admin/theme`. In practice only mounted at `/admin/settings`.
 
 ### `AdminEvents` (`admin/Events.tsx`) — per-event `is_global` gate (no `isSuperAdmin`)
 - **Edit/Delete controls** (cards line 282, list line 332, `{!event.is_global && …}`): **EXIST for church-owned events; DO NOT EXIST for global events.** Delete guard toast: `Global events can only be deleted by super admin`.
@@ -186,7 +186,9 @@ List: H1 `Messages` + `{n} total messages` + `New Message`. Rows (unread `bg-blu
 `Messages` back + H1 `New Message`. `To *` (`All Members`/`Soprano Section`/`Alto Section`/`Tenor Section`/`Bass Section`); `Subject *` `What is this about?`; `Message *` `Type your message...`; `Mark as Important` toggle + `Shows a red badge to recipients`. `Cancel` / `Send`(→`Sending...`). Toasts `Message sent successfully`/`Failed to send message`.
 
 ### 5.10 Settings — `/admin/settings` & `/super-admin/settings`
-H1 `Settings`. **Google Drive Sync** card (`Google Drive Sync`/`Syncing...` + `Sync sheet music from Drive`; result `{n} added` / `{n} skipped` / `{n} errors`; toasts `No files found in Google Drive folder`, `Successfully synced {n} songs!`, `All {n} songs already exist`, `Failed to sync: {msg}`). **Church Theme** card (`Colors, logo & branding`) → `/admin/theme` or `/super-admin/theme` (**path-based**, §2).
+`/admin/settings`: H1 `Settings` + **Church Theme** card only. `/super-admin/settings` (`SuperAdminSettings`): H1 `Settings`, **Google Drive Sync** card (super-admin only — song writes are super-admin-only under RLS), then **Data Management** (`Purge inactive churches`).
+
+**Google Drive Sync** card (`components/GoogleDriveSyncCard.tsx`) (`Google Drive Sync`/`Syncing...` + `Sync sheet music from Drive`; result `{n} added` / `{n} skipped` / `{n} errors`; toasts `No files found in Google Drive folder`, `Successfully synced {n} songs!`, `All {n} songs already exist`, `Failed to sync: {msg}`). **Church Theme** card (`Colors, logo & branding`) → `/admin/theme` or `/super-admin/theme` (**path-based**, §2).
 
 ### 5.11 SongForm — `/admin/repertoire/new|/:id/edit` (+ super-admin)
 Heading `Add New Song`/`Edit Song`. Fields: `Song Title *` `e.g. Amazing Grace`; `Composer` `e.g. John Newton`; `Language` `e.g. English, French, Latin`; `Sheet Music URL` `https://drive.google.com/...` + helper `Link to Google Drive PDF or other sheet music file` + **PDF Preview** (`Open in new tab` + iframe); `Learning Status` radios `✅ Learned`/`📚 Learning`/`⏳ Not Yet` (default `not_yet`). Buttons `Cancel` / `Create Song`/`Update Song` (`Saving...`). No modal, **no delete/danger zone**, no role gate.
