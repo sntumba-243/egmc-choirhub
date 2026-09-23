@@ -324,7 +324,14 @@ export const AdminRepertoire = () => {
     e.stopPropagation();
     if (!isSuperAdmin || !confirm('Delete this song?')) return;
     try {
-      await supabase.from('songs').delete().eq('id', id);
+      // supabase-js resolves (never throws) on errors, and an RLS-blocked or
+      // expired-session DELETE returns no error with zero rows — so check both.
+      const { data: deleted, error } = await supabase.from('songs').delete().eq('id', id).select('id');
+      if (error) throw error;
+      if (!deleted || deleted.length === 0) {
+        toast.error('Song was not deleted — your session may have expired. Please sign in again and retry.');
+        return;
+      }
       setSongs(songs.filter(s => s.id !== id));
       setTotalCount(prev => prev - 1);
       const oldStatus = (statusMap.get(id) || 'not_started') as string;
@@ -336,7 +343,10 @@ export const AdminRepertoire = () => {
         return s;
       });
       toast.success('Song deleted');
-    } catch { toast.error('Failed to delete'); }
+    } catch (error: any) {
+      console.error('Error deleting song:', error);
+      toast.error(`Failed to delete: ${error?.message || 'unknown error'}`);
+    }
   };
 
   const handleViewPDF = (song: Song) => {
