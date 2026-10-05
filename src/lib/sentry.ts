@@ -14,8 +14,8 @@ export function initSentry() {
       }),
     ],
     tracesSampleRate: 0.1,
-    replaysSessionSampleRate: 0.1,
-    replaysOnErrorSampleRate: 1.0,
+    replaysSessionSampleRate: 0,
+    replaysOnErrorSampleRate: 0.1,
     beforeSend(event) {
       // Don't send errors in development
       if (import.meta.env.DEV) return null
