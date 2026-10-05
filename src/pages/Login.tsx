@@ -34,13 +34,11 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister }) => {
   const lookupChurch = async (emailValue: string) => {
     if (!emailValue.trim()) return;
     try {
-      const { data: member } = await supabase
-        .from('members')
-        .select('church_id, churches(name, short_name, logo_url)')
-        .eq('email', emailValue.trim().toLowerCase())
-        .single();
-      if (member?.churches) {
-        const c = member.churches as any;
+      // Anon can't read members/churches directly (RLS) — this RPC returns
+      // only the church's display branding for the email.
+      const { data } = await supabase.rpc('login_branding', { p_email: emailValue.trim() });
+      const c = Array.isArray(data) ? data[0] : null;
+      if (c) {
         const name = c.short_name || c.name || null;
         const logo = c.logo_url || null;
         setChurchName(name);
