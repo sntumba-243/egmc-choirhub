@@ -368,6 +368,10 @@ export const ChurchDetail = () => {
     }
   };
 
+  // Fuzzy search first (ranked), then the existing pagination on its output.
+  // Must stay above the early returns below (Rules of Hooks).
+  const memberSearcher = useMemo(() => createSearcher(members, MEMBER_KEYS), [members]);
+
   if (loading) {
     return (
       <div className="flex justify-center p-12">
@@ -385,8 +389,6 @@ export const ChurchDetail = () => {
     songs: 'Songs',
     settings: 'Settings',
   };
-  // Fuzzy search first (ranked), then the existing pagination on its output.
-  const memberSearcher = useMemo(() => createSearcher(members, MEMBER_KEYS), [members]);
   const searchedMembers = memberSearcher(debouncedMemberSearch);
   const totalMemberPages = Math.max(1, Math.ceil(searchedMembers.length / MEMBER_PAGE_SIZE));
   const paginatedMembers = searchedMembers.slice(
