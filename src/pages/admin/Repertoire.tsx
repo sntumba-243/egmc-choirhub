@@ -9,6 +9,7 @@ import SheetMusicViewer from '../../components/SheetMusicViewer';
 import { createSongSearcher } from '../../lib/smartSearch';
 
 import { formatEventDates } from '../../lib/eventDates';
+import { dbErrorMessage } from '../../lib/dbError';
 const PAGE_SIZE = 20;
 
 interface Song {
@@ -301,7 +302,7 @@ export const AdminRepertoire = () => {
       setSelectedSongs(new Set());
       setShowEventModal(false);
     } catch (error: any) {
-      toast.error(error.message?.includes('duplicate') ? 'Some songs already in this event' : 'Failed to add songs');
+      toast.error(error.message?.includes('duplicate') ? 'Some songs already in this event' : dbErrorMessage('Failed to add songs', error));
     }
   };
 

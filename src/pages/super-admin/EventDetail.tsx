@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import SheetMusicViewer from '../../components/SheetMusicViewer';
 
 import { formatEventDates } from '../../lib/eventDates';
+import { dbErrorMessage } from '../../lib/dbError';
 interface Event {
   id: string;
   title: string;
@@ -134,7 +135,7 @@ export const SuperAdminEventDetail = () => {
       fetchEventSongs();
     } catch (error) {
       console.error('Error adding song:', error);
-      toast.error('Failed to add song');
+      toast.error(dbErrorMessage('Failed to add song', error));
     }
   };
 
@@ -148,18 +149,21 @@ export const SuperAdminEventDetail = () => {
     if (!confirm(`Remove "${songTitle}"?`)) return;
 
     try {
-      const { error } = await supabase
+      const { data: deleted, error } = await supabase
         .from('event_songs')
         .delete()
-        .eq('id', eventSongId);
+        .eq('id', eventSongId)
+        .select('id');
 
       if (error) throw error;
+      // RLS-blocked deletes don't error — they just match no rows.
+      if (!deleted || deleted.length === 0) throw { code: '42501' };
 
       setEventSongs(eventSongs.filter(es => es.id !== eventSongId));
       toast.success('Song removed');
     } catch (error) {
       console.error('Error removing song:', error);
-      toast.error('Failed to remove song');
+      toast.error(dbErrorMessage('Failed to remove song', error));
     }
   };
 

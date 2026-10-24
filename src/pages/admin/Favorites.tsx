@@ -7,6 +7,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import SheetMusicViewer from '../../components/SheetMusicViewer';
 
 import { formatEventDates } from '../../lib/eventDates';
+import { dbErrorMessage } from '../../lib/dbError';
 interface Song {
   id: string;
   title: string;
@@ -138,7 +139,7 @@ export const AdminFavorites = () => {
       if (error.message?.includes('relation "event_songs" does not exist')) {
         toast.error('Event songs table not set up yet. Check setup instructions.');
       } else {
-        toast.error('Failed to add songs to event');
+        toast.error(dbErrorMessage('Failed to add songs to event', error));
       }
     }
   };

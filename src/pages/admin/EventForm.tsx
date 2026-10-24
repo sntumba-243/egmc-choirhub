@@ -199,26 +199,26 @@ export const EventForm: React.FC = () => {
         
         if (error) throw error;
 
-        await supabase.from('event_songs').delete().eq('event_id', eventId);
+        { const { error: writeError } = await supabase.from('event_songs').delete().eq('event_id', eventId); if (writeError) throw writeError; }
         if (selectedSongIds.length > 0) {
           const eventSongs = selectedSongIds.map(songId => ({
             event_id: eventId,
             song_id: songId
           }));
-          await supabase.from('event_songs').insert(eventSongs);
+          { const { error: writeError } = await supabase.from('event_songs').insert(eventSongs); if (writeError) throw writeError; }
         }
 
         if (visibility === 'specific_users') {
-          await supabase.from('event_user_access').delete().eq('event_id', eventId);
+          { const { error: writeError } = await supabase.from('event_user_access').delete().eq('event_id', eventId); if (writeError) throw writeError; }
           if (selectedMemberIds.length > 0) {
             const userAccess = selectedMemberIds.map(memberId => ({
               event_id: eventId,
               member_id: memberId
             }));
-            await supabase.from('event_user_access').insert(userAccess);
+            { const { error: writeError } = await supabase.from('event_user_access').insert(userAccess); if (writeError) throw writeError; }
           }
         } else {
-          await supabase.from('event_user_access').delete().eq('event_id', eventId);
+          { const { error: writeError } = await supabase.from('event_user_access').delete().eq('event_id', eventId); if (writeError) throw writeError; }
         }
         
         toast.success('Event updated');
@@ -236,7 +236,7 @@ export const EventForm: React.FC = () => {
             event_id: data.id,
             song_id: songId
           }));
-          await supabase.from('event_songs').insert(eventSongs);
+          { const { error: writeError } = await supabase.from('event_songs').insert(eventSongs); if (writeError) throw writeError; }
         }
 
         if (visibility === 'specific_users' && selectedMemberIds.length > 0 && data?.id) {
@@ -244,7 +244,7 @@ export const EventForm: React.FC = () => {
             event_id: data.id,
             member_id: memberId
           }));
-          await supabase.from('event_user_access').insert(userAccess);
+          { const { error: writeError } = await supabase.from('event_user_access').insert(userAccess); if (writeError) throw writeError; }
         }
         
         toast.success('Event created');
