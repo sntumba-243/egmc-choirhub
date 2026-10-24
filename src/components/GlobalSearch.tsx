@@ -3,6 +3,7 @@ import { Search, X, Music, Calendar, Mail } from 'lucide-react';
 import { songsService, eventsService, messagesService, directMessagesService } from '../lib/database';
 import { createSearcher, SONG_KEYS, EVENT_KEYS, MESSAGE_KEYS } from '../lib/smartSearch';
 
+import { formatEventDates } from '../lib/eventDates';
 interface SearchResult {
   type: 'song' | 'event' | 'message';
   id: string;
@@ -69,11 +70,11 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ onNavigate }) => {
             type: 'event' as const,
             id: event.id,
             title: event.title,
-            subtitle: new Date(event.date + 'T00:00:00').toLocaleDateString('en-US', {
+            subtitle: formatEventDates(event, d => new Date(d + 'T00:00:00').toLocaleDateString('en-US', {
               month: 'short',
               day: 'numeric',
               year: 'numeric',
-            }),
+            })),
           })),
           ...createSearcher(messages as any[], MESSAGE_KEYS)(q).map(message => ({
             type: 'message' as const,

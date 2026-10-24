@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 import SheetMusicViewer from '../../components/SheetMusicViewer';
 
+import { formatEventDates } from '../../lib/eventDates';
 interface Song {
   id: string;
   title: string;
@@ -18,6 +19,7 @@ interface Event {
   id: string;
   title: string;
   date: string;
+  end_date?: string | null;
   type: string;
 }
 
@@ -64,8 +66,8 @@ export const AdminFavorites = () => {
     try {
       const { data, error } = await supabase
         .from('events')
-        .select('id, title, date, type')
-        .gte('date', new Date().toISOString().split('T')[0])
+        .select('id, title, date, end_date, type')
+        .gte('last_date', new Date().toISOString().split('T')[0])
         .order('date', { ascending: true })
         .limit(10);
 
@@ -299,7 +301,7 @@ export const AdminFavorites = () => {
                   >
                     <div className="font-medium text-gray-900">{event.title}</div>
                     <div className="text-sm text-gray-600">
-                      {new Date(event.date + 'T00:00:00').toLocaleDateString()}
+                      {formatEventDates(event, d => new Date(d + 'T00:00:00').toLocaleDateString())}
                     </div>
                   </button>
                 ))}

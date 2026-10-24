@@ -6,6 +6,7 @@ import { Church, Users, Music, Calendar, ArrowLeft, Edit, Shield, ShieldOff, Tra
 import toast from 'react-hot-toast';
 import { generateMemorablePassword } from '../../lib/passwordUtils';
 
+import { eventRangeLabel, isEventPast } from '../../lib/eventDates';
 interface ChurchData {
   id: string;
   name: string;
@@ -32,6 +33,7 @@ interface EventData {
   id: string;
   title: string;
   date: string;
+  end_date?: string | null;
   time: string;
   location: string;
   type: string;
@@ -396,9 +398,9 @@ export const ChurchDetail = () => {
     memberPage * MEMBER_PAGE_SIZE
   );
 
-  const isPast = (date: string) => new Date(date + 'T23:59:59') < new Date();
-  const upcomingEvents = churchEvents.filter(e => !isPast(e.date));
-  const pastEvents = churchEvents.filter(e => isPast(e.date));
+  const isPast = (e: EventData) => isEventPast(e, ev => new Date(ev.date + 'T23:59:59') < new Date());
+  const upcomingEvents = churchEvents.filter(e => !isPast(e));
+  const pastEvents = churchEvents.filter(e => isPast(e));
 
   return (
     <div className="space-y-6 pb-8">
@@ -533,6 +535,7 @@ export const ChurchDetail = () => {
                   <div className="flex-1">
                     <p className="font-medium text-sm">{event.title}</p>
                     <p className="text-xs text-gray-500 flex items-center gap-2">
+                      {eventRangeLabel(event) && <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {eventRangeLabel(event)}</span>}
                       <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {event.time}</span>
                       <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {event.location}</span>
                     </p>

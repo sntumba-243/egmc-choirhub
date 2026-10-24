@@ -112,7 +112,7 @@ async function upcomingEventSongIds(opts: BackgroundCacheOpts): Promise<string[]
   const todayStr = now.toISOString().slice(0, 10);
   const in14Str = new Date(now.getTime() + 14 * 864e5).toISOString().slice(0, 10);
 
-  let query = supabase.from('events').select('id, date').gte('date', todayStr).lte('date', in14Str);
+  let query = supabase.from('events').select('id, date').gte('last_date', todayStr).lte('date', in14Str);
   if (opts.churchId) query = query.or(`church_id.eq.${opts.churchId},is_global.eq.true`);
   const { data: events } = await query;
 

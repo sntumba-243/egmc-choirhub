@@ -7,10 +7,12 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 import SheetMusicViewer from '../../components/SheetMusicViewer';
 
+import { formatEventDates } from '../../lib/eventDates';
 interface Event {
   id: string;
   title: string;
   date: string;
+  end_date?: string | null;
   time: string;
   location: string;
   description?: string;
@@ -266,7 +268,7 @@ export const AdminEventDetail = () => {
             <Calendar className="w-4 h-4 text-indigo-600" />
             <div className="min-w-0">
               <p className="text-xs text-gray-600">Date</p>
-              <p className="text-sm font-semibold text-gray-900 truncate">{formatDate(event.date)}</p>
+              <p className="text-sm font-semibold text-gray-900 truncate">{formatEventDates(event, formatDate)}</p>
             </div>
           </div>
 

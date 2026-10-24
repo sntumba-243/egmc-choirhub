@@ -10,6 +10,7 @@ import {
 import toast from 'react-hot-toast';
 import { useChurch } from '../../contexts/ChurchContext';
 
+import { daysUntilEvent, eventRangeLabel, formatEventDates } from '../../lib/eventDates';
 interface Stats {
   totalMembers: number;
   totalSongs: number;
@@ -103,7 +104,7 @@ export const AdminDashboard = () => {
       const [membersRes, songsRes, eventsRes, messagesRes] = await Promise.all([
         supabase.from('members').select('id, created_at').eq('church_id', user?.church_id),
         supabase.from('songs').select('id, created_at'),
-        supabase.from('events').select('id').eq('church_id', user?.church_id).gte('date', new Date().toISOString().split('T')[0]),
+        supabase.from('events').select('id').eq('church_id', user?.church_id).gte('last_date', new Date().toISOString().split('T')[0]),
         supabase.from('messages').select('id, created_at').eq('church_id', user?.church_id)
       ]);
 
@@ -134,7 +135,7 @@ export const AdminDashboard = () => {
       const { data } = await supabase
         .from('events')
         .select('*').eq('church_id', user?.church_id)
-        .gte('date', new Date().toISOString().split('T')[0])
+        .gte('last_date', new Date().toISOString().split('T')[0])
         .order('date', { ascending: true })
         .limit(3);
 
@@ -155,8 +156,8 @@ export const AdminDashboard = () => {
       
       const { data: upcomingEventsData } = await supabase
         .from("events")
-        .select("id, title, date")
-        .gte("date", new Date().toISOString().split("T")[0])
+        .select("id, title, date, end_date")
+        .gte("last_date", new Date().toISOString().split("T")[0])
         .lte("date", sevenDaysFromNow.toISOString().split("T")[0])
         .order("date", { ascending: true });
       
@@ -185,9 +186,10 @@ export const AdminDashboard = () => {
           if (missingRsvps > 0) {
             eventsNeedingRsvps++;
             
-            const daysUntil = Math.ceil(
-              (new Date(event.date + 'T00:00:00').getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
-            );
+            // 0 while a multi-day event is running ('today'), else days until it starts.
+            const now = new Date();
+            const localToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            const daysUntil = daysUntilEvent(event, localToday);
             
             const dayText = daysUntil === 0 ? 'today' : 
                            daysUntil === 1 ? 'tomorrow' : 
@@ -252,8 +254,8 @@ export const AdminDashboard = () => {
       
       const { data: events } = await supabase
         .from("events")
-        .select("id, title, date")
-        .gte("date", new Date().toISOString().split("T")[0])
+        .select("id, title, date, end_date")
+        .gte("last_date", new Date().toISOString().split("T")[0])
         .lte("date", sevenDaysFromNow.toISOString().split("T")[0]);
       
       if (!events || events.length === 0) {
@@ -287,7 +289,7 @@ export const AdminDashboard = () => {
 
       for (const event of events) {
         const { data: rsvps } = await supabase
-          .from("rsvps")
+          .from("event_rsvps")
           .select("member_id")
           .eq("event_id", event.id);
         
@@ -301,7 +303,7 @@ export const AdminDashboard = () => {
             await supabase.from("messages").insert({
               send_to: member.id,
               subject: reminderSubject,
-              body: `Hi ${member.first_name}, please RSVP for ${event.title} on ${new Date(event.date + 'T00:00:00').toLocaleDateString()}. Your response helps us plan better!`,
+              body: `Hi ${member.first_name}, please RSVP for ${event.title} on ${formatEventDates(event, d => new Date(d + 'T00:00:00').toLocaleDateString())}. Your response helps us plan better!`,
               is_important: false,
               sender_id: authId,
               church_id: user?.church_id,
@@ -502,7 +504,7 @@ export const AdminDashboard = () => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-gray-900 mb-0.5 text-sm">{event.title}</h3>
-                    <p className="text-xs text-gray-600">{event.time}</p>
+                    <p className="text-xs text-gray-600">{eventRangeLabel(event) ? `${eventRangeLabel(event)} · ` : ''}{event.time}</p>
                     <p className="text-xs text-gray-600">📍 {event.location}</p>
                   </div>
                 </div>

@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useChurch } from '../../contexts/ChurchContext';
 import { createSearcher } from '../../lib/smartSearch';
+import { eventCoversDay, eventRangeLabel, formatEventDates } from '../../lib/eventDates';
 import {
   getEventAttendanceWithMembers,
   markMemberAttendance,
@@ -20,6 +21,7 @@ interface EventLite {
   id: string;
   title: string;
   date: string;
+  end_date?: string | null;
   time: string;
   type?: string | null;
   location?: string | null;
@@ -82,8 +84,6 @@ const monthShort = (dateString: string) => {
   return d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
 };
 
-const isSameDayAsToday = (dateString: string) => dateString === todayYMD();
-
 export default function TakeAttendance() {
   const navigate = useNavigate();
   const { eventId } = useParams<{ eventId?: string }>();
@@ -128,9 +128,9 @@ export default function TakeAttendance() {
         const end = new Date(today); end.setDate(today.getDate() + 7);
         const { data, error } = await supabase
           .from('events')
-          .select('id, title, date, time, type, location, church_id, is_global')
+          .select('id, title, date, end_date, time, type, location, church_id, is_global')
           .or(`church_id.eq.${churchId},is_global.eq.true`)
-          .gte('date', fmtYMD(start))
+          .gte('last_date', fmtYMD(start))
           .lte('date', fmtYMD(end))
           .order('date', { ascending: true });
         if (cancelled) return;
@@ -156,7 +156,7 @@ export default function TakeAttendance() {
       try {
         const { data, error } = await supabase
           .from('events')
-          .select('id, title, date, time, type, location')
+          .select('id, title, date, end_date, time, type, location')
           .eq('id', eventId)
           .single();
         if (cancelled) return;
@@ -458,7 +458,7 @@ export default function TakeAttendance() {
         ) : (
           <ul className="space-y-2">
             {events.map(ev => {
-              const today = isSameDayAsToday(ev.date);
+              const today = eventCoversDay(ev, todayYMD());
               return (
                 <li key={ev.id}>
                   <button
@@ -476,6 +476,7 @@ export default function TakeAttendance() {
                     <div className="flex-1 min-w-0">
                       <h3 className="text-sm font-semibold text-gray-900 truncate">{ev.title}</h3>
                       <div className="text-xs text-gray-500 mt-0.5">
+                        {eventRangeLabel(ev) && <span className="mr-2">{eventRangeLabel(ev)}</span>}
                         {ev.time && <span>{formatTime(ev.time)}</span>}
                         {ev.type && <span className="ml-2 text-gray-400">{ev.type}</span>}
                       </div>
@@ -521,7 +522,7 @@ export default function TakeAttendance() {
           <div className="flex-1 min-w-0">
             <div className="text-white text-lg font-semibold">{selectedEvent.title}</div>
             <div className="text-gray-300 text-sm mt-1">
-              {formatLongDate(selectedEvent.date)}{selectedEvent.time ? ` · ${formatTime(selectedEvent.time)}` : ''}
+              {formatEventDates(selectedEvent, formatLongDate)}{selectedEvent.time ? ` · ${formatTime(selectedEvent.time)}` : ''}
             </div>
           </div>
         </div>
@@ -573,7 +574,7 @@ export default function TakeAttendance() {
           </button>
           <div className="flex-1 min-w-0">
             <div className="text-white font-semibold text-sm truncate">{selectedEvent.title}</div>
-            <div className="text-gray-400 text-xs">{formatLongDate(selectedEvent.date)}</div>
+            <div className="text-gray-400 text-xs">{formatEventDates(selectedEvent, formatLongDate)}</div>
           </div>
         </div>
 
@@ -790,7 +791,7 @@ export default function TakeAttendance() {
           </button>
           <div className="flex-1 min-w-0">
             <div className="text-white font-semibold text-sm truncate">{selectedEvent.title}</div>
-            <div className="text-gray-400 text-xs">{formatLongDate(selectedEvent.date)}</div>
+            <div className="text-gray-400 text-xs">{formatEventDates(selectedEvent, formatLongDate)}</div>
           </div>
         </div>
         <div className="px-6 py-8 bg-white min-h-[calc(100vh-4rem)]">

@@ -5,12 +5,14 @@ import { createSearcher, SONG_KEYS } from '../../lib/smartSearch';
 import { useAuth } from '../../contexts/AuthContext';
 import { Calendar, Plus, Clock, MapPin, Trash2, Edit, Globe, Music, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { endDateError, eventRangeLabel, formatEventDates, isEventPast } from '../../lib/eventDates';
 
 interface GlobalEvent {
   id: string;
   title: string;
   description?: string;
   date: string;
+  end_date?: string | null;
   time: string;
   location: string;
   type?: string;
@@ -33,6 +35,7 @@ export const GlobalEvents = () => {
     location: '',
     type: 'concert',
   });
+  const [endDate, setEndDate] = useState('');
 
   const [allSongs, setAllSongs] = useState<{id: string; title: string; composer?: string}[]>([]);
   // Church targeting: no event_churches rows = all churches.
@@ -129,6 +132,8 @@ export const GlobalEvents = () => {
       toast.error('Please fill in all required fields');
       return;
     }
+    const rangeError = endDateError(form.date, endDate);
+    if (rangeError) { toast.error(rangeError); return; }
     if (!allChurches && selectedChurchIds.length === 0) {
       toast.error('Select at least one church, or choose All churches');
       return;
@@ -143,6 +148,7 @@ export const GlobalEvents = () => {
           .from('events')
           .update({
             ...form,
+            end_date: endDate && endDate !== form.date ? endDate : null,
             is_global: true,
             updated_at: new Date().toISOString(),
           })
@@ -157,6 +163,7 @@ export const GlobalEvents = () => {
           .from('events')
           .insert([{
             ...form,
+            end_date: endDate && endDate !== form.date ? endDate : null,
             is_global: true,
             church_id: user?.church_id,
             requires_rsvp: true,
@@ -190,6 +197,7 @@ export const GlobalEvents = () => {
       location: event.location,
       type: event.type || 'concert',
     });
+    setEndDate(event.end_date || '');
     setEditingId(event.id);
     const eventTargets = targets[event.id] || [];
     setAllChurches(eventTargets.length === 0);
@@ -221,6 +229,7 @@ export const GlobalEvents = () => {
 
   const resetForm = () => {
     setForm({ title: '' , description: '' , date: '' , time: '' , location: '' , type: 'concert' });
+    setEndDate('');
     setEditingId(null);
     setSelectedSongIds([]);
     setSongSearch('' );
@@ -229,7 +238,7 @@ export const GlobalEvents = () => {
     setShowForm(false);
   };
 
-  const isPast = (date: string) => new Date(date + 'T23:59:59') < new Date();
+  const isPast = (e: GlobalEvent) => isEventPast(e, ev => new Date(ev.date + 'T23:59:59') < new Date());
 
   // 'All churches' or e.g. 'EGMC +2'.
   const targetLabel = (eventId: string) => {
@@ -242,8 +251,8 @@ export const GlobalEvents = () => {
     (targets[eventId] || []).map(id => churches.find(c => c.id === id)?.name || id).join(', ') || 'All churches';
   // Active churches, plus any inactive one an event is already targeted at.
   const pickableChurches = churches.filter(c => c.is_active || selectedChurchIds.includes(c.id));
-  const upcoming = events.filter(e => !isPast(e.date));
-  const past = events.filter(e => isPast(e.date));
+  const upcoming = events.filter(e => !isPast(e));
+  const past = events.filter(e => isPast(e));
 
   // Setlist picker: fuzzy, accent/typo-tolerant, ranked; empty query = all songs.
   const songSearcher = useMemo(() => createSearcher(allSongs, SONG_KEYS), [allSongs]);
@@ -287,9 +296,15 @@ export const GlobalEvents = () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500" required />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Date *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">From *</label>
               <input type="date" value={form.date} onChange={(e) => setForm(f => ({ ...f, date: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500" required />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">To <span className="text-gray-400 font-normal">(optional)</span></label>
+              <input type="date" value={endDate} min={form.date || undefined} onChange={(e) => setEndDate(e.target.value)}
+                className={`w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-slate-500 ${endDateError(form.date, endDate) ? 'border-red-400' : 'border-gray-300'}`} />
+              {endDateError(form.date, endDate) && <p className="text-xs text-red-600 mt-1">{endDateError(form.date, endDate)}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Time *</label>
@@ -447,6 +462,7 @@ export const GlobalEvents = () => {
                       <span className="text-xs bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded-full" title={targetTitle(event.id)}>{targetLabel(event.id)}</span>
                     </h3>
                     <p className="text-xs text-gray-500 flex items-center gap-2">
+                      {eventRangeLabel(event) && <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {eventRangeLabel(event)}</span>}
                       <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {event.time}</span>
                       <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {event.location}</span>
                     </p>
@@ -486,7 +502,7 @@ export const GlobalEvents = () => {
                       {event.title}
                       <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full" title={targetTitle(event.id)}>{targetLabel(event.id)}</span>
                     </h3>
-                    <p className="text-xs text-gray-400">{event.date} • {event.location}</p>
+                    <p className="text-xs text-gray-400">{formatEventDates(event, d => d)} • {event.location}</p>
                   </div>
                 </div>
                 <button onClick={() => handleDelete(event.id)} className="p-1.5 hover:bg-red-50 rounded text-red-400">

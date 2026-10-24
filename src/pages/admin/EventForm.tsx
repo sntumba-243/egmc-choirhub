@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { useChurch } from '../../contexts/ChurchContext';
 import { getChurchToday } from '../../lib/dateUtils';
+import { endDateError } from '../../lib/eventDates';
 
 interface Song {
   id: string;
@@ -30,6 +31,7 @@ export const EventForm: React.FC = () => {
   const { id: eventId } = useParams();
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [time, setTime] = useState('');
   const [location, setLocation] = useState('');
   const [description, setDescription] = useState('');
@@ -107,6 +109,7 @@ export const EventForm: React.FC = () => {
       if (data) {
         setTitle(data.title);
         setDate(data.date);
+        setEndDate(data.end_date || '');
         setOriginalDate(data.date);
         setTime(data.time);
         setLocation(data.location);
@@ -147,12 +150,15 @@ export const EventForm: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const rangeError = endDateError(date, endDate);
+    if (rangeError) { toast.error(rangeError); return; }
     setLoading(true);
 
     try {
       const eventData = {
         title,
         date,
+        end_date: endDate && endDate !== date ? endDate : null,
         time,
         location,
         description,
@@ -330,18 +336,41 @@ export const EventForm: React.FC = () => {
             className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500"
           />
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="relative">
-              <Calendar className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                required
-                className="w-full pl-8 pr-2 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500"
-              />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="event-from" className="block text-xs font-medium text-gray-600 mb-1">From *</label>
+              <div className="relative">
+                <Calendar className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  id="event-from"
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  required
+                  className="w-full pl-8 pr-2 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
             </div>
+            <div>
+              <label htmlFor="event-to" className="block text-xs font-medium text-gray-600 mb-1">To <span className="text-gray-400">(optional)</span></label>
+              <div className="relative">
+                <Calendar className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  id="event-to"
+                  type="date"
+                  value={endDate}
+                  min={date || undefined}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className={`w-full pl-8 pr-2 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500 ${endDateError(date, endDate) ? 'border-red-400' : ''}`}
+                />
+              </div>
+            </div>
+          </div>
+          {endDateError(date, endDate) && (
+            <p className="text-xs text-red-600 -mt-1">{endDateError(date, endDate)}</p>
+          )}
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="relative">
               <Clock className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input

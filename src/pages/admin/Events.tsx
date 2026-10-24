@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { createSearcher, EVENT_KEYS } from '../../lib/smartSearch';
 import { Calendar, Clock, MapPin, Users, Grid, List, ArrowUpDown, Plus, Edit, Trash2, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { formatEventDates, isEventPast } from '../../lib/eventDates';
 import { useChurch } from '../../contexts/ChurchContext';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -12,6 +13,7 @@ interface Event {
   title: string;
   description?: string;
   date: string;
+  end_date?: string | null;
   time: string;
   location: string;
   type?: string;
@@ -158,10 +160,9 @@ export const AdminEvents = () => {
     }
   };
 
-  const isPast = (dateString: string, timeString: string) => {
-    const eventDateTime = new Date(`${dateString}T${timeString}`);
-    return eventDateTime < new Date();
-  };
+  // Single-day: past once the start time passes; multi-day: after the last day.
+  const isPast = (event: Event) =>
+    isEventPast(event, e => new Date(`${e.date}T${e.time}`) < new Date());
 
   const searcher = useMemo(() => createSearcher(events, EVENT_KEYS), [events]);
 
@@ -171,9 +172,9 @@ export const AdminEvents = () => {
     const search = debouncedSearch.trim();
     let filtered = search ? searcher(search) : events;
     if (timelineFilter === 'upcoming') {
-      filtered = filtered.filter(e => !isPast(e.date, e.time));
+      filtered = filtered.filter(e => !isPast(e));
     } else if (timelineFilter === 'past') {
-      filtered = filtered.filter(e => isPast(e.date, e.time));
+      filtered = filtered.filter(e => isPast(e));
     }
 
     // While searching, relevance is the order; the sort control resumes when the
@@ -246,10 +247,10 @@ export const AdminEvents = () => {
 
       <div className="flex gap-1.5 overflow-x-auto pb-2 -mt-1">
         <button onClick={() => setTimelineFilter('upcoming')} className={`min-h-[44px] px-4 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${timelineFilter === 'upcoming' ? 'bg-blue-500 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-          Upcoming ({events.filter(e => !isPast(e.date, e.time)).length})
+          Upcoming ({events.filter(e => !isPast(e)).length})
         </button>
         <button onClick={() => setTimelineFilter('past')} className={`min-h-[44px] px-4 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${timelineFilter === 'past' ? 'bg-gray-500 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-          Past ({events.filter(e => isPast(e.date, e.time)).length})
+          Past ({events.filter(e => isPast(e)).length})
         </button>
         <button onClick={() => setTimelineFilter('all')} className={`min-h-[44px] px-4 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${timelineFilter === 'all' ? 'bg-teal-500 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
           All ({events.length})
@@ -269,7 +270,7 @@ export const AdminEvents = () => {
               <div className="p-3 pt-2 sm:p-2.5 sm:pt-2 space-y-1">
                 <div className="flex items-center gap-1.5 text-gray-700">
                   <div className="flex-shrink-0 w-5 h-5 rounded-lg bg-blue-500 flex items-center justify-center shadow-sm"><Calendar className="w-3 h-3 text-white" strokeWidth={2.5} /></div>
-                  <span className="text-xs font-medium">{formatDate(event.date)}</span>
+                  <span className="text-xs font-medium">{formatEventDates(event, formatDate)}</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-gray-700">
                   <div className="flex-shrink-0 w-5 h-5 rounded-lg bg-purple-500 flex items-center justify-center shadow-sm"><Clock className="w-3 h-3 text-white" strokeWidth={2.5} /></div>
@@ -297,7 +298,7 @@ export const AdminEvents = () => {
                     </div>
                   </div>
                 )}
-                {!isPast(event.date, event.time) && (
+                {!isPast(event) && (
                   <div className="pt-1">
                     <button
                       onClick={(e) => { e.stopPropagation(); navigate(`/admin/attendance/take/${event.id}`); }}
@@ -353,12 +354,12 @@ export const AdminEvents = () => {
                       <div className="font-semibold text-sm text-gray-900 group-hover:text-blue-600 transition-colors">{event.title}</div>
                       {event.description && <div className="text-xs text-gray-500 truncate max-w-xs mt-0.5">{event.description}</div>}
                     </td>
-                    <td className="px-3 sm:px-4 py-3 whitespace-nowrap"><div className="flex items-center gap-2"><div className="w-6 h-6 rounded-lg bg-blue-500 flex items-center justify-center shadow-sm flex-shrink-0"><Calendar className="w-3 h-3 text-white" strokeWidth={2.5} /></div><span className="text-xs font-medium text-gray-700">{formatDate(event.date)}</span></div></td>
+                    <td className="px-3 sm:px-4 py-3 whitespace-nowrap"><div className="flex items-center gap-2"><div className="w-6 h-6 rounded-lg bg-blue-500 flex items-center justify-center shadow-sm flex-shrink-0"><Calendar className="w-3 h-3 text-white" strokeWidth={2.5} /></div><span className="text-xs font-medium text-gray-700">{formatEventDates(event, formatDate)}</span></div></td>
                     <td className="px-3 sm:px-4 py-3 whitespace-nowrap"><div className="flex items-center gap-2"><div className="w-6 h-6 rounded-lg bg-purple-500 flex items-center justify-center shadow-sm flex-shrink-0"><Clock className="w-3 h-3 text-white" strokeWidth={2.5} /></div><span className="text-xs text-gray-700">{formatTime(event.time)}</span></div></td>
                     <td className="px-3 sm:px-4 py-3 whitespace-nowrap"><div className="flex items-center gap-2"><div className="w-6 h-6 rounded-lg bg-teal-500 flex items-center justify-center shadow-sm flex-shrink-0"><MapPin className="w-3 h-3 text-white" strokeWidth={2.5} /></div><span className="text-xs text-gray-700">{event.location}</span></div></td>
                     <td className="px-3 sm:px-4 py-3 whitespace-nowrap">{event.type && <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-700 shadow-sm">{event.type}</span>}</td>
                     <td className="px-3 sm:px-4 py-3 whitespace-nowrap">{event.requires_rsvp ? (<div className="flex items-center justify-center gap-1"><Users className="w-4 h-4 text-green-600" /><span className="text-xs font-semibold text-green-600">{rsvpCounts[event.id] || 0}</span>{(rsvpCounts[event.id] || 0) > 0 && <button onClick={(e) => { e.stopPropagation(); handleResetRsvps(event.id, event.title); }} className="ml-1 text-xs text-red-500 hover:text-red-600 font-medium p-2 min-h-[44px] min-w-[44px]">Reset</button>}</div>) : <span className="text-xs text-gray-400">-</span>}</td>
-                    <td className="px-3 sm:px-4 py-3 whitespace-nowrap text-right"><div className="flex items-center justify-end gap-2">{!isPast(event.date, event.time) && (<button onClick={(e) => { e.stopPropagation(); navigate(`/admin/attendance/take/${event.id}`); }} className="text-xs font-medium text-blue-600 hover:text-blue-800 whitespace-nowrap py-3 min-h-[44px] inline-flex items-center">Take Attendance</button>)}{!event.is_global && (<div className="flex items-center justify-end gap-1"><button onClick={(e) => { e.stopPropagation(); navigate(`/admin/events/${event.id}/edit`); }} className="p-3 min-h-[44px] min-w-[44px] rounded-lg bg-gray-100 text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition-colors"><Edit className="w-3.5 h-3.5" /></button><button onClick={(e) => handleDelete(e, event.id, event.title)} className="p-3 min-h-[44px] min-w-[44px] rounded-lg bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-700 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button></div>)}</div></td>
+                    <td className="px-3 sm:px-4 py-3 whitespace-nowrap text-right"><div className="flex items-center justify-end gap-2">{!isPast(event) && (<button onClick={(e) => { e.stopPropagation(); navigate(`/admin/attendance/take/${event.id}`); }} className="text-xs font-medium text-blue-600 hover:text-blue-800 whitespace-nowrap py-3 min-h-[44px] inline-flex items-center">Take Attendance</button>)}{!event.is_global && (<div className="flex items-center justify-end gap-1"><button onClick={(e) => { e.stopPropagation(); navigate(`/admin/events/${event.id}/edit`); }} className="p-3 min-h-[44px] min-w-[44px] rounded-lg bg-gray-100 text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition-colors"><Edit className="w-3.5 h-3.5" /></button><button onClick={(e) => handleDelete(e, event.id, event.title)} className="p-3 min-h-[44px] min-w-[44px] rounded-lg bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-700 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button></div>)}</div></td>
                   </tr>
                 ))}
               </tbody>

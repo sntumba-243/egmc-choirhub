@@ -8,6 +8,7 @@ import { useChurch } from '../../contexts/ChurchContext';
 import SheetMusicViewer from '../../components/SheetMusicViewer';
 import { createSongSearcher } from '../../lib/smartSearch';
 
+import { formatEventDates } from '../../lib/eventDates';
 const PAGE_SIZE = 20;
 
 interface Song {
@@ -28,6 +29,7 @@ interface Event {
   id: string;
   title: string;
   date: string;
+  end_date?: string | null;
   type: string;
 }
 
@@ -214,9 +216,9 @@ export const AdminRepertoire = () => {
     try {
       const { data, error } = await supabase
         .from('events')
-        .select('id, title, date, type')
+        .select('id, title, date, end_date, type')
         .eq('church_id', church.id)
-        .gte('date', new Date().toISOString().split('T')[0])
+        .gte('last_date', new Date().toISOString().split('T')[0])
         .order('date', { ascending: true })
         .limit(20);
       if (error) throw error;
@@ -601,7 +603,7 @@ export const AdminRepertoire = () => {
                   {events.map((event) => (
                     <button key={event.id} onClick={() => addSongsToEvent(event.id)} className="w-full text-left p-2 rounded-lg border-2 border-gray-200 hover:border-indigo-500 hover:bg-indigo-50 transition">
                       <div className="font-semibold text-xs">{event.title}</div>
-                      <div className="text-sm text-gray-500">{new Date(event.date + 'T00:00:00').toLocaleDateString()}</div>
+                      <div className="text-sm text-gray-500">{formatEventDates(event, d => new Date(d + 'T00:00:00').toLocaleDateString())}</div>
                     </button>
                   ))}
                 </div>

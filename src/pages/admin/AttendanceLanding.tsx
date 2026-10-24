@@ -4,11 +4,13 @@ import { ChevronRight } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useChurch } from '../../contexts/ChurchContext';
+import { eventCoversDay, eventRangeLabel } from '../../lib/eventDates';
 
 interface EventLite {
   id: string;
   title: string;
   date: string;
+  end_date?: string | null;
   time: string;
   type?: string | null;
   location?: string | null;
@@ -111,7 +113,7 @@ export default function AttendanceLanding() {
 
         const { data: evData } = await supabase
           .from('events')
-          .select('id, title, date, time, type, location')
+          .select('id, title, date, end_date, time, type, location')
           .or(`church_id.eq.${churchId},is_global.eq.true`)
           .order('date', { ascending: false })
           .limit(20);
@@ -119,7 +121,10 @@ export default function AttendanceLanding() {
         const recent: EventLite[] = evData || [];
 
         const today = todayYMD();
-        const foundTodayEvent = recent.find(e => e.date === today) || null;
+        // An event starting today wins; otherwise any multi-day event spanning today.
+        const foundTodayEvent = recent.find(e => e.date === today)
+          || recent.find(e => eventCoversDay(e, today))
+          || null;
         if (cancelled) return;
         setTodayEvent(foundTodayEvent);
 
@@ -241,6 +246,7 @@ export default function AttendanceLanding() {
               </div>
               <div className="text-lg font-semibold mt-1">{todayEvent.title}</div>
               <div className="text-sm mt-0.5" style={{ opacity: 0.75 }}>
+                {eventRangeLabel(todayEvent) ? `${eventRangeLabel(todayEvent)} · ` : ''}
                 {formatTime(todayEvent.time)}
                 {todayEvent.location ? ` · ${todayEvent.location}` : ''}
               </div>
@@ -311,6 +317,7 @@ export default function AttendanceLanding() {
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-gray-900 truncate">{ev.title}</div>
                       <div className="text-xs text-gray-400 mt-1 truncate">
+                        {eventRangeLabel(ev) ? `${eventRangeLabel(ev)} · ` : ''}
                         {formatTime(ev.time)}
                         {ev.location ? ` · ${ev.location}` : ''}
                       </div>

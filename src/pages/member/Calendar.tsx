@@ -4,12 +4,14 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Calendar, Clock, MapPin, Users, Grid, List, ArrowUpDown, CheckCircle, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { formatEventDates, isEventPast } from '../../lib/eventDates';
 
 interface Event {
   id: string;
   title: string;
   description?: string;
   date: string;
+  end_date?: string | null;
   time: string;
   location: string;
   type?: string;
@@ -128,9 +130,9 @@ export const MemberCalendar = () => {
     
     // Apply timeline filter
     if (timelineFilter === 'upcoming') {
-      filtered = events.filter(e => !isPast(e.date, e.time));
+      filtered = events.filter(e => !isPast(e));
     } else if (timelineFilter === 'past') {
-      filtered = events.filter(e => isPast(e.date, e.time));
+      filtered = events.filter(e => isPast(e));
     }
     
     return [...filtered].sort((a, b) => {
@@ -172,10 +174,9 @@ export const MemberCalendar = () => {
     return eventDate.toDateString() === today.toDateString();
   };
 
-  const isPast = (dateString: string, timeString: string) => {
-    const eventDateTime = new Date(`${dateString}T${timeString}`);
-    return eventDateTime < new Date();
-  };
+  // Single-day: past once the start time passes; multi-day: after the last day.
+  const isPast = (event: Event) =>
+    isEventPast(event, e => new Date(`${e.date}T${e.time}`) < new Date());
 
   const isFuture = (dateString: string, timeString: string) => {
     const eventDateTime = new Date(`${dateString}T${timeString}`);
@@ -236,7 +237,7 @@ export const MemberCalendar = () => {
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
-          Upcoming ({events.filter(e => !isPast(e.date, e.time)).length})
+          Upcoming ({events.filter(e => !isPast(e)).length})
         </button>
 <button
           onClick={() => setTimelineFilter('past')}
@@ -246,7 +247,7 @@ export const MemberCalendar = () => {
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
-          Past ({events.filter(e => isPast(e.date, e.time)).length})
+          Past ({events.filter(e => isPast(e)).length})
         </button>
         <button
           onClick={() => setTimelineFilter('all')}
@@ -291,7 +292,7 @@ export const MemberCalendar = () => {
                     <div className="flex-shrink-0 w-5 h-5 rounded-lg bg-blue-500 flex items-center justify-center shadow-sm">
                       <Calendar className="w-3 h-3 text-white" strokeWidth={2.5} />
                     </div>
-                    <span className="text-xs font-medium">{formatDate(event.date)}</span>
+                    <span className="text-xs font-medium">{formatEventDates(event, formatDate)}</span>
                   </div>
                   
                   <div className="flex items-center gap-1.5 text-gray-700">
@@ -471,7 +472,7 @@ export const MemberCalendar = () => {
                           <div className="w-6 h-6 rounded-lg bg-blue-500 flex items-center justify-center shadow-sm flex-shrink-0">
                             <Calendar className="w-3 h-3 text-white" strokeWidth={2.5} />
                           </div>
-                          <span className="text-xs font-medium text-gray-700">{formatDate(event.date)}</span>
+                          <span className="text-xs font-medium text-gray-700">{formatEventDates(event, formatDate)}</span>
                         </div>
                       </td>
                       <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
