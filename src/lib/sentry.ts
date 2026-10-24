@@ -10,6 +10,8 @@ export function initSentry() {
       Sentry.browserTracingIntegration(),
     ],
     tracesSampleRate: 0.1,
+    // Safari autofill noise, not our code
+    ignoreErrors: [/_logicalFormForControl/],
     beforeSend(event) {
       // Don't send errors in development
       if (import.meta.env.DEV) return null
