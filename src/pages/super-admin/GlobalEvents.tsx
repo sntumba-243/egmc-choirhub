@@ -35,11 +35,17 @@ export const GlobalEvents = () => {
   });
 
   const [allSongs, setAllSongs] = useState<{id: string; title: string; composer?: string}[]>([]);
+  // Church targeting: no event_churches rows = all churches.
+  const [churches, setChurches] = useState<{ id: string; name: string; short_name: string; is_active: boolean }[]>([]);
+  const [targets, setTargets] = useState<Record<string, string[]>>({});
+  const [allChurches, setAllChurches] = useState(true);
+  const [selectedChurchIds, setSelectedChurchIds] = useState<string[]>([]);
   const [selectedSongIds, setSelectedSongIds] = useState<string[]>([]);
   const [songSearch, setSongSearch] = useState('');
   useEffect(() => {
     fetchEvents();
     fetchSongs();
+    fetchChurches();
   }, []);
 
   const fetchEvents = async () => {
@@ -53,6 +59,20 @@ export const GlobalEvents = () => {
 
       if (error) throw error;
       setEvents(data || []);
+
+      const ids = (data || []).map(e => e.id);
+      if (ids.length > 0) {
+        const { data: rows, error: targetsError } = await supabase
+          .from('event_churches')
+          .select('event_id, church_id')
+          .in('event_id', ids);
+        if (targetsError) throw targetsError;
+        const map: Record<string, string[]> = {};
+        for (const r of rows || []) (map[r.event_id] = map[r.event_id] || []).push(r.church_id);
+        setTargets(map);
+      } else {
+        setTargets({});
+      }
     } catch (error) {
       console.error('Error:', error);
       toast.error('Failed to load global events');
@@ -61,6 +81,40 @@ export const GlobalEvents = () => {
     }
   };
 
+
+  const fetchChurches = async () => {
+    try {
+      const supabase = getDbClient();
+      const { data } = await supabase.from('churches').select('id, name, short_name, is_active').order('name');
+      setChurches(data || []);
+    } catch (e) { console.error('Error fetching churches:', e); }
+  };
+
+  // Replace the event's church targeting: no rows = all churches.
+  const saveTargets = async (eventId: string) => {
+    const supabase = getDbClient();
+    const { error: delError } = await supabase.from('event_churches').delete().eq('event_id', eventId);
+    if (delError) throw delError;
+    if (!allChurches && selectedChurchIds.length > 0) {
+      const { error } = await supabase
+        .from('event_churches')
+        .insert(selectedChurchIds.map(church_id => ({ event_id: eventId, church_id })));
+      if (error) throw error;
+    }
+  };
+
+  // Replace the event's setlist.
+  const saveSongs = async (eventId: string) => {
+    const supabase = getDbClient();
+    const { error: delError } = await supabase.from('event_songs').delete().eq('event_id', eventId);
+    if (delError) throw delError;
+    if (selectedSongIds.length > 0) {
+      const { error } = await supabase.from('event_songs').insert(
+        selectedSongIds.map((songId, i) => ({ event_id: eventId, song_id: songId, song_order: i + 1 }))
+      );
+      if (error) throw error;
+    }
+  };
 
   const fetchSongs = async () => {
     try {
@@ -73,6 +127,10 @@ export const GlobalEvents = () => {
     e.preventDefault();
     if (!form.title || !form.date || !form.time || !form.location) {
       toast.error('Please fill in all required fields');
+      return;
+    }
+    if (!allChurches && selectedChurchIds.length === 0) {
+      toast.error('Select at least one church, or choose All churches');
       return;
     }
 
@@ -91,16 +149,8 @@ export const GlobalEvents = () => {
           .eq('id', editingId);
         if (error) throw error;
 
-        // Update songs for edited event
-        await supabase.from('event_songs').delete().eq('event_id', editingId);
-        if (selectedSongIds.length > 0) {
-          const eventSongs = selectedSongIds.map((songId, i) => ({
-            event_id: editingId,
-            song_id: songId,
-            order_num: i + 1,
-          }));
-          await supabase.from('event_songs').insert(eventSongs);
-        }
+        await saveTargets(editingId);
+        await saveSongs(editingId);
         toast.success('Event updated!');
       } else {
         const { data: newEvent, error } = await supabase
@@ -114,16 +164,10 @@ export const GlobalEvents = () => {
           .select('id')
           .single();
         if (error) throw error;
+        if (!newEvent) throw new Error('Event was not created');
 
-        // Save selected songs
-        if (newEvent && selectedSongIds.length > 0) {
-          const eventSongs = selectedSongIds.map((songId, i) => ({
-            event_id: newEvent.id,
-            song_id: songId,
-            order_num: i + 1,
-          }));
-          await supabase.from('event_songs').insert(eventSongs);
-        }
+        await saveTargets(newEvent.id);
+        await saveSongs(newEvent.id);
         toast.success('Global event created!');
       }
 
@@ -147,11 +191,14 @@ export const GlobalEvents = () => {
       type: event.type || 'concert',
     });
     setEditingId(event.id);
+    const eventTargets = targets[event.id] || [];
+    setAllChurches(eventTargets.length === 0);
+    setSelectedChurchIds(eventTargets);
 
     // Load existing songs for this event
     try {
       const supabase = getDbClient();
-      const { data } = await supabase.from('event_songs').select('song_id').eq('event_id', event.id);
+      const { data } = await supabase.from('event_songs').select('song_id').eq('event_id', event.id).order('song_order');
       setSelectedSongIds(data?.map(es => es.song_id) || []);
     } catch (e) { setSelectedSongIds([]); }
 
@@ -159,7 +206,7 @@ export const GlobalEvents = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this global event? All churches will no longer see it.')) return;
+    if (!confirm('Delete this global event? No church will see it any more.')) return;
     try {
       const supabase = getDbClient();
       const { error } = await supabase.from('events').delete().eq('id', id);
@@ -177,10 +224,24 @@ export const GlobalEvents = () => {
     setEditingId(null);
     setSelectedSongIds([]);
     setSongSearch('' );
+    setAllChurches(true);
+    setSelectedChurchIds([]);
     setShowForm(false);
   };
 
   const isPast = (date: string) => new Date(date + 'T23:59:59') < new Date();
+
+  // 'All churches' or e.g. 'EGMC +2'.
+  const targetLabel = (eventId: string) => {
+    const ids = targets[eventId] || [];
+    if (ids.length === 0) return 'All churches';
+    const names = ids.map(id => churches.find(c => c.id === id)?.short_name || '?').sort();
+    return names.length === 1 ? names[0] : `${names[0]} +${names.length - 1}`;
+  };
+  const targetTitle = (eventId: string) =>
+    (targets[eventId] || []).map(id => churches.find(c => c.id === id)?.name || id).join(', ') || 'All churches';
+  // Active churches, plus any inactive one an event is already targeted at.
+  const pickableChurches = churches.filter(c => c.is_active || selectedChurchIds.includes(c.id));
   const upcoming = events.filter(e => !isPast(e.date));
   const past = events.filter(e => isPast(e.date));
 
@@ -205,7 +266,7 @@ export const GlobalEvents = () => {
           </div>
           <div>
             <h1 className="text-2xl font-bold">Global Events</h1>
-            <p className="text-xs text-gray-600">Visible to all churches</p>
+            <p className="text-xs text-gray-600">Visible to all churches, or only the ones you choose</p>
           </div>
         </div>
         <button
@@ -255,6 +316,47 @@ export const GlobalEvents = () => {
               <textarea value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))}
                 rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500" />
             </div>
+          </div>
+
+          {/* Church targeting */}
+          <div className="border-t pt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <Globe className="w-4 h-4 inline mr-1" /> Churches
+            </label>
+            <label className="flex items-center gap-2 text-sm min-h-[44px] cursor-pointer">
+              <input
+                type="checkbox"
+                checked={allChurches}
+                onChange={(e) => setAllChurches(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-slate-800 focus:ring-slate-500"
+              />
+              <span className="font-medium">All churches</span>
+            </label>
+            {!allChurches && (
+              <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-4 border border-gray-200 rounded-lg px-3 py-1">
+                {pickableChurches.map(c => (
+                  <label key={c.id} className="flex items-center gap-2 text-sm min-h-[44px] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedChurchIds.includes(c.id)}
+                      onChange={() => setSelectedChurchIds(prev =>
+                        prev.includes(c.id) ? prev.filter(id => id !== c.id) : [...prev, c.id]
+                      )}
+                      className="w-4 h-4 rounded border-gray-300 text-slate-800 focus:ring-slate-500"
+                    />
+                    <span className="truncate">{c.name}</span>
+                    <span className="text-xs text-gray-400 ml-auto">{c.short_name}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+            {!allChurches && (
+              <p className="text-xs text-gray-500 mt-1">
+                {selectedChurchIds.length === 0
+                  ? 'Select at least one church.'
+                  : `Only members of ${selectedChurchIds.length} selected ${selectedChurchIds.length === 1 ? 'church' : 'churches'} will see this event.`}
+              </p>
+            )}
           </div>
 
           {/* Song Selector */}
@@ -342,7 +444,7 @@ export const GlobalEvents = () => {
                   <div>
                     <h3 className="font-semibold text-gray-900 text-sm flex items-center gap-1">
                       {event.title}
-                      <span className="text-xs bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded-full">Global</span>
+                      <span className="text-xs bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded-full" title={targetTitle(event.id)}>{targetLabel(event.id)}</span>
                     </h3>
                     <p className="text-xs text-gray-500 flex items-center gap-2">
                       <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {event.time}</span>
@@ -380,7 +482,10 @@ export const GlobalEvents = () => {
                     </div>
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-600 text-sm">{event.title}</h3>
+                    <h3 className="font-semibold text-gray-600 text-sm flex items-center gap-1">
+                      {event.title}
+                      <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full" title={targetTitle(event.id)}>{targetLabel(event.id)}</span>
+                    </h3>
                     <p className="text-xs text-gray-400">{event.date} • {event.location}</p>
                   </div>
                 </div>
@@ -397,7 +502,7 @@ export const GlobalEvents = () => {
         <div className="bg-white rounded-lg p-8 text-center border border-gray-100">
           <Globe className="w-12 h-12 text-gray-300 mx-auto mb-2" />
           <p className="text-gray-500">No global events yet</p>
-          <p className="text-xs text-gray-400 mt-1">Create events that all churches can see</p>
+          <p className="text-xs text-gray-400 mt-1">Create events for all churches or selected ones</p>
         </div>
       )}
     </div>
