@@ -214,14 +214,13 @@ export const MemberForm: React.FC = () => {
         toast.success('Member updated');
         navigate(isSuperAdmin ? '/super-admin/members' : '/admin/members');
       } else {
-        let authUserId: string | null = null;
-
+        // The create-member edge function also inserts the public.users row
+        // (service role); clients have no write access to users under RLS.
         if (createAuthAccount) {
           try {
             const newPassword = generateMemorablePassword();
             setGeneratedPassword(newPassword);
-            const authUser = await createAuthUser(email, newPassword, role);
-            authUserId = authUser?.id || null;
+            await createAuthUser(email, newPassword, role);
           } catch (authError: any) {
             console.error('Auth creation failed:', authError);
             toast.error(`Auth account failed: ${authError.message}`);
@@ -230,30 +229,10 @@ export const MemberForm: React.FC = () => {
           }
         }
 
-        // Add user_id if auth account was created
-        if (authUserId) {
-          // auth user created, member will be linked by email
-        }
-
         const { error } = await supabase
           .from('members')
           .insert([memberData]);
         if (error) throw error;
-
-        // Sync to public.users table so the auth user has a corresponding row
-        if (authUserId) {
-          const { error: usersError } = await supabase.from('users').upsert({
-            id: authUserId,
-            email,
-            name: `${firstName} ${lastName}`.trim(),
-            role,
-            church_id: churchIdParam || church?.id,
-          }, { onConflict: 'id' });
-          if (usersError) {
-            console.error('Failed to sync user to users table:', usersError);
-            toast.error(`User sync failed: ${usersError.message}`);
-          }
-        }
 
         setShowPasswordModal(true);
       }
