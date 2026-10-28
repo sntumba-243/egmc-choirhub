@@ -8,6 +8,7 @@ import SheetMusicViewer from '../../components/SheetMusicViewer';
 
 import { formatEventDates } from '../../lib/eventDates';
 import { dbErrorMessage } from '../../lib/dbError';
+import { fetchSetlistEditableEvents, type PickableEvent } from '../../lib/setlistEvents';
 interface Song {
   id: string;
   title: string;
@@ -16,19 +17,11 @@ interface Song {
   sheet_music_url?: string;
 }
 
-interface Event {
-  id: string;
-  title: string;
-  date: string;
-  end_date?: string | null;
-  type: string;
-}
-
 export const AdminFavorites = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [favorites, setFavorites] = useState<Song[]>([]);
-  const [events, setEvents] = useState<Event[]>([]);
+  const [events, setEvents] = useState<PickableEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSongs, setSelectedSongs] = useState<Set<string>>(new Set());
   const [showEventModal, setShowEventModal] = useState(false);
@@ -65,15 +58,8 @@ export const AdminFavorites = () => {
 
   const fetchUpcomingEvents = async () => {
     try {
-      const { data, error } = await supabase
-        .from('events')
-        .select('id, title, date, end_date, type')
-        .gte('last_date', new Date().toISOString().split('T')[0])
-        .order('date', { ascending: true })
-        .limit(10);
-
-      if (error) throw error;
-      setEvents(data || []);
+      // Own-church events + global events this admin may edit (see setlistEvents).
+      setEvents(await fetchSetlistEditableEvents(new Date().toISOString().split('T')[0], 10));
     } catch (error) {
       console.error('Error fetching events:', error);
     }
@@ -300,7 +286,10 @@ export const AdminFavorites = () => {
                     onClick={() => addSongsToEvent(event.id)}
                     className="w-full text-left p-3 rounded-lg border hover:bg-gray-50 transition-colors"
                   >
-                    <div className="font-medium text-gray-900">{event.title}</div>
+                    <div className="font-medium text-gray-900">
+                      {event.title}
+                      {event.is_global && <span className="ml-1.5 inline-block align-middle text-[10px] font-semibold uppercase tracking-wide bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded-full">Global</span>}
+                    </div>
                     <div className="text-sm text-gray-600">
                       {formatEventDates(event, d => new Date(d + 'T00:00:00').toLocaleDateString())}
                     </div>

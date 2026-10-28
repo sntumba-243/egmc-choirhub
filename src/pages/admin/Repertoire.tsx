@@ -10,6 +10,7 @@ import { createSongSearcher } from '../../lib/smartSearch';
 
 import { formatEventDates } from '../../lib/eventDates';
 import { dbErrorMessage } from '../../lib/dbError';
+import { fetchSetlistEditableEvents, type PickableEvent } from '../../lib/setlistEvents';
 const PAGE_SIZE = 20;
 
 interface Song {
@@ -26,14 +27,6 @@ interface SongWithStatus extends Song {
   learning_status: 'learned' | 'learning' | 'not_started';
 }
 
-interface Event {
-  id: string;
-  title: string;
-  date: string;
-  end_date?: string | null;
-  type: string;
-}
-
 export const AdminRepertoire = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -47,7 +40,7 @@ export const AdminRepertoire = () => {
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [selectedSongs, setSelectedSongs] = useState<Set<string>>(new Set());
   const [showEventModal, setShowEventModal] = useState(false);
-  const [events, setEvents] = useState<Event[]>([]);
+  const [events, setEvents] = useState<PickableEvent[]>([]);
   const [sortBy, setSortBy] = useState<'a-z' | 'z-a' | 'recent'>('a-z');
   const [languageFilter, setLanguageFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'learned' | 'learning' | 'not_started'>('all');
@@ -215,15 +208,8 @@ export const AdminRepertoire = () => {
   const fetchUpcomingEvents = async () => {
     if (!church?.id) return;
     try {
-      const { data, error } = await supabase
-        .from('events')
-        .select('id, title, date, end_date, type')
-        .eq('church_id', church.id)
-        .gte('last_date', new Date().toISOString().split('T')[0])
-        .order('date', { ascending: true })
-        .limit(20);
-      if (error) throw error;
-      setEvents(data || []);
+      // Own-church events + global events this admin may edit (see setlistEvents).
+      setEvents(await fetchSetlistEditableEvents(new Date().toISOString().split('T')[0], 20));
     } catch (error) {
       console.error('Error fetching events:', error);
     }
@@ -603,7 +589,11 @@ export const AdminRepertoire = () => {
                 <div className="space-y-1.5">
                   {events.map((event) => (
                     <button key={event.id} onClick={() => addSongsToEvent(event.id)} className="w-full text-left p-2 rounded-lg border-2 border-gray-200 hover:border-indigo-500 hover:bg-indigo-50 transition">
-                      <div className="font-semibold text-xs">{event.title}</div>
+                      <div className="font-semibold text-xs">
+                        {event.title}
+                        {event.is_global && <span className="ml-1.5 inline-block align-middle text-[10px] font-semibold uppercase tracking-wide bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded-full">Global</span>}
+                        {isSuperAdmin && !event.is_global && event.church_short_name && <span className="ml-1.5 text-[10px] text-gray-400">{event.church_short_name}</span>}
+                      </div>
                       <div className="text-sm text-gray-500">{formatEventDates(event, d => new Date(d + 'T00:00:00').toLocaleDateString())}</div>
                     </button>
                   ))}
