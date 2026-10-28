@@ -4,6 +4,8 @@ import { supabase } from '../../lib/supabase';
 import { Star, Music, Calendar, Plus, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
+import { useChurch } from '../../contexts/ChurchContext';
+import { getChurchToday } from '../../lib/dateUtils';
 import SheetMusicViewer from '../../components/SheetMusicViewer';
 
 import { formatEventDates } from '../../lib/eventDates';
@@ -20,8 +22,11 @@ interface Song {
 export const AdminFavorites = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { church } = useChurch();
   const [favorites, setFavorites] = useState<Song[]>([]);
   const [events, setEvents] = useState<PickableEvent[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventsError, setEventsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedSongs, setSelectedSongs] = useState<Set<string>>(new Set());
   const [showEventModal, setShowEventModal] = useState(false);
@@ -29,7 +34,6 @@ export const AdminFavorites = () => {
 
   useEffect(() => {
     fetchFavorites();
-    fetchUpcomingEvents();
   }, []);
 
   const fetchFavorites = async () => {
@@ -57,12 +61,24 @@ export const AdminFavorites = () => {
   };
 
   const fetchUpcomingEvents = async () => {
+    setEventsLoading(true);
+    setEventsError(null);
     try {
       // Own-church events + global events this admin may edit (see setlistEvents).
-      setEvents(await fetchSetlistEditableEvents(new Date().toISOString().split('T')[0], 10));
+      setEvents(await fetchSetlistEditableEvents(getChurchToday(church?.timezone), 10));
     } catch (error) {
       console.error('Error fetching events:', error);
+      setEvents([]);
+      setEventsError(dbErrorMessage("Couldn't load events", error));
+    } finally {
+      setEventsLoading(false);
     }
+  };
+
+  // Refetch on every open so events created/edited since page load appear.
+  const openEventPicker = () => {
+    setShowEventModal(true);
+    fetchUpcomingEvents();
   };
 
   const removeFavorite = async (songId: string) => {
@@ -158,7 +174,7 @@ export const AdminFavorites = () => {
 
         {selectedSongs.size > 0 && (
           <button
-            onClick={() => setShowEventModal(true)}
+            onClick={openEventPicker}
             className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
           >
             <Calendar className="w-4 h-4" />
@@ -264,7 +280,14 @@ export const AdminFavorites = () => {
               Add to Event
             </h2>
 
-            {events.length === 0 ? (
+            {eventsLoading ? (
+              <p className="text-sm text-gray-500 text-center py-6">Loading events…</p>
+            ) : eventsError ? (
+              <div className="text-center py-6" role="alert">
+                <p className="text-sm text-red-600 mb-3">{eventsError}</p>
+                <button onClick={fetchUpcomingEvents} className="px-3 py-1.5 text-xs bg-gray-200 rounded hover:bg-gray-300 min-h-[44px]">Try again</button>
+              </div>
+            ) : events.length === 0 ? (
               <div className="text-center py-8">
                 <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                 <p className="text-gray-600 mb-4">No upcoming events</p>

@@ -8,6 +8,9 @@ import { supabase } from './supabase';
 //   • church admin: own church's events + globals explicitly targeted at them
 //     (all-churches globals are super-admin-only setlists, so they're left out)
 //   • super admin: every upcoming event
+//
+// Throws on ANY failure (events fetch or a permission probe) — callers must
+// show an error, never a fake "No upcoming events".
 
 export interface PickableEvent {
   id: string;
@@ -19,12 +22,15 @@ export interface PickableEvent {
   church_short_name?: string | null;
 }
 
-export async function fetchSetlistEditableEvents(fromYmd: string, limit: number): Promise<PickableEvent[]> {
-  // RLS already narrows this to events the user can see.
+/** `todayYmd` must be the church-LOCAL date (getChurchToday), not a UTC date. */
+export async function fetchSetlistEditableEvents(todayYmd: string, limit: number): Promise<PickableEvent[]> {
+  // RLS already narrows this to events the user can see. The embed must name
+  // its FK: event_churches is a second events↔churches path, and a bare
+  // churches(...) fails with PGRST201 (ambiguous relationship).
   const { data, error } = await supabase
     .from('events')
-    .select('id, title, date, end_date, type, is_global, churches(short_name)')
-    .gte('last_date', fromYmd)
+    .select('id, title, date, end_date, type, is_global, churches!events_church_id_fkey(short_name)')
+    .gte('last_date', todayYmd)
     .order('date', { ascending: true })
     .limit(100);
   if (error) throw error;
@@ -34,7 +40,7 @@ export async function fetchSetlistEditableEvents(fromYmd: string, limit: number)
     rows.map(e => supabase.rpc('msg_can_edit_setlist', { eid: e.id }))
   );
   const checkError = checks.find(c => c.error)?.error;
-  if (checkError) console.error('Setlist permission check failed:', checkError);
+  if (checkError) throw checkError;
 
   return rows
     .filter((_, i) => checks[i].data === true)

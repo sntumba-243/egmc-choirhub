@@ -5,6 +5,7 @@ import { Music, Search, Star, Calendar, X, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { useChurch } from '../../contexts/ChurchContext';
+import { getChurchToday } from '../../lib/dateUtils';
 import SheetMusicViewer from '../../components/SheetMusicViewer';
 import { createSongSearcher } from '../../lib/smartSearch';
 
@@ -41,6 +42,8 @@ export const AdminRepertoire = () => {
   const [selectedSongs, setSelectedSongs] = useState<Set<string>>(new Set());
   const [showEventModal, setShowEventModal] = useState(false);
   const [events, setEvents] = useState<PickableEvent[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventsError, setEventsError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'a-z' | 'z-a' | 'recent'>('a-z');
   const [languageFilter, setLanguageFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'learned' | 'learning' | 'not_started'>('all');
@@ -207,12 +210,24 @@ export const AdminRepertoire = () => {
 
   const fetchUpcomingEvents = async () => {
     if (!church?.id) return;
+    setEventsLoading(true);
+    setEventsError(null);
     try {
       // Own-church events + global events this admin may edit (see setlistEvents).
-      setEvents(await fetchSetlistEditableEvents(new Date().toISOString().split('T')[0], 20));
+      setEvents(await fetchSetlistEditableEvents(getChurchToday(church?.timezone), 20));
     } catch (error) {
       console.error('Error fetching events:', error);
+      setEvents([]);
+      setEventsError(dbErrorMessage("Couldn't load events", error));
+    } finally {
+      setEventsLoading(false);
     }
+  };
+
+  // Refetch on every open so events created/edited since page load appear.
+  const openEventPicker = () => {
+    setShowEventModal(true);
+    fetchUpcomingEvents();
   };
 
   const toggleFavorite = async (songId: string, e: React.MouseEvent) => {
@@ -436,7 +451,7 @@ export const AdminRepertoire = () => {
         <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-2 flex items-center justify-between">
           <span className="text-sm font-semibold text-indigo-900">{selectedSongs.size} selected</span>
           <div className="flex items-center gap-1.5">
-            <button onClick={() => setShowEventModal(true)} className="flex items-center gap-1 px-4 py-2 bg-green-600 text-white rounded text-sm font-semibold min-h-[44px]">
+            <button onClick={openEventPicker} className="flex items-center gap-1 px-4 py-2 bg-green-600 text-white rounded text-sm font-semibold min-h-[44px]">
               <Calendar className="w-3 h-3" /> Event
             </button>
             <select value="" onChange={(e) => { if (e.target.value) handleBulkStatusUpdate(e.target.value as any); }}
@@ -579,7 +594,14 @@ export const AdminRepertoire = () => {
               <button onClick={() => setShowEventModal(false)} className="p-2 min-h-[44px] min-w-[44px] hover:bg-gray-100 rounded"><X className="w-4 h-4" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-3">
-              {events.length === 0 ? (
+              {eventsLoading ? (
+                <p className="text-sm text-gray-500 text-center py-6">Loading events…</p>
+              ) : eventsError ? (
+                <div className="text-center py-6" role="alert">
+                  <p className="text-sm text-red-600 mb-3">{eventsError}</p>
+                  <button onClick={fetchUpcomingEvents} className="px-3 py-1.5 text-xs bg-gray-200 rounded hover:bg-gray-300 min-h-[44px]">Try again</button>
+                </div>
+              ) : events.length === 0 ? (
                 <div className="text-center py-6">
                   <Calendar className="w-10 h-10 text-gray-300 mx-auto mb-2" />
                   <p className="text-sm text-gray-500 mb-2">No upcoming events</p>
