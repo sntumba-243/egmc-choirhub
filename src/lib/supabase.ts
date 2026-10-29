@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { neonClient } from './neonClient';
 import { autoFailover } from './autoFailover';
+import { storageGet, storageSet, storageRemove } from './safeStorage';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -18,6 +19,9 @@ if (!forceNeon) {
       // Trigger a re-render or reload if needed
       window.dispatchEvent(new Event('database-failover'));
     }
+  }).catch(err => {
+    // Fire-and-forget at module load: never let it reject unhandled.
+    console.warn('Auto-failover check failed:', err);
   });
 }
 
@@ -30,12 +34,14 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // sessionStorage (cleared on close). Flag defaults to true. The adapter is the
 // single source the supabase client reads/writes the session through, so both
 // online session-restore and the offline auth path honor the choice.
+// Storage access goes through safeStorage: a throw here would surface inside
+// supabase-js' async session restore as an unhandled rejection.
 const REMEMBER_KEY = 'choirhub_remember_me';
-const rememberMe = () => localStorage.getItem(REMEMBER_KEY) !== 'false'; // default true
+const store = () => (storageGet(REMEMBER_KEY) !== 'false' ? 'local' : 'session'); // default true
 const authStorage = {
-  getItem: (k: string) => (rememberMe() ? localStorage : sessionStorage).getItem(k),
-  setItem: (k: string, v: string) => (rememberMe() ? localStorage : sessionStorage).setItem(k, v),
-  removeItem: (k: string) => { localStorage.removeItem(k); sessionStorage.removeItem(k); },
+  getItem: (k: string) => storageGet(k, store()),
+  setItem: (k: string, v: string) => storageSet(k, v, store()),
+  removeItem: (k: string) => { storageRemove(k, 'local'); storageRemove(k, 'session'); },
 };
 
 const supabaseClient = createClient(supabaseUrl || '', supabaseAnonKey || '', {

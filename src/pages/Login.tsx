@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Mail, Lock, Eye, EyeOff, AlertCircle, Loader2, WifiOff } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { storageGet, storageSet, storageRemove } from '../lib/safeStorage';
 
 interface LoginProps {
   onNavigateToRegister: () => void;
@@ -9,10 +10,10 @@ interface LoginProps {
 
 export const Login: React.FC<LoginProps> = ({ onNavigateToRegister }) => {
   const { login } = useAuth();
-  const [email, setEmail] = useState(() => localStorage.getItem('choirhub_saved_email') || '');
+  const [email, setEmail] = useState(() => storageGet('choirhub_saved_email') || '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(() => localStorage.getItem('choirhub_remember_me') !== 'false'); // default true
+  const [rememberMe, setRememberMe] = useState(() => storageGet('choirhub_remember_me') !== 'false'); // default true
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -27,8 +28,8 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister }) => {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
-  const [churchLogo, setChurchLogo] = useState<string | null>(localStorage.getItem('login_church_logo'));
-  const [churchName, setChurchName] = useState<string | null>(localStorage.getItem('login_church_name'));
+  const [churchLogo, setChurchLogo] = useState<string | null>(() => storageGet('login_church_logo'));
+  const [churchName, setChurchName] = useState<string | null>(() => storageGet('login_church_name'));
 
 
   const lookupChurch = async (emailValue: string) => {
@@ -36,18 +37,19 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister }) => {
     try {
       // Anon can't read members/churches directly (RLS) — this RPC returns
       // only the church's display branding for the email.
-      const { data } = await supabase.rpc('login_branding', { p_email: emailValue.trim() });
+      const { data, error } = await supabase.rpc('login_branding', { p_email: emailValue.trim() });
+      if (error) return; // keep the generic logo
       const c = Array.isArray(data) ? data[0] : null;
       if (c) {
         const name = c.short_name || c.name || null;
         const logo = c.logo_url || null;
         setChurchName(name);
         setChurchLogo(logo);
-        if (name) localStorage.setItem('login_church_name', name);
-        if (logo) localStorage.setItem('login_church_logo', logo);
+        if (name) storageSet('login_church_name', name);
+        if (logo) storageSet('login_church_logo', logo);
       }
-    } catch (err) {
-      // silently fail - just show default branding
+    } catch {
+      // Branding is cosmetic: any failure keeps the generic logo, never rejects.
     }
   };
   const handleSubmit = async (e: React.FormEvent) => {
@@ -58,9 +60,9 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister }) => {
     // Remember-me: pick persistent vs session-only storage for the auth token
     // (consulted by the supabase client's storage adapter), and prefill email
     // next time when enabled.
-    localStorage.setItem('choirhub_remember_me', String(rememberMe));
-    if (rememberMe) localStorage.setItem('choirhub_saved_email', email.trim());
-    else localStorage.removeItem('choirhub_saved_email');
+    storageSet('choirhub_remember_me', String(rememberMe));
+    if (rememberMe) storageSet('choirhub_saved_email', email.trim());
+    else storageRemove('choirhub_saved_email');
 
     try {
       await login(email.trim(), password);
@@ -256,7 +258,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister }) => {
                   required
                   style={{ ...inputStyle, paddingLeft: '34px', paddingRight: '12px' }}
                   onFocus={handleFocus}
-                  onBlur={(e) => { handleBlur(e); lookupChurch(email); }}
+                  onBlur={(e) => { handleBlur(e); void lookupChurch(email).catch(() => {}); }}
                 />
               </div>
             </div>

@@ -16,6 +16,13 @@ const versionPlugin = {
   }
 };
 
+// Sentry source maps: uploaded only when SENTRY_AUTH_TOKEN is set (Vercel env
+// var). Without it — local/CI builds — the plugin is disabled and no maps are
+// emitted, so the build never fails on a missing token. With it, maps are
+// 'hidden' (no sourceMappingURL in the bundle) and deleted from dist after
+// upload, so they're never served publicly.
+const SENTRY_AUTH_TOKEN = process.env.SENTRY_AUTH_TOKEN;
+
 export default defineConfig({
   define: {
     __APP_BUILD_VERSION__: JSON.stringify(BUILD_VERSION),
@@ -24,9 +31,14 @@ export default defineConfig({
     react(),
     versionPlugin,
     sentryVitePlugin({
-      org: 'o4511217496227841',
-      project: 'choirhub',
-      authToken: process.env.SENTRY_AUTH_TOKEN,
+      // Slugs, not IDs: override with SENTRY_ORG / SENTRY_PROJECT env vars if they differ.
+      org: process.env.SENTRY_ORG || 'o4511217496227841',
+      project: process.env.SENTRY_PROJECT || 'choirhub',
+      authToken: SENTRY_AUTH_TOKEN,
+      disable: !SENTRY_AUTH_TOKEN,
+      telemetry: false,
+      // Release = git SHA (auto-detected from VERCEL_GIT_COMMIT_SHA on Vercel).
+      sourcemaps: { filesToDeleteAfterUpload: ['./dist/**/*.map'] },
     }),
   ],
   build: {
@@ -36,7 +48,7 @@ export default defineConfig({
     // shell runs there too (the PDF layer uses pdfjs' legacy build separately).
     // Negligible bundle-size cost; a few transpiled helpers.
     target: ['es2018', 'safari13'],
-    sourcemap: true,
+    sourcemap: SENTRY_AUTH_TOKEN ? 'hidden' : false,
     rollupOptions: {
       output: {
         manualChunks: {

@@ -1,3 +1,5 @@
+import { storageGet, storageSet } from './safeStorage';
+
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const HEALTH_CHECK_TIMEOUT = 5000; // 5 seconds
 const RETRY_INTERVAL = 60000; // Check every 60 seconds
@@ -16,12 +18,13 @@ export class AutoFailover {
 
   private constructor() {
     // Load cached status
-    const cached = localStorage.getItem(FAILOVER_CACHE_KEY);
-    this.status = cached ? JSON.parse(cached) : {
-      usingNeon: false,
-      lastCheck: 0,
-      supabaseHealthy: true
-    };
+    const fallback: FailoverStatus = { usingNeon: false, lastCheck: 0, supabaseHealthy: true };
+    try {
+      const cached = storageGet(FAILOVER_CACHE_KEY);
+      this.status = cached ? JSON.parse(cached) : fallback;
+    } catch {
+      this.status = fallback; // corrupt cache
+    }
   }
 
   static getInstance(): AutoFailover {
@@ -125,7 +128,7 @@ export class AutoFailover {
   }
 
   private saveStatus() {
-    localStorage.setItem(FAILOVER_CACHE_KEY, JSON.stringify(this.status));
+    storageSet(FAILOVER_CACHE_KEY, JSON.stringify(this.status));
   }
 
   isUsingNeon(): boolean {
