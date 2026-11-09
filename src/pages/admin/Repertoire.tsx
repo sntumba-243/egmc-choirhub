@@ -576,7 +576,7 @@ export const AdminRepertoire = () => {
               className="px-4 py-1.5 text-sm font-medium rounded-lg border border-gray-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 min-h-[44px]">
               Previous
             </button>
-            <span className="text-sm text-gray-600">Page {currentPage} of {totalPages}</span>
+            <span translate="no" className="text-sm text-gray-600">Page {currentPage} of {totalPages}</span>
             <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages}
               className="px-4 py-1.5 text-sm font-medium rounded-lg border border-gray-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 min-h-[44px]">
               Next

@@ -251,6 +251,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister }) => {
                   style={{ left: '11px', width: '15px', height: '15px', color: 'rgba(30,68,128,0.3)' }}
                 />
                 <input
+                  translate="no"
                   type="text"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -277,6 +278,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister }) => {
                   style={{ left: '11px', width: '15px', height: '15px', color: 'rgba(30,68,128,0.3)' }}
                 />
                 <input
+                  translate="no"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -288,6 +290,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister }) => {
                 />
                 <button
                   type="button"
+                  translate="no"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute top-1/2 -translate-y-1/2 transition-colors hover:opacity-70"
                   style={{ right: '11px', color: 'rgba(30,68,128,0.3)', background: 'none', border: 'none', cursor: 'pointer' }}
@@ -324,6 +327,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister }) => {
             {/* Submit */}
             <button
               type="submit"
+              translate="no"
               disabled={loading || isOffline}
               className="w-full text-white flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.99] transition-all"
               style={{
@@ -351,10 +355,10 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister }) => {
               {loading ? (
                 <>
                   <Loader2 style={{ width: '16px', height: '16px' }} className="animate-spin" />
-                  Signing in...
+                  <span>Signing in...</span>
                 </>
               ) : (
-                'Sign In'
+                <span>Sign In</span>
               )}
             </button>
           </form>

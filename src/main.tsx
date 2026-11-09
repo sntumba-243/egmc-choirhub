@@ -5,8 +5,11 @@ import App from './App.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import { registerServiceWorker, startVersionPolling } from './serviceWorkerUtils';
 import { initSentry } from './lib/sentry';
+import { patchDomForExternalMutations } from './lib/domPatch';
 import './index.css';
 
+// Must run before React mounts — see lib/domPatch.ts (Google Translate crash).
+patchDomForExternalMutations();
 initSentry();
 registerServiceWorker();
 startVersionPolling();
