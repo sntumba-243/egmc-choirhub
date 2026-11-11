@@ -69,13 +69,17 @@ self.addEventListener('activate', (event) => {
 });
 
 // Network-first with a timeout fallback to cache. Only plain 200s are stored
-// (a 206 range response cannot be cache.put()).
-function networkFirst(event, cacheName, offlineFallback) {
+// (a 206 range response cannot be cache.put()). putIfAbsent: never overwrite an
+// existing copy (PDFs — the app's copies carry the bucket etag; see below).
+function networkFirst(event, cacheName, offlineFallback, putIfAbsent = false) {
   const { request } = event;
   const network = fetch(request).then((response) => {
     if (response.status === 200) {
       const clone = response.clone();
-      event.waitUntil(caches.open(cacheName).then((c) => c.put(request, clone)).catch(() => {}));
+      event.waitUntil(caches.open(cacheName).then(async (c) => {
+        if (putIfAbsent && (await c.match(request, { ignoreVary: true }))) return;
+        await c.put(request, clone);
+      }).catch(() => {}));
     }
     return response;
   });
@@ -105,12 +109,17 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return; // POST/PATCH/HEAD etc. go straight to network
   const url = new URL(request.url);
 
-  // Sheet-music PDFs in Supabase Storage → network-first (an edited sheet must
-  // show fresh online; the ?v= param also changes on edit), cache for offline.
+  // Sheet-music PDFs in Supabase Storage → network-first (online always shows
+  // the current file), cached for offline. The app's offline download manager
+  // (src/lib/backgroundCache.ts) owns the saved copies: it stores each one with
+  // the bucket etag and replaces it when the etag changes. So here:
+  //   • its own downloads (`_dl=1`) go straight to the network, untouched;
+  //   • a sheet opened online is saved only if there is no copy yet (never
+  //     overwrite a tagged copy with an untagged one).
   // A Range request bypasses the SW entirely (the viewer disables ranges).
   if (url.pathname.includes('/storage/v1/object/public/choirhub_partitions')) {
-    if (request.headers.has('range')) return;
-    event.respondWith(networkFirst(event, PDF_CACHE, offlineError));
+    if (request.headers.has('range') || url.searchParams.has('_dl')) return;
+    event.respondWith(networkFirst(event, PDF_CACHE, offlineError, true));
     return;
   }
 
