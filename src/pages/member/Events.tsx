@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Calendar, Clock, MapPin, Users, Grid, List, ArrowUpDown, CheckCircle, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { fetchRsvps, countByEvent } from '../../lib/rsvps';
 
 interface Event {
   id: string;
@@ -39,7 +40,6 @@ export const MemberEvents = () => {
   useEffect(() => {
     fetchEvents();
     fetchRSVPs();
-    fetchRsvpCounts();
   }, [user?.church_id]);
 
   const fetchEvents = async () => {
@@ -52,6 +52,7 @@ export const MemberEvents = () => {
 
       if (error) throw error;
       setEvents(data || []);
+      fetchRsvpCounts((data || []).map((e: Event) => e.id));
     } catch (error) {
       console.error('Error fetching events:', error);
       toast.error('Failed to load events');
@@ -81,21 +82,13 @@ export const MemberEvents = () => {
     }
   };
 
-  const fetchRsvpCounts = async () => {
+  const fetchRsvpCounts = async (eventIds: string[]) => {
     try {
-      const { data, error } = await supabase
-        .from('event_rsvps')
-        .select('event_id, status');
-
+      // Same RSVP definition as the admin views (lib/rsvps); scoped to the
+      // events on screen instead of reading every RSVP row.
+      const { valid, error } = await fetchRsvps(eventIds);
       if (error) throw error;
-
-      const counts: Record<string, number> = {};
-      data?.forEach((rsvp) => {
-        if (rsvp.status === 'yes') {
-          counts[rsvp.event_id] = (counts[rsvp.event_id] || 0) + 1;
-        }
-      });
-      setRsvpCounts(counts);
+      setRsvpCounts(countByEvent(valid, 'yes'));
     } catch (error) {
       console.error('Error fetching RSVP counts:', error);
     }

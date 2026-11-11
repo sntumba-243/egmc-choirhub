@@ -7,6 +7,7 @@ import SheetMusicViewer from '../../components/SheetMusicViewer';
 import toast from 'react-hot-toast';
 
 import { formatEventDates } from '../../lib/eventDates';
+import { fetchRsvps } from '../../lib/rsvps';
 interface Event {
   id: string;
   title: string;
@@ -117,15 +118,9 @@ export const EventDetail = () => {
 
   const fetchRsvpCount = async () => {
     try {
-      const { count, error } = await supabase
-        .from('event_rsvps')
-        .select('*', { count: 'exact', head: true })
-        .eq('event_id', eventId)
-        .eq('status', 'yes');
-
-      if (!error && count !== null) {
-        setRsvpCount(count);
-      }
+      // Same RSVP definition as everywhere else (lib/rsvps).
+      const { valid, error } = await fetchRsvps(eventId ? [eventId] : []);
+      if (!error) setRsvpCount(valid.filter(r => r.status === 'yes').length);
     } catch (error) {
       console.error('Error fetching RSVP count:', error);
     }

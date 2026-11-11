@@ -7,6 +7,8 @@ import toast from 'react-hot-toast';
 import { formatEventDates, isEventPast } from '../../lib/eventDates';
 import { useChurch } from '../../contexts/ChurchContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { fetchRsvps, countByEvent } from '../../lib/rsvps';
+import { dbErrorMessage, dbErrorReason } from '../../lib/dbError';
 
 interface Event {
   id: string;
@@ -61,18 +63,11 @@ export const AdminEvents = () => {
       setEvents(data || []);
 
       if (data) {
-        const counts: Record<string, number> = {};
-        for (const event of data) {
-          if (event.requires_rsvp) {
-            const { count } = await supabase
-              .from('event_rsvps')
-              .select('*', { count: 'exact', head: true })
-              .eq('event_id', event.id)
-              .eq('status', 'yes');
-            counts[event.id] = count || 0;
-          }
-        }
-        setRsvpCounts(counts);
+        // Same definition as EventDetail (lib/rsvps): only rows whose member
+        // exists and is visible. One batched query instead of one per event.
+        const { valid, error: rsvpError } = await fetchRsvps(data.filter((e: Event) => e.requires_rsvp).map((e: Event) => e.id));
+        if (rsvpError) console.error('Error fetching RSVP counts:', rsvpError);
+        setRsvpCounts(countByEvent(valid, 'yes'));
       }
     } catch (error) {
       console.error('Error fetching events:', error);
@@ -107,47 +102,66 @@ export const AdminEvents = () => {
     if (!window.confirm(`Reset all RSVPs for "${title}"? (Data will be archived for attendance tracking)`)) return;
 
     try {
-      // 1. Fetch event details and current RSVPs
-      const { data: event, error: eventError } = await supabase.from('events').select('date, church_id').eq('id', eventId).single();
-      if (!event) throw new Error('Event not found');
+      // 1. Event + every RSVP row (valid AND hidden — reset should clear both if it can)
+      const { data: event, error: eventError } = await supabase.from('events').select('date, church_id, is_global').eq('id', eventId).single();
+      if (eventError || !event) { toast.error(dbErrorMessage('Could not reset RSVPs', eventError || { message: 'event not found' })); return; }
 
-      const { data: rsvps, error: fetchError } = await supabase.from('event_rsvps').select('member_id, status').eq('event_id', eventId);
+      const { valid, hidden, error: fetchError } = await fetchRsvps([eventId]);
+      if (fetchError) { toast.error(dbErrorMessage('Could not reset RSVPs', fetchError)); return; }
+      // Local event: the admin owns EVERY row (DELETE policy, migration
+      // 20261111000000), so every row must go. Global event: admins manage only
+      // their own church's members' RSVPs — other churches' rows are out of scope.
+      const rows = event.is_global ? valid : [...valid, ...hidden];
+      if (rows.length === 0) { toast.success('No RSVPs to reset'); fetchEvents(); return; }
 
-      // 2. Archive to attendance_history (insert, ignore duplicates)
-      if (rsvps && rsvps.length > 0) {
-        const archivePayload = rsvps.map(r => ({
-          event_id: eventId,
-          member_id: r.member_id,
-          event_title: title,
-          event_date: event.date,
-          status: r.status,
-          church_id: event.church_id ?? church?.id,
-        }));
-        const { data: archiveData, error: archiveError } = await supabase
-          .from('attendance_history')
-          .upsert(archivePayload, { onConflict: 'event_id,member_id', ignoreDuplicates: true });
-        // If upsert fails due to constraint mismatch, fall back to individual inserts
-        if (archiveError) {
-          for (const row of archivePayload) {
-            const { error: insertErr } = await supabase.from('attendance_history').insert(row);
-            if (insertErr && !insertErr.message.includes('duplicate')) {
-              console.error('[ResetRSVPs] Insert failed for member:', row.member_id, insertErr);
-            }
-          }
+      // 2. Archive to attendance_history (ignore duplicates). Archive failures
+      //    abort the reset: deleting un-archived RSVPs would lose attendance data.
+      const archivePayload = rows.map(r => ({
+        event_id: eventId,
+        member_id: r.member_id,
+        event_title: title,
+        event_date: event.date,
+        status: r.status,
+        church_id: event.church_id ?? church?.id,
+      }));
+      const { error: archiveError } = await supabase
+        .from('attendance_history')
+        .upsert(archivePayload, { onConflict: 'event_id,member_id', ignoreDuplicates: true });
+      if (archiveError) {
+        // Constraint mismatch fallback: individual inserts, duplicates are fine.
+        const failures: unknown[] = [];
+        for (const row of archivePayload) {
+          const { error: insertErr } = await supabase.from('attendance_history').insert(row);
+          if (insertErr && insertErr.code !== '23505' && !insertErr.message?.includes('duplicate')) failures.push(insertErr);
+        }
+        if (failures.length) {
+          console.error('[ResetRSVPs] Archive failed:', failures);
+          toast.error(dbErrorMessage(`Reset cancelled — could not archive ${failures.length} RSVP(s)`, failures[0]));
+          return;
         }
       }
 
-      // 3. Delete RSVPs (only after archive succeeds)
-      const { error: deleteError } = await supabase.from('event_rsvps').delete().eq('event_id', eventId);
-      if (deleteError) throw deleteError;
+      // 3. Delete and CHECK what was actually deleted. RLS silently skips rows
+      //    the admin may not delete (no error, 0 rows) — never assume success.
+      // (cast: the Neon fallback builder's type lacks .select on delete)
+      let del = supabase.from('event_rsvps').delete().eq('event_id', eventId) as any;
+      if (event.is_global) del = del.in('member_id', rows.map(r => r.member_id)); // own church only
+      const { data: deleted, error: deleteError } = await del.select('member_id');
+      if (deleteError) { toast.error(dbErrorMessage('Could not reset RSVPs', deleteError)); fetchEvents(); return; }
 
-      // 4. Update local state
-      setRsvpCounts(prev => ({ ...prev, [eventId]: 0 }));
-      toast.success('RSVPs archived and reset');
+      const deletedIds = new Set((deleted || []).map((d: { member_id: string }) => d.member_id));
+      const leftover = rows.filter(r => !deletedIds.has(r.member_id));
+      if (leftover.length === 0) {
+        toast.success(`RSVPs archived and reset (${deletedIds.size})`);
+      } else {
+        // Rows remain → RLS refused them (no error, just fewer rows deleted).
+        console.warn('[ResetRSVPs] Not deleted:', leftover);
+        toast.error(`Reset ${deletedIds.size} of ${rows.length} RSVPs — ${leftover.length} could not be deleted: ${dbErrorReason({ code: '42501' })}`, { duration: 8000 });
+      }
       fetchEvents();
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('[ResetRSVPs] Failed:', e);
-      toast.error('Failed: ' + (e?.message || String(e)));
+      toast.error(dbErrorMessage('Could not reset RSVPs', e));
     }
   };
 

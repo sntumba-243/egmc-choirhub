@@ -8,6 +8,7 @@ import SheetMusicViewer from '../../components/SheetMusicViewer';
 
 import { formatEventDates } from '../../lib/eventDates';
 import { dbErrorMessage } from '../../lib/dbError';
+import { fetchRsvps } from '../../lib/rsvps';
 interface Event {
   id: string;
   title: string;
@@ -61,17 +62,26 @@ export const SuperAdminEventDetail = () => {
 
   const fetchEventAndRsvps = async () => {
     try {
+      // Was reading the legacy, EMPTY `rsvps` table (always "0 RSVPs").
+      // Live data is event_rsvps; same definition as the admin views (lib/rsvps).
       const [eventRes, rsvpsRes] = await Promise.all([
         supabase.from('events').select('*').eq('id', id).single(),
-        supabase
-          .from('rsvps')
-          .select('id, status, members(first_name, last_name, voice_part)')
-          .eq('event_id', id)
+        fetchRsvps(id ? [id] : []),
       ]);
 
       if (eventRes.error) throw eventRes.error;
       setEvent(eventRes.data);
-      setRsvps(rsvpsRes.data || []);
+      if (rsvpsRes.error) console.error('Error loading RSVPs:', rsvpsRes.error);
+      const memberIds = rsvpsRes.valid.map(r => r.member_id);
+      const { data: members } = memberIds.length
+        ? await supabase.from('members').select('id, first_name, last_name, voice_part').in('id', memberIds)
+        : { data: [] as any[] };
+      const byId = new Map((members || []).map((m: any) => [m.id, m]));
+      setRsvps(rsvpsRes.valid.filter(r => byId.has(r.member_id)).map(r => ({
+        id: r.member_id,
+        status: r.status,
+        members: byId.get(r.member_id),
+      })));
     } catch (error) {
       console.error('Error:', error);
       toast.error('Failed to load event details');

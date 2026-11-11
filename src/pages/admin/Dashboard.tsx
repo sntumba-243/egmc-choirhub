@@ -11,6 +11,7 @@ import toast from 'react-hot-toast';
 import { useChurch } from '../../contexts/ChurchContext';
 
 import { daysUntilEvent, eventRangeLabel, formatEventDates } from '../../lib/eventDates';
+import { fetchRsvps, countByEvent } from '../../lib/rsvps';
 interface Stats {
   totalMembers: number;
   totalSongs: number;
@@ -173,14 +174,13 @@ export const AdminDashboard = () => {
         let mostUrgentMissing = 0;
         let mostUrgentDays = 0;
         
+        // Responses per event (any status), same RSVP definition as Events /
+        // EventDetail: orphaned or other-church rows no longer shrink "missing".
+        const { valid: upcomingRsvps } = await fetchRsvps(upcomingEventsData.map((e: any) => e.id));
+        const responsesByEvent = countByEvent(upcomingRsvps);
         for (const event of upcomingEventsData) {
-          // Get RSVP count for this event
-          const { count: rsvpCount } = await supabase
-            .from("event_rsvps")
-            .select("*", { count: "exact", head: true })
-            .eq("event_id", event.id);
-          
-          const missingRsvps = totalMembers - (rsvpCount || 0);
+          const rsvpCount = responsesByEvent[event.id] || 0;
+          const missingRsvps = totalMembers - rsvpCount;
           
           // Count events with missing RSVPs
           if (missingRsvps > 0) {

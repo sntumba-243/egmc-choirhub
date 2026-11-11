@@ -9,6 +9,7 @@ import SheetMusicViewer from '../../components/SheetMusicViewer';
 
 import { formatEventDates } from '../../lib/eventDates';
 import { dbErrorMessage } from '../../lib/dbError';
+import { fetchRsvps } from '../../lib/rsvps';
 interface Event {
   id: string;
   title: string;
@@ -64,10 +65,7 @@ export const AdminEventDetail = () => {
     try {
       const [eventRes, rsvpsRes] = await Promise.all([
         supabase.from('events').select('*').eq('id', id).single(),
-        supabase
-          .from('event_rsvps')
-          .select('member_id, status')
-          .eq('event_id', id)
+        fetchRsvps(id ? [id] : []), // same RSVP definition as the Events card (lib/rsvps)
       ]);
 
       if (eventRes.error) throw eventRes.error;
@@ -81,8 +79,9 @@ export const AdminEventDetail = () => {
 
       setEvent(eventRes.data);
 
-      // member_id stores auth.uid(), which equals members.id
-      const rsvpData = rsvpsRes.data || [];
+      if (rsvpsRes.error) console.error('Error loading RSVPs:', rsvpsRes.error);
+      // member_id stores members.id; rsvpsRes.valid only has rows whose member is visible.
+      const rsvpData = rsvpsRes.valid;
       if (rsvpData.length > 0) {
         const memberIds = rsvpData.map(r => r.member_id);
         const { data: members } = await supabase
