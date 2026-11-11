@@ -124,6 +124,10 @@ export default function SheetMusicViewer({ url, title, onClose, version }: Sheet
         const loadingTask = pdfjsLib.getDocument({
           url: directUrl,
           withCredentials: false,
+          // One plain GET for the whole file (no HTTP Range requests): that is
+          // the response the SW / "Download all" store, and the only shape a
+          // cached copy can answer offline (a 206 range reply can't be cached).
+          disableRange: true,
         })
         const pdfDoc = await loadingTask.promise
         if (cancelled) return

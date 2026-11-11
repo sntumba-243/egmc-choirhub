@@ -7,6 +7,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useChurch } from '../../contexts/ChurchContext';
 import SheetMusicViewer from '../../components/SheetMusicViewer';
 import { createSongSearcher } from '../../lib/smartSearch';
+import { getOfflineData, putOfflineData } from '../../lib/offlineCache';
 
 const PAGE_SIZE = 20;
 
@@ -94,8 +95,16 @@ export const MemberRepertoire = () => {
         supabase.from('songs').select('*', { count: 'exact', head: true }),
         supabase.from('church_song_status').select('song_id, status').eq('church_id', church.id),
       ]);
-      const total = countResult.count || 0;
-      const statuses = statusResult.data || [];
+      // Offline (or flaky): fall back to the persisted library snapshot.
+      let total = countResult.count || 0;
+      if (countResult.error || countResult.count == null) {
+        total = ((await getOfflineData('songs')) as Song[] | null)?.length || total;
+      }
+      let statuses: any[] = statusResult.data || [];
+      if (statusResult.error) {
+        const snap = (await getOfflineData('churchSongStatus')) as any[] | null;
+        statuses = (snap || []).filter((s: any) => s.church_id === church.id);
+      }
       const map = new Map<string, 'learned' | 'learning' | 'not_started'>();
       statuses.forEach((s: any) => map.set(s.song_id, s.status));
       setStatusMap(map);
@@ -137,8 +146,16 @@ export const MemberRepertoire = () => {
         query = query.range(from, to);
       }
 
-      const { data: songsData, error, count } = await query;
-      if (error) throw error;
+      let { data: songsData, error, count } = await query;
+      if (error || !songsData) {
+        // Offline and this exact query was never cached: serve the persisted
+        // full-library snapshot (lib/offlineCache) with the same filter / sort /
+        // pagination applied client-side, so the list never goes blank offline.
+        const snap = await snapshotSongs(page, shouldPaginate);
+        if (!snap) throw error;
+        songsData = snap.data;
+        count = snap.count;
+      }
 
       const sm = statuses || statusMap;
       setTotalCount(count || 0);
@@ -171,6 +188,22 @@ export const MemberRepertoire = () => {
     }
   };
 
+  const snapshotSongs = async (page: number, paginate: boolean): Promise<{ data: Song[]; count: number } | null> => {
+    const all = (await getOfflineData('songs')) as Song[] | null;
+    if (!all?.length) return null;
+    let rows = languageFilter !== 'all'
+      ? all.filter(s => (s.language || '').toLowerCase() === languageFilter.toLowerCase())
+      : all.slice();
+    if (sortBy === 'recent') rows.sort((a: any, b: any) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+    else {
+      rows.sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' }));
+      if (sortBy === 'z-a') rows.reverse();
+    }
+    const count = rows.length;
+    if (paginate) rows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+    return { data: rows, count };
+  };
+
   const getAuthUid = async (): Promise<string | null> => {
     const { data: { session } } = await supabase.auth.getSession();
     return session?.user?.id || null;
@@ -182,8 +215,14 @@ export const MemberRepertoire = () => {
       const authUid = await getAuthUid();
       if (!authUid) return;
       const { data, error } = await supabase.from('user_favorites').select('song_id').eq('user_id', authUid);
-      if (error) throw error;
-      setFavorites(new Set(data?.map(f => f.song_id) || []));
+      if (error) {
+        const saved = (await getOfflineData('favorites:' + authUid)) as string[] | null;
+        if (saved) { setFavorites(new Set(saved)); return; }
+        throw error;
+      }
+      const ids = data?.map(f => f.song_id) || [];
+      setFavorites(new Set(ids));
+      putOfflineData('favorites:' + authUid, ids).catch(() => {});
     } catch (error) {
       console.error('Error loading favorites:', error);
     }

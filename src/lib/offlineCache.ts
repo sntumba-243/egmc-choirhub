@@ -1,7 +1,6 @@
 // Offline Data Pre-cacher
 // Call this after login to pre-cache user's essential data
 
-const SUPABASE_URL = '__SUPABASE_URL__'; // replaced at build time
 
 export async function preCacheUserData(supabase, churchId) {
   if (!navigator.onLine) return;
@@ -11,7 +10,7 @@ export async function preCacheUserData(supabase, churchId) {
   try {
     // Fetch essential data
     const [songsRes, churchSongsRes, eventsRes, membersRes, messagesRes, churchRes] = await Promise.all([
-      supabase.from('songs').select('*').limit(500),
+      fetchAllSongs(supabase), // whole library (paged past PostgREST's 1000-row cap) — was .limit(500)
       supabase.from('church_song_status').select('*').eq('church_id', churchId).limit(500),
       supabase.from('events').select('*').eq('church_id', churchId).limit(500),
       supabase.from('members').select('*').eq('church_id', churchId).limit(500),
@@ -20,7 +19,7 @@ export async function preCacheUserData(supabase, churchId) {
     ]);
 
     const offlineData = {
-      songs: songsRes.data || [],
+      songs: songsRes, // fetchAllSongs throws on error → whole pre-cache skipped, old snapshot kept
       churchSongStatus: churchSongsRes.data || [],
       events: eventsRes.data || [],
       members: membersRes.data || [],
@@ -33,8 +32,6 @@ export async function preCacheUserData(supabase, churchId) {
     // Store in IndexedDB for larger storage
     await saveToIndexedDB(offlineData);
     
-    // Also cache PDF sheet music URLs
-    await preCachePDFs(offlineData.songs);
   } catch (err) {
     console.warn('[Offline] Pre-cache failed:', err);
   }
@@ -95,27 +92,28 @@ export async function getOfflineMeta() {
   return getOfflineData('meta');
 }
 
-async function preCachePDFs(songs) {
-  const pdfUrls = songs
-    .filter(s => s.sheet_music_url) // any sheet URL (Supabase Storage or legacy Drive)
-    .map(s => s.sheet_music_url)
-    .slice(0, 50); // Limit to 50 PDFs to avoid excessive storage
-  
-  if (pdfUrls.length === 0) return;
-  
-  const cache = await caches.open('egmc-pdfs-2.0.0');
-  let cached = 0;
-  
-  for (const url of pdfUrls) {
-    try {
-      const existing = await cache.match(url);
-      if (!existing) {
-        await cache.add(url);
-        cached++;
-      }
-    } catch {
-      // Skip failed PDFs
-    }
+/** Store one value in the offline IndexedDB (same store as preCacheUserData). */
+export async function putOfflineData(key: string, value: unknown) {
+  const db = (await openDB()) as IDBDatabase;
+  const tx = db.transaction('data', 'readwrite');
+  tx.objectStore('data').put({ key, value, cachedAt: new Date().toISOString() });
+  return new Promise<void>((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+/**
+ * Every song row, paged in 1000-row chunks (PostgREST caps a response at 1000).
+ * Throws on error so callers never overwrite a good snapshot with a partial one.
+ */
+export async function fetchAllSongs(supabase: any): Promise<any[]> {
+  const PAGE = 1000;
+  const all: any[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase.from('songs').select('*').order('created_at', { ascending: false }).range(from, from + PAGE - 1);
+    if (error) throw error;
+    all.push(...(data || []));
+    if (!data || data.length < PAGE) return all;
   }
-  
 }

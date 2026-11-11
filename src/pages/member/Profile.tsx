@@ -29,7 +29,8 @@ export const MemberProfile: React.FC = () => {
   const [showAvatarMenu, setShowAvatarMenu] = useState(false);
   const [showOffline, setShowOffline] = useState(false);
   const [status, setStatus] = useState({ priority: { cached: 0, total: 0 }, full: { cached: 0, total: 0 } });
-  const [progress, setProgress] = useState({ cached: 0, total: 0 }); // live count of the running download
+  const [progress, setProgress] = useState({ cached: 0, total: 0, failed: 0 }); // live count of the running download
+  const [lastFailed, setLastFailed] = useState(0); // songs that failed in the last full download
   const [downloadingAll, setDownloadingAll] = useState(false);
   const prevDownloadingRef = useRef(false);
 
@@ -47,7 +48,7 @@ export const MemberProfile: React.FC = () => {
     const opts = { userId: user?.id, churchId: (user as any)?.church_id };
     getCacheStatus(opts).then(setStatus).catch(() => {});
     unsub = subscribeCacheProgress((p) => {
-      setProgress({ cached: p.cached, total: p.total });
+      setProgress({ cached: p.cached, total: p.total, failed: p.failed });
       setDownloadingAll(p.downloading);
       // When any download (button or background) finishes, refresh the counts.
       if (prevDownloadingRef.current && !p.downloading) {
@@ -61,9 +62,16 @@ export const MemberProfile: React.FC = () => {
   const handleDownloadAll = async () => {
     setDownloadingAll(true);
     try {
-      await downloadAllNow({ userId: user?.id, churchId: (user as any)?.church_id });
-      setStatus(await getCacheStatus({ userId: user?.id, churchId: (user as any)?.church_id }));
-      toast.success('Songs saved for offline use');
+      const result = await downloadAllNow({ userId: user?.id, churchId: (user as any)?.church_id });
+      const fresh = await getCacheStatus({ userId: user?.id, churchId: (user as any)?.church_id });
+      setStatus(fresh);
+      setLastFailed(result.failed);
+      // Honest outcome: only claim success when every sheet is actually stored.
+      if (fresh.full.total > 0 && fresh.full.cached >= fresh.full.total) {
+        toast.success(`All ${fresh.full.total} songs available offline`);
+      } else {
+        toast.error(`${fresh.full.cached}/${fresh.full.total} songs saved — ${fresh.full.total - fresh.full.cached} couldn't download. Tap Retry when your connection is better.`);
+      }
     } catch {
       toast.error('Could not download all songs');
     } finally {
@@ -288,15 +296,24 @@ export const MemberProfile: React.FC = () => {
 
       {/* Offline songs (auto sheet-music pre-cache) */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center flex-shrink-0">
             <Download className="w-3.5 h-3.5 text-gray-500" />
           </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-gray-900">Offline songs</p>
             <p className="text-xs text-gray-400">
-              Sunday-ready: {status.priority.cached}/{status.priority.total} · Full library: {status.full.cached}/{status.full.total}
+              {downloadingAll && progress.total > 0
+                ? `Saving ${progress.cached}/${progress.total} (${Math.round((progress.cached / progress.total) * 100)}%) — you can keep using the app`
+                : status.full.total > 0 && status.full.cached >= status.full.total
+                ? `✓ All ${status.full.total} songs available offline`
+                : `Full library: ${status.full.cached}/${status.full.total} offline${lastFailed > 0 ? ` · ${lastFailed} failed` : ''} · Sunday-ready: ${status.priority.cached}/${status.priority.total}`}
             </p>
+            {downloadingAll && progress.total > 0 && (
+              <div className="mt-1.5 h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+                <div className="h-full rounded-full transition-all" style={{ width: `${(progress.cached / progress.total) * 100}%`, background: '#E85D26' }} />
+              </div>
+            )}
           </div>
         </div>
         <button
@@ -310,6 +327,8 @@ export const MemberProfile: React.FC = () => {
             ? `Downloading… ${progress.cached}/${progress.total}`
             : status.full.total > 0 && status.full.cached >= status.full.total
             ? 'All saved'
+            : status.full.cached > 0
+            ? (lastFailed > 0 ? 'Retry' : 'Resume')
             : 'Download all now'}
         </button>
       </div>

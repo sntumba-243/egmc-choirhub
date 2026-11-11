@@ -1,4 +1,5 @@
 import { preCacheUserData } from '../lib/offlineCache';
+import { saveOfflineUser, loadOfflineUser, clearOfflineUser, isOfflineError } from '../lib/offlineSession';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getDbClient } from '../lib/supabase';
@@ -41,22 +42,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(user);
       } else {
         const supabase = getDbClient();
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          const { data: memberData } = await supabase
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        // Offline restore: no live session (expired token can't refresh without
+        // network) or profile unreachable → use the last signed-in profile. See
+        // lib/offlineSession.ts. Only when the failure is the network, never on
+        // a real sign-out.
+        const restoreOffline = (err: unknown) => {
+          if (!isOfflineError(err)) return false;
+          const cached = loadOfflineUser();
+          if (cached) { setUser(cached); Sentry.setUser({ id: cached.id, email: cached.email, role: cached.role }); }
+          return !!cached;
+        };
+        if (!session?.user) {
+          restoreOffline(sessionError);
+        } else {
+          const { data: memberData, error: memberError } = await supabase
             .from('members')
             .select('*')
             .eq('email', session.user.email)
             .single();
 
-          if (memberData) {
+          if (!memberData) {
+            restoreOffline(memberError);
+          } else {
             const { data: userData } = await supabase
               .from('users')
               .select('is_super_admin')
               .eq('id', session.user.id)
               .maybeSingle();
 
-            setUser({
+            const restored: NeonUser = {
               id: memberData.id,
               email: memberData.email,
               name: memberData.first_name ? `${memberData.first_name} ${memberData.last_name || ''}`.trim() : memberData.email,
@@ -65,7 +80,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               voice_part: memberData.voice_part,
               church_id: memberData.church_id,
               is_super_admin: userData?.is_super_admin || false,
-            });
+            };
+            setUser(restored);
+            saveOfflineUser(restored);
             // Pre-cache data for offline use on session restore
             if (memberData.church_id) {
               preCacheUserData(supabase, memberData.church_id).catch(() => {});
@@ -132,6 +149,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             };
 
             setUser(loggedInUser);
+            saveOfflineUser(loggedInUser);
             Sentry.setUser({ id: loggedInUser.id, email: loggedInUser.email, role: loggedInUser.role });
             // Pre-cache data for offline use
             if (loggedInUser.church_id) {
@@ -159,6 +177,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       setUser(null);
+      clearOfflineUser();
+      // Cached API responses are URL-keyed (not per-user): drop them on logout.
+      try { navigator.serviceWorker?.controller?.postMessage({ type: 'CLEAR_DATA_CACHE' }); } catch { /* no SW */ }
       Sentry.setUser(null);
       toast.success('Logged out successfully');
       navigate('/login');

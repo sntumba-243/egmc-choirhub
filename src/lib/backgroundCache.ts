@@ -9,11 +9,14 @@
 // version param) so the entries this writes are the ones the viewer requests.
 
 import { supabase } from './supabase';
+import { fetchAllSongs, getOfflineData, putOfflineData } from './offlineCache';
+import { storageGet, storageSet } from './safeStorage';
 
 // ── Types ──
 export interface CacheProgress {
   total: number;
   cached: number;
+  failed: number;       // fetch failed this run (offline/network/HTTP error) — retried on resume
   downloading: boolean;
 }
 
@@ -31,9 +34,14 @@ export interface BackgroundCacheOpts {
 }
 
 // ── Constants ──
-// Fallback must track SW_VERSION in public/service-worker.js; getPdfCache()
-// prefers any existing egmc-pdfs-* cache so a version bump doesn't orphan data.
-const PDF_CACHE_FALLBACK = 'egmc-pdfs-2.0.0';
+// STABLE name shared with public/service-worker.js (PDF_CACHE). It used to be
+// versioned (egmc-pdfs-<SW_VERSION>), so every SW bump deleted every downloaded
+// sheet; the SW now migrates any legacy egmc-pdfs-* into this one on activate.
+const PDF_CACHE = 'egmc-pdfs';
+// Set when the member taps "Download all": every later app launch resumes the
+// full-library download (new/edited songs, anything that failed) automatically.
+const FULL_LIBRARY_KEY = 'choirhub_offline_full_library';
+const FETCH_TIMEOUT_MS = 60000;
 const START_DELAY_MS = 8000;
 const BATCH_SIZE = 2;
 const BATCH_PAUSE_MS = 500;
@@ -42,7 +50,7 @@ const CACHES_OK = typeof caches !== 'undefined';
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 // ── Progress store (tiny emitter) ──
-let progress: CacheProgress = { total: 0, cached: 0, downloading: false };
+let progress: CacheProgress = { total: 0, cached: 0, failed: 0, downloading: false };
 const listeners = new Set<(p: CacheProgress) => void>();
 
 function setProgress(next: Partial<CacheProgress>) {
@@ -70,16 +78,12 @@ function cacheUrl(sheetUrl: string, version?: string | null): string {
   return sheetUrl + (sheetUrl.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(version || '');
 }
 
-async function getPdfCache(): Promise<Cache> {
-  // Prefer an existing egmc-pdfs-* cache (robust to SW version bumps).
-  try {
-    const keys = await caches.keys();
-    const existing = keys.find((k) => k.startsWith('egmc-pdfs-'));
-    return caches.open(existing || PDF_CACHE_FALLBACK);
-  } catch {
-    return caches.open(PDF_CACHE_FALLBACK);
-  }
+function getPdfCache(): Promise<Cache> {
+  return caches.open(PDF_CACHE);
 }
+
+// cache.match ignoring Vary so a Storage `Vary: Origin` can't hide an entry.
+const has = async (cache: Cache, url: string) => !!(await cache.match(url, { ignoreVary: true }));
 
 function waitWhileOffline(): Promise<void> {
   if (navigator.onLine) return Promise.resolve();
@@ -128,12 +132,17 @@ async function upcomingEventSongIds(opts: BackgroundCacheOpts): Promise<string[]
 async function buildQueue(
   opts: BackgroundCacheOpts
 ): Promise<{ p12: Song[]; p3: Song[] }> {
-  const { data: allSongs, error } = await supabase
-    .from('songs')
-    .select('id, title, sheet_music_url, created_at, updated_at')
-    .not('sheet_music_url', 'is', null)
-    .order('created_at', { ascending: false }); // Priority 3: newest first
-  if (error || !allSongs) return { p12: [], p3: [] };
+  // Whole library, newest first (priority 3 order). Online: fetch it and refresh
+  // the offline list snapshot (what Repertoire renders offline). Offline: use
+  // that snapshot, so status counts still work with no network.
+  let allSongs: Song[] | null = null;
+  try {
+    allSongs = await fetchAllSongs(supabase);
+    putOfflineData('songs', allSongs).catch(() => {});
+  } catch {
+    allSongs = (await getOfflineData('songs').catch(() => null)) as Song[] | null;
+  }
+  if (!allSongs) return { p12: [], p3: [] };
 
   const withSheet = (allSongs as Song[]).filter((s) => !!(s.sheet_music_url && s.sheet_music_url.trim()));
   const byId = new Map(withSheet.map((s) => [s.id, s]));
@@ -179,7 +188,7 @@ async function countCached(
 ): Promise<number> {
   let n = 0;
   for (const s of songs) {
-    if (s.sheet_music_url && (await cache.match(cacheUrl(s.sheet_music_url, s.updated_at)))) n++;
+    if (s.sheet_music_url && (await has(cache, cacheUrl(s.sheet_music_url, s.updated_at)))) n++;
   }
   return n;
 }
@@ -187,43 +196,57 @@ async function countCached(
 // ── Queue runner (concurrency BATCH_SIZE, paused while offline) ──
 let running = false;
 
-async function runQueue(queue: Song[]): Promise<void> {
-  if (running || !CACHES_OK || queue.length === 0) return;
+async function fetchWithTimeout(url: string): Promise<Response> {
+  const ctrl = new AbortController();
+  const t = window.setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  try { return await fetch(url, { signal: ctrl.signal }); } finally { window.clearTimeout(t); }
+}
+
+async function downloadOne(cache: Cache, song: Song): Promise<boolean> {
+  const url = cacheUrl(song.sheet_music_url!, song.updated_at);
+  try {
+    if (await has(cache, url)) return true;
+    const res = await fetchWithTimeout(url);
+    if (res.status !== 200) return false;
+    // The SW also stores it (network-first branch); writing here makes this
+    // independent of whether a SW controls the page.
+    await cache.put(url, res);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export interface RunResult { total: number; cached: number; failed: number }
+
+async function runQueue(queue: Song[]): Promise<RunResult> {
+  if (running || !CACHES_OK || queue.length === 0) return { ...progress };
   running = true;
   try {
     const cache = await getPdfCache();
 
-    const pending: Song[] = [];
+    let pending: Song[] = [];
     let cached = 0;
     for (const song of queue) {
-      if (await cache.match(cacheUrl(song.sheet_music_url!, song.updated_at))) cached++;
+      if (await has(cache, cacheUrl(song.sheet_music_url!, song.updated_at))) cached++;
       else pending.push(song);
     }
-    setProgress({ total: queue.length, cached, downloading: pending.length > 0 });
+    setProgress({ total: queue.length, cached, failed: 0, downloading: pending.length > 0 });
 
-    for (let i = 0; i < pending.length; i += BATCH_SIZE) {
-      await waitWhileOffline(); // pause immediately when offline, resume on online
-      const batch = pending.slice(i, i + BATCH_SIZE);
-      await Promise.all(
-        batch.map(async (song) => {
-          const url = cacheUrl(song.sheet_music_url!, song.updated_at);
-          try {
-            if (await cache.match(url)) {
-              setProgress({ cached: progress.cached + 1 });
-              return;
-            }
-            const res = await fetch(url);
-            if (res.ok) {
-              await cache.put(url, res.clone());
-              setProgress({ cached: progress.cached + 1 });
-            }
-          } catch {
-            /* leave uncached; retried next session */
-          }
-        })
-      );
-      if (i + BATCH_SIZE < pending.length) await sleep(BATCH_PAUSE_MS);
+    // Two passes: anything that failed in pass 1 (blip, timeout) is retried once.
+    for (let pass = 0; pass < 2 && pending.length; pass++) {
+      const failed: Song[] = [];
+      for (let i = 0; i < pending.length; i += BATCH_SIZE) {
+        await waitWhileOffline(); // pause while offline, resume on 'online'
+        const batch = pending.slice(i, i + BATCH_SIZE);
+        const ok = await Promise.all(batch.map((song) => downloadOne(cache, song)));
+        ok.forEach((good, k) => (good ? setProgress({ cached: progress.cached + 1 }) : failed.push(batch[k])));
+        if (i + BATCH_SIZE < pending.length) await sleep(BATCH_PAUSE_MS);
+      }
+      pending = failed;
+      setProgress({ failed: failed.length });
     }
+    return { total: progress.total, cached: progress.cached, failed: progress.failed };
   } finally {
     setProgress({ downloading: false });
     running = false;
@@ -245,8 +268,10 @@ export function startBackgroundCache(opts: BackgroundCacheOpts = {}): void {
   window.setTimeout(async () => {
     if (!navigator.onLine) return; // try again on the next app load
     try {
-      const { p12 } = await buildQueue(opts);
-      await runQueue(p12); // tiers 1-2 only
+      const { p12, p3 } = await buildQueue(opts);
+      // Member opted into the full library → resume it (new songs, edited
+      // sheets, earlier failures). Otherwise tiers 1-2 only.
+      await runQueue(isFullLibraryEnabled() ? [...p12, ...p3] : p12);
     } catch {
       /* never surface background errors to the user */
     }
@@ -257,10 +282,20 @@ export function startBackgroundCache(opts: BackgroundCacheOpts = {}): void {
  * Force-download the entire queue regardless of connection type. Backs the
  * "Download all now" button on the member Profile page.
  */
-export async function downloadAllNow(opts: BackgroundCacheOpts = {}): Promise<void> {
-  if (!CACHES_OK) return;
+export async function downloadAllNow(opts: BackgroundCacheOpts = {}): Promise<RunResult> {
+  if (!CACHES_OK) throw new Error('Offline storage is not available in this browser');
+  storageSet(FULL_LIBRARY_KEY, '1');
+  // Ask the browser not to evict ~500 sheets under storage pressure.
+  try { await navigator.storage?.persist?.(); } catch { /* best-effort */ }
+  // A background run may be in flight (auto tiers 1-2): let it finish, then run
+  // the full queue — otherwise runQueue would no-op and report stale numbers.
+  while (running) await sleep(500);
   const { p12, p3 } = await buildQueue(opts);
-  await runQueue([...p12, ...p3]);
+  return runQueue([...p12, ...p3]);
+}
+
+export function isFullLibraryEnabled(): boolean {
+  return storageGet(FULL_LIBRARY_KEY) === '1';
 }
 
 /**
