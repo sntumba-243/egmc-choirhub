@@ -43,7 +43,10 @@ export const MemberRepertoire = () => {
   const [viewingSong, setViewingSong] = useState<Song | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [searchParams] = useSearchParams();
+  // Dashboard "Favorites" links open /member/repertoire?tab=favorites. Read it
+  // at first render: the initial fetch below runs before an effect could flip it.
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(() => searchParams.get('tab') === 'favorites');
   const [showFilters, setShowFilters] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [sortBy, setSortBy] = useState<'a-z' | 'z-a' | 'recent'>('a-z');
@@ -53,8 +56,6 @@ export const MemberRepertoire = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [songStats, setSongStats] = useState({ total: 0, learned: 0, learning: 0, notStarted: 0 });
   const [statusMap, setStatusMap] = useState<Map<string, 'learned' | 'learning' | 'not_started'>>(new Map());
-
-  const [searchParams] = useSearchParams();
 
   const isPaginated = !debouncedSearch.trim() && statusFilter === 'all' && !showFavoritesOnly;
   const totalPages = isPaginated ? Math.ceil(totalCount / PAGE_SIZE) : 1;
@@ -74,7 +75,7 @@ export const MemberRepertoire = () => {
 
   // Initial data load
   useEffect(() => {
-    if (church?.id) { initData(); fetchFavorites(); fetchChurchSongs(); }
+    if (church?.id) { initData(); fetchChurchSongs(); }
   }, [church?.id]);
 
   // Refetch when page or filters change
@@ -83,9 +84,11 @@ export const MemberRepertoire = () => {
     fetchSongs(currentPage);
   }, [currentPage, debouncedSearch, languageFilter, sortBy, statusFilter, showFavoritesOnly]);
 
+  // Favorites are loaded BEFORE the first song fetch and passed in: the
+  // favorites filter must not run against the still-empty initial set.
   const initData = async () => {
-    const sm = await fetchStatsAndStatuses();
-    await fetchSongs(1, sm);
+    const [sm, favs] = await Promise.all([fetchStatsAndStatuses(), fetchFavorites()]);
+    await fetchSongs(1, sm, favs);
   };
 
   const fetchStatsAndStatuses = async () => {
@@ -118,7 +121,7 @@ export const MemberRepertoire = () => {
     }
   };
 
-  const fetchSongs = async (page: number, statuses?: Map<string, 'learned' | 'learning' | 'not_started'>) => {
+  const fetchSongs = async (page: number, statuses?: Map<string, 'learned' | 'learning' | 'not_started'>, favs?: Set<string>) => {
     if (!church?.id) return;
     setPageLoading(true);
     try {
@@ -175,7 +178,8 @@ export const MemberRepertoire = () => {
         result = result.filter(s => s.learning_status === statusFilter);
       }
       if (showFavoritesOnly) {
-        result = result.filter(s => favorites.has(s.id));
+        const fav = favs || favorites;
+        result = result.filter(s => fav.has(s.id));
       }
 
       setSongs(result);
@@ -209,7 +213,7 @@ export const MemberRepertoire = () => {
     return session?.user?.id || null;
   };
 
-  const fetchFavorites = async () => {
+  const fetchFavorites = async (): Promise<Set<string> | undefined> => {
     if (!user) return;
     try {
       const authUid = await getAuthUid();
@@ -217,12 +221,14 @@ export const MemberRepertoire = () => {
       const { data, error } = await supabase.from('user_favorites').select('song_id').eq('user_id', authUid);
       if (error) {
         const saved = (await getOfflineData('favorites:' + authUid)) as string[] | null;
-        if (saved) { setFavorites(new Set(saved)); return; }
+        if (saved) { const set = new Set<string>(saved); setFavorites(set); return set; }
         throw error;
       }
       const ids = data?.map(f => f.song_id) || [];
-      setFavorites(new Set(ids));
+      const set = new Set<string>(ids);
+      setFavorites(set);
       putOfflineData('favorites:' + authUid, ids).catch(() => {});
+      return set;
     } catch (error) {
       console.error('Error loading favorites:', error);
     }
