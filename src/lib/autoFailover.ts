@@ -22,6 +22,8 @@ export class AutoFailover {
     try {
       const cached = storageGet(FAILOVER_CACHE_KEY);
       this.status = cached ? JSON.parse(cached) : fallback;
+      // Never boot an offline session onto Neon (see initialize()).
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) this.status.usingNeon = false;
     } catch {
       this.status = fallback; // corrupt cache
     }
@@ -53,7 +55,18 @@ export class AutoFailover {
   }
 
   async initialize(): Promise<boolean> {
+    // OFFLINE ≠ SUPABASE DOWN. With no network the health check always fails,
+    // which used to flip (and PERSIST) usingNeon=true: the offline session then
+    // queried Neon (uncached → blank), and the next ONLINE launch read the
+    // persisted flag at module load and stayed on Neon for that whole session.
+    // When the device is offline, stay on Supabase (its responses are what the
+    // service worker caches) and don't touch the persisted status.
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      this.status = { ...this.status, usingNeon: false };
+      return false;
+    }
     const isHealthy = await this.checkSupabaseHealth();
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return false; // went offline mid-check
 
     this.status = {
       usingNeon: !isHealthy,

@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { sentryVitePlugin } from '@sentry/vite-plugin';
 import path from 'path';
-import { writeFileSync } from 'fs';
+import { writeFileSync, readFileSync, readdirSync, statSync } from 'fs';
 
 // One build version, written to version.json AND baked into the bundle so they
 // always match. A later deploy writes a NEWER version.json than the running
@@ -14,6 +14,41 @@ const versionPlugin = {
     writeFileSync('public/version.json', JSON.stringify({ version: BUILD_VERSION, timestamp: BUILD_VERSION }));
     console.log(`📦 Generated version.json: ${BUILD_VERSION}`);
   }
+};
+
+// Service-worker precache: after the bundle is written, inject this build's
+// version and the full list of built files into dist/service-worker.js so the
+// SW install caches the ENTIRE app shell (JS/CSS chunks, pdf.js worker, icons).
+// Without it, offline launches got index.html but none of its hashed assets.
+const SW_EXCLUDE = /(^|\/)(service-worker\.js|firebase-messaging-sw\.js|version\.json|index\.html)$|\.map$/;
+const swPrecachePlugin = {
+  name: 'sw-precache',
+  apply: 'build' as const,
+  closeBundle() {
+    const dist = path.resolve(__dirname, 'dist');
+    const files: string[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        const full = path.join(dir, name);
+        if (statSync(full).isDirectory()) walk(full);
+        else {
+          const rel = path.relative(dist, full).split(path.sep).join('/');
+          if (!SW_EXCLUDE.test(rel)) files.push('/' + rel);
+        }
+      }
+    };
+    walk(dist);
+    const swPath = path.join(dist, 'service-worker.js');
+    let sw = readFileSync(swPath, 'utf8');
+    if (!sw.includes('/*__PRECACHE_MANIFEST__*/[]') || !sw.includes("const SW_VERSION = 'dev';")) {
+      throw new Error('sw-precache: placeholders missing from public/service-worker.js');
+    }
+    sw = sw
+      .replace("const SW_VERSION = 'dev';", `const SW_VERSION = '${BUILD_VERSION}';`)
+      .replace('/*__PRECACHE_MANIFEST__*/[]', JSON.stringify(files.sort()));
+    writeFileSync(swPath, sw);
+    console.log(`🗂  SW precache: ${files.length} files injected (version ${BUILD_VERSION})`);
+  },
 };
 
 // Sentry source maps: uploaded only when SENTRY_AUTH_TOKEN is set (Vercel env
@@ -30,6 +65,7 @@ export default defineConfig({
   plugins: [
     react(),
     versionPlugin,
+    swPrecachePlugin,
     sentryVitePlugin({
       // Slugs, not IDs: override with SENTRY_ORG / SENTRY_PROJECT env vars if they differ.
       org: process.env.SENTRY_ORG || 'o4511217496227841',

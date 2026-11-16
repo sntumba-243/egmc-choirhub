@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Music, Trash2, HardDrive, Download, Clock, Award, Target, Phone, Camera, Save, ChevronRight, Upload, Loader2 } from 'lucide-react';
+import { User, Music, Trash2, HardDrive, Download, Clock, Award, Target, Phone, Camera, Save, ChevronRight, Upload } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { offlineStorage, OfflineSong } from '../../lib/offlineStorage';
 import { practiceLogService, PracticeLog } from '../../lib/practiceLog';
-import { getCacheStatus, downloadAllNow, subscribeCacheProgress } from '../../lib/backgroundCache';
+import { OfflineSongsCard } from '../../components/OfflineSongsCard';
 import toast from 'react-hot-toast';
 
 export const MemberProfile: React.FC = () => {
@@ -28,48 +28,12 @@ export const MemberProfile: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [showAvatarMenu, setShowAvatarMenu] = useState(false);
   const [showOffline, setShowOffline] = useState(false);
-  const [status, setStatus] = useState({ priority: { cached: 0, total: 0 }, full: { cached: 0, total: 0 } });
-  const [progress, setProgress] = useState({ cached: 0, total: 0 }); // live count of the running download
-  const [downloadingAll, setDownloadingAll] = useState(false);
-  const prevDownloadingRef = useRef(false);
 
   useEffect(() => {
     loadOfflineData();
     loadPracticeData();
     loadProfileData();
   }, [user]);
-
-  // READ-ONLY on mount: just report how many songs are already cached, then
-  // track live progress. Opening this page NEVER starts a download — only the
-  // explicit "Download all now" button (or the layout's background cacher) does.
-  useEffect(() => {
-    let unsub = () => {};
-    const opts = { userId: user?.id, churchId: (user as any)?.church_id };
-    getCacheStatus(opts).then(setStatus).catch(() => {});
-    unsub = subscribeCacheProgress((p) => {
-      setProgress({ cached: p.cached, total: p.total });
-      setDownloadingAll(p.downloading);
-      // When any download (button or background) finishes, refresh the counts.
-      if (prevDownloadingRef.current && !p.downloading) {
-        getCacheStatus(opts).then(setStatus).catch(() => {});
-      }
-      prevDownloadingRef.current = p.downloading;
-    });
-    return () => unsub();
-  }, [user?.id]);
-
-  const handleDownloadAll = async () => {
-    setDownloadingAll(true);
-    try {
-      await downloadAllNow({ userId: user?.id, churchId: (user as any)?.church_id });
-      setStatus(await getCacheStatus({ userId: user?.id, churchId: (user as any)?.church_id }));
-      toast.success('Songs saved for offline use');
-    } catch {
-      toast.error('Could not download all songs');
-    } finally {
-      setDownloadingAll(false);
-    }
-  };
 
   const loadProfileData = async () => {
     if (!user?.id) return;
@@ -286,33 +250,8 @@ export const MemberProfile: React.FC = () => {
         </div>
       </div>
 
-      {/* Offline songs (auto sheet-music pre-cache) */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center flex-shrink-0">
-            <Download className="w-3.5 h-3.5 text-gray-500" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-900">Offline songs</p>
-            <p className="text-xs text-gray-400">
-              Sunday-ready: {status.priority.cached}/{status.priority.total} · Full library: {status.full.cached}/{status.full.total}
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={handleDownloadAll}
-          disabled={downloadingAll || status.full.total === 0 || status.full.cached >= status.full.total}
-          className="px-4 min-h-[44px] rounded-lg text-white text-xs font-semibold disabled:opacity-50 flex-shrink-0 flex items-center gap-1.5"
-          style={{ background: 'linear-gradient(135deg, #FF8C42, #E85D26)' }}
-        >
-          {downloadingAll && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-          {downloadingAll
-            ? `Downloading… ${progress.cached}/${progress.total}`
-            : status.full.total > 0 && status.full.cached >= status.full.total
-            ? 'All saved'
-            : 'Download all now'}
-        </button>
-      </div>
+      {/* Offline songs (auto sheet-music pre-cache) — shared with admin / super-admin Settings */}
+      <OfflineSongsCard />
 
       {/* Offline Downloads - Collapsible */}
       <div className="bg-white rounded-xl border border-gray-200">

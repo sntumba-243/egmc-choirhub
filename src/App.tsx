@@ -12,7 +12,6 @@ import toast from 'react-hot-toast';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import IOSInstallPrompt from './components/IOSInstallPrompt';
 import UpdateBanner from './components/UpdateBanner';
-import EnhancedOfflineIndicator from './components/EnhancedOfflineIndicator';
 import { NativeUpdateBanner } from './components/NativeUpdateBanner';
 
 // Firebase Notifications
@@ -125,7 +124,6 @@ function App() {
       <PWAInstallPrompt />
       <IOSInstallPrompt />
       <UpdateBanner />
-      <EnhancedOfflineIndicator />
       <NativeUpdateBanner />
     </ChurchProvider>
     </AuthProvider>

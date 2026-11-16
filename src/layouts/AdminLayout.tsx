@@ -4,11 +4,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { useChurch } from '../contexts/ChurchContext';
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { startBackgroundCache } from '../lib/backgroundCache';
 
 export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const { church } = useChurch();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -19,6 +20,17 @@ export default function AdminLayout() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Offline sheet music, same as the member portal: on each app open, quietly
+  // save upcoming-event songs and favorites (and their setlists / favorites
+  // lists for offline pages), and refresh saved copies whose file changed. The
+  // full library only if this device chose it in Settings. At most once per app
+  // open. See lib/backgroundCache.
+  useEffect(() => {
+    if (user?.id) {
+      startBackgroundCache({ userId: user.id, churchId: (user as any)?.church_id || church?.id });
+    }
+  }, [user?.id]);
 
   const handleLogout = async () => {
     try {

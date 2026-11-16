@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 
 import { formatEventDates } from '../../lib/eventDates';
 import { fetchRsvps } from '../../lib/rsvps';
+import { getSavedEvent } from '../../lib/backgroundCache';
 interface Event {
   id: string;
   title: string;
@@ -61,7 +62,14 @@ export const EventDetail = () => {
         .eq('id', eventId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // Offline and not cached: the event saved on this device (upcoming
+        // events only — lib/backgroundCache).
+        const saved = eventId ? await getSavedEvent(eventId) : null;
+        if (!saved) throw error;
+        setEvent(saved.event);
+        return;
+      }
       setEvent(eventData);
     } catch (error) {
       console.error('Error:', error);
@@ -90,7 +98,14 @@ export const EventDetail = () => {
         .eq('event_id', eventId)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        // Offline and not cached: the setlist saved on this device for upcoming
+        // events (lib/backgroundCache).
+        const saved = eventId ? await getSavedEvent(eventId) : null;
+        if (!saved) throw error;
+        setEventSongs(saved.eventSongs as any);
+        return;
+      }
       setEventSongs(data || []);
     } catch (error) {
       console.error('Error loading event songs:', error);

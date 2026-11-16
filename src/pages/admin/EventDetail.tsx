@@ -10,6 +10,7 @@ import SheetMusicViewer from '../../components/SheetMusicViewer';
 import { formatEventDates } from '../../lib/eventDates';
 import { dbErrorMessage } from '../../lib/dbError';
 import { fetchRsvps } from '../../lib/rsvps';
+import { getSavedEvent } from '../../lib/backgroundCache';
 interface Event {
   id: string;
   title: string;
@@ -68,7 +69,15 @@ export const AdminEventDetail = () => {
         fetchRsvps(id ? [id] : []), // same RSVP definition as the Events card (lib/rsvps)
       ]);
 
-      if (eventRes.error) throw eventRes.error;
+      if (eventRes.error) {
+        // Offline and not cached: the event saved on this device (upcoming
+        // events only — lib/backgroundCache). RSVPs aren't saved offline.
+        const saved = id ? await getSavedEvent(id) : null;
+        if (!saved) throw eventRes.error;
+        setEvent(saved.event);
+        setRsvps([]);
+        return;
+      }
 
       // Verify event belongs to user's church (unless global)
       if (eventRes.data && !eventRes.data.is_global && user?.church_id && eventRes.data.church_id !== user.church_id) {
@@ -132,7 +141,14 @@ export const AdminEventDetail = () => {
         .eq('event_id', id)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        // Offline and not cached: the setlist saved on this device for upcoming
+        // events (lib/backgroundCache).
+        const saved = id ? await getSavedEvent(id) : null;
+        if (!saved) throw error;
+        setEventSongs(saved.eventSongs as any);
+        return;
+      }
       setEventSongs(data || []);
     } catch (error) {
       console.error('Error loading event songs:', error);

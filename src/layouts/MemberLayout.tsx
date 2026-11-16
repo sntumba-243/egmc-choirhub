@@ -17,8 +17,10 @@ export default function MemberLayout() {
 
   useEffect(() => { setSidebarOpen(false); }, [location]);
 
-  // Quietly pre-cache song PDFs for offline use once the member is authed
-  // (member portal only). Runs at most once per session.
+  // Offline sheet music: on each app open, quietly save upcoming-event songs and
+  // favorites, and refresh saved copies whose file changed. The full library is
+  // downloaded only if the member chose it on Profile. Member portal only; at
+  // most once per app open. See lib/backgroundCache.
   useEffect(() => {
     if (user?.id) {
       startBackgroundCache({ userId: user.id, churchId: (user as any)?.church_id || church?.id });
@@ -173,6 +175,7 @@ export default function MemberLayout() {
           <Outlet />
         </div>
       </main>
+
 
       <style>{`
         @supports (padding-top: env(safe-area-inset-top)) {

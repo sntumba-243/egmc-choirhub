@@ -1,20 +1,51 @@
-// Background PDF pre-caching for ChoirHub member portal.
+// Offline sheet music: what each device saves, and keeping it current.
 //
-// Quietly downloads song sheet-music PDFs (directly from their Supabase Storage
-// URL) into the service worker's PDF cache while the member is online, so
-// previously unopened songs still work offline. Invisible during normal use —
-// the only surface is the "Offline songs" row on the member Profile page.
+// On every app open while online — member, admin and super-admin portals alike
+// (each layout calls startBackgroundCache) — this:
+//   1. fetches, in ONE request each: the song list, the bucket manifest
+//      (partition_manifest(): file name + etag), upcoming events + their
+//      setlists, and the signed-in person's favorites — and keeps a snapshot of
+//      the song list, the upcoming events + setlists and the favorites in
+//      IndexedDB (lib/offlineCache) so Repertoire, event setlists and Favorites
+//      render offline;
+//   2. drops saved copies of songs that no longer exist (or whose sheet moved);
+//   3. downloads, in this order:
+//        • songs on ALL upcoming events the person can see — always;
+//        • their favorites — always;
+//        • any OTHER song already saved on this device whose file changed;
+//        • the rest of the library — ONLY if this device chose the full
+//          library ("Download all now": member Profile, admin / super-admin
+//          Settings — components/OfflineSongsCard). Never automatic: the library
+//          is ~175 MB per device and Storage egress is metered.
+// A chosen full download that gets interrupted resumes on the next online open
+// (saved files are skipped — never restarts from zero). Those automatic
+// resumes wait for Wi-Fi where the browser reports a cellular connection
+// (Android Chrome) until the full library has completed once; event songs and
+// favorites never wait. A tap on Profile always downloads right away.
 //
-// The cache key MUST match SheetMusicViewer.getDirectUrl exactly (Storage URL +
-// version param) so the entries this writes are the ones the viewer requests.
+// CHANGE DETECTION: songs are usually fixed by replacing the PDF in the bucket
+// under the SAME name without touching the songs row, so the cache key (URL +
+// songs.updated_at, see SheetMusicViewer.getDirectUrl) doesn't change. Each
+// saved PDF therefore carries the bucket etag it was downloaded at (header
+// X-ChoirHub-ETag on the cached copy); a different etag in the manifest means
+// "re-download". Storage doesn't expose its ETag header to the browser, which
+// is why the etag comes from the manifest and is stored by us.
+//
+// The cache key MUST match SheetMusicViewer.getDirectUrl exactly so the copies
+// this writes are the ones the viewer requests offline.
 
 import { supabase } from './supabase';
+import { fetchAllSongs, getOfflineData, putOfflineData } from './offlineCache';
+import { storageGet, storageSet } from './safeStorage';
+import { getAuthUid } from './authUid';
 
 // ── Types ──
 export interface CacheProgress {
   total: number;
   cached: number;
+  failed: number;          // failed this run (network/HTTP error) — retried on the next open
   downloading: boolean;
+  waitingForWifi: boolean; // first full download paused on a cellular connection
 }
 
 interface Song {
@@ -25,24 +56,46 @@ interface Song {
   updated_at?: string | null;
 }
 
+interface Item {
+  song: Song;
+  key: string;           // cache key = viewer URL
+  etag: string | null;   // bucket etag; null when the manifest is unavailable (offline)
+  gated: boolean;        // may wait for Wi-Fi (rest-of-library tier, first full download only)
+}
+
+interface Plan {
+  event: Item[];
+  fav: Item[];
+  rest: Item[];
+  online: boolean;       // song list AND manifest came from the network (safe to prune)
+}
+
 export interface BackgroundCacheOpts {
   userId?: string;
   churchId?: string;
 }
 
 // ── Constants ──
-// Fallback must track SW_VERSION in public/service-worker.js; getPdfCache()
-// prefers any existing egmc-pdfs-* cache so a version bump doesn't orphan data.
-const PDF_CACHE_FALLBACK = 'egmc-pdfs-2.0.0';
-const START_DELAY_MS = 8000;
+// STABLE name shared with public/service-worker.js (PDF_CACHE).
+const PDF_CACHE = 'egmc-pdfs';
+export const ETAG_HEADER = 'X-ChoirHub-ETag';
+// Set when the member taps "Download all now" on Profile: from then on this
+// device keeps the WHOLE library (new songs included). Without it, only event
+// songs, favorites and already-saved songs are kept.
+const FULL_LIBRARY_KEY = 'choirhub_offline_full_library';
+// Set once the whole library has been saved on this device (ends the Wi-Fi wait).
+const FULL_DONE_KEY = 'choirhub_offline_full_done';
+const BUCKET_PATH = '/storage/v1/object/public/choirhub_partitions/';
+const FETCH_TIMEOUT_MS = 60000;
+const START_DELAY_MS = 4000;
 const BATCH_SIZE = 2;
-const BATCH_PAUSE_MS = 500;
+const BATCH_PAUSE_MS = 300;
 const CACHES_OK = typeof caches !== 'undefined';
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 // ── Progress store (tiny emitter) ──
-let progress: CacheProgress = { total: 0, cached: 0, downloading: false };
+let progress: CacheProgress = { total: 0, cached: 0, failed: 0, downloading: false, waitingForWifi: false };
 const listeners = new Set<(p: CacheProgress) => void>();
 
 function setProgress(next: Partial<CacheProgress>) {
@@ -64,21 +117,35 @@ export function subscribeCacheProgress(fn: (p: CacheProgress) => void): () => vo
 }
 
 // ── Helpers ──
-// Must match SheetMusicViewer.getDirectUrl exactly so the pre-cached key is the
-// one the viewer later requests (Storage URL + version param).
+// Same string SheetMusicViewer.getDirectUrl builds, normalised the way the
+// Cache API normalises request URLs (so keys compare equal when pruning).
 function cacheUrl(sheetUrl: string, version?: string | null): string {
-  return sheetUrl + (sheetUrl.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(version || '');
+  const raw = sheetUrl + (sheetUrl.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(version || '');
+  try { return new URL(raw).href; } catch { return raw; }
 }
 
-async function getPdfCache(): Promise<Cache> {
-  // Prefer an existing egmc-pdfs-* cache (robust to SW version bumps).
-  try {
-    const keys = await caches.keys();
-    const existing = keys.find((k) => k.startsWith('egmc-pdfs-'));
-    return caches.open(existing || PDF_CACHE_FALLBACK);
-  } catch {
-    return caches.open(PDF_CACHE_FALLBACK);
-  }
+// Download URL: same file, with `_dl=<etag>` so that
+//  • the service worker passes it straight to the network (it would otherwise
+//    store an un-tagged copy), and
+//  • each file VERSION has its own URL. Storage sits behind a CDN that caches
+//    every URL for an hour and purges a replaced file only after a short delay;
+//    re-using the viewer URL right after a replacement could fetch the OLD
+//    bytes and store them under the NEW etag — stale forever. A URL that
+//    contains the new etag can't be answered from the old version's CDN entry.
+const downloadUrl = (it: Item) =>
+  it.key + '&_dl=' + encodeURIComponent((it.etag || '').replace(/"/g, '') || String(Date.now()));
+
+function objectName(sheetUrl: string): string | null {
+  const i = sheetUrl.indexOf(BUCKET_PATH);
+  if (i < 0) return null;
+  const path = sheetUrl.slice(i + BUCKET_PATH.length).split(/[?#]/)[0];
+  try { return decodeURIComponent(path); } catch { return path; }
+}
+
+function localYmd(d = new Date()): string {
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
 }
 
 function waitWhileOffline(): Promise<void> {
@@ -92,161 +159,306 @@ function waitWhileOffline(): Promise<void> {
   });
 }
 
-// ── Priority 1: songs in local setlists tied to events in the next 14 days ──
-// Setlists live in localStorage (no event_songs DB table), so this tier is
-// best-effort and silently empty when the device has no local setlists.
-async function upcomingEventSongIds(opts: BackgroundCacheOpts): Promise<string[]> {
-  let setlists: Array<{ eventId?: string; songIds?: string[] }> = [];
+// Android Chrome reports the connection type; iOS Safari / desktop don't (→ not cellular).
+function onCellular(): boolean {
+  const type = (navigator as any).connection?.type;
+  return type === 'cellular' || type === 'bluetooth' || type === 'wimax';
+}
+
+let wifiOverride = false; // the member tapped Download/Resume/Retry: don't wait for Wi-Fi
+
+async function waitForWifi(): Promise<void> {
+  if (!onCellular() || wifiOverride) return;
+  setProgress({ waitingForWifi: true });
+  while (onCellular() && !wifiOverride) await sleep(2000);
+  setProgress({ waitingForWifi: false });
+}
+
+const isFullDone = () => storageGet(FULL_DONE_KEY) === '1';
+export const isFullLibraryEnabled = () => storageGet(FULL_LIBRARY_KEY) === '1';
+
+// ── Data for the plan (one request per kind, never one per song) ──
+async function fetchManifest(): Promise<Map<string, string> | null> {
+  // The exported client can be the Neon failover client, which has no rpc():
+  // then there's no manifest and saved copies are simply kept as they are.
+  const client = supabase as any;
+  if (typeof client.rpc !== 'function') return null;
   try {
-    const raw = localStorage.getItem('choir_setlists');
-    setlists = raw ? JSON.parse(raw) : [];
+    const { data, error } = await client.rpc('partition_manifest');
+    if (error || !Array.isArray(data)) return null;
+    return new Map((data as Array<{ name: string; etag: string | null }>).map((o) => [o.name, o.etag || '']));
   } catch {
-    return [];
+    return null;
   }
-  const withEvent = setlists.filter(
-    (s) => s.eventId && Array.isArray(s.songIds) && s.songIds.length > 0
-  );
-  if (!withEvent.length) return [];
+}
 
-  const now = new Date();
-  const todayStr = now.toISOString().slice(0, 10);
-  const in14Str = new Date(now.getTime() + 14 * 864e5).toISOString().slice(0, 10);
+// Offline snapshots are per signed-in person (favorites and visible events
+// differ). Key = auth user id — NOT user.id from the app, which is members.id and
+// differs from the auth id for about half the accounts (lib/authUid).
+const favKey = (uid: string) => 'favorites:' + uid;
+const setlistKey = (uid: string) => 'setlists:' + uid;
 
-  let query = supabase.from('events').select('id, date').gte('last_date', todayStr).lte('date', in14Str);
-  if (opts.churchId) query = query.or(`church_id.eq.${opts.churchId},is_global.eq.true`);
-  const { data: events } = await query;
+interface SetlistSnapshot {
+  events: any[];                                                  // full event rows
+  rows: Array<{ id: string; event_id: string; song_id: string; song_order: number | null; created_at: string | null }>;
+}
 
-  const upcoming = new Set((events || []).map((e: any) => e.id));
-  const ids: string[] = [];
-  withEvent.forEach((s) => {
-    if (s.eventId && upcoming.has(s.eventId)) ids.push(...(s.songIds || []));
-  });
+// Songs on the setlists of ALL upcoming events this person can see. RLS on
+// `events` decides which: a member/admin sees their church's events + global
+// events targeted at it; a super admin sees every church's. Ordered by event
+// date, then setlist order. Also saves the events + setlists for offline use.
+async function upcomingEventSongIds(uid: string | null): Promise<string[]> {
+  const { data: events, error } = await supabase
+    .from('events')
+    .select('*')
+    .gte('last_date', localYmd())
+    .order('date', { ascending: true })
+    .limit(500);
+  if (error || !events) return [];
+  const rank = new Map((events as any[]).map((e, i) => [e.id, i]));
+  let rows: SetlistSnapshot['rows'] = [];
+  if (events.length) {
+    const { data, error: e2 } = await supabase
+      .from('event_songs')
+      .select('id, event_id, song_id, song_order, created_at')
+      .in('event_id', [...rank.keys()]);
+    if (e2 || !data) return [];
+    rows = data as SetlistSnapshot['rows'];
+  }
+  if (uid) putOfflineData(setlistKey(uid), { events, rows } satisfies SetlistSnapshot).catch(() => {});
+  return rows
+    .slice()
+    .sort((a, b) => (rank.get(a.event_id)! - rank.get(b.event_id)!) || ((a.song_order ?? 0) - (b.song_order ?? 0)))
+    .map((r) => r.song_id);
+}
+
+// user_favorites.user_id is the AUTH user id (RLS: auth.uid() = user_id).
+async function favoriteSongIds(uid: string | null): Promise<string[]> {
+  if (!uid) return [];
+  const { data, error } = await supabase.from('user_favorites').select('song_id').eq('user_id', uid);
+  if (error || !data) return [];
+  const ids = (data as any[]).map((f) => f.song_id);
+  putOfflineData(favKey(uid), ids).catch(() => {});
   return ids;
 }
 
-// ── Build the prioritized, de-duplicated queue ──
-async function buildQueue(
-  opts: BackgroundCacheOpts
-): Promise<{ p12: Song[]; p3: Song[] }> {
-  const { data: allSongs, error } = await supabase
-    .from('songs')
-    .select('id, title, sheet_music_url, created_at, updated_at')
-    .not('sheet_music_url', 'is', null)
-    .order('created_at', { ascending: false }); // Priority 3: newest first
-  if (error || !allSongs) return { p12: [], p3: [] };
+// ── Build the prioritized, de-duplicated plan ──
+// opts is unused since favorites are keyed by the auth id (getAuthUid), not opts.userId (members.id).
+async function buildPlan(_opts: BackgroundCacheOpts): Promise<Plan> {
+  // Whole library, newest first. Online: also refresh the offline list snapshot
+  // (what Repertoire renders offline). Offline: use that snapshot.
+  let allSongs: Song[] | null = null;
+  let songsOnline = false;
+  try {
+    allSongs = await fetchAllSongs(supabase);
+    songsOnline = true;
+    putOfflineData('songs', allSongs).catch(() => {});
+  } catch {
+    allSongs = (await getOfflineData('songs').catch(() => null)) as Song[] | null;
+  }
+  if (!allSongs) return { event: [], fav: [], rest: [], online: false };
 
-  const withSheet = (allSongs as Song[]).filter((s) => !!(s.sheet_music_url && s.sheet_music_url.trim()));
-  const byId = new Map(withSheet.map((s) => [s.id, s]));
+  const uid = await getAuthUid().catch(() => null);
+  const [manifest, eventIds, favIds] = await Promise.all([
+    fetchManifest(),
+    upcomingEventSongIds(uid).catch(() => [] as string[]),
+    favoriteSongIds(uid).catch(() => [] as string[]),
+  ]);
 
-  const seen = new Set<string>();
-  const priority: Song[] = [];
-  const push = (id: string) => {
-    const song = byId.get(id);
-    if (song && !seen.has(id)) {
-      seen.add(id);
-      priority.push(song);
+  const toItem = (s: Song): Item | null => {
+    if (!s.sheet_music_url?.trim()) return null;
+    let etag: string | null = null;
+    if (manifest) {
+      const name = objectName(s.sheet_music_url);
+      // Online and the file isn't in the bucket: nothing to download (it would fail every time).
+      if (name !== null) {
+        if (!manifest.has(name)) return null;
+        etag = manifest.get(name)!;
+      }
     }
+    return { song: s, key: cacheUrl(s.sheet_music_url, s.updated_at), etag, gated: false };
   };
 
-  // Priority 1 — upcoming-event songs
-  try {
-    (await upcomingEventSongIds(opts)).forEach(push);
-  } catch {
-    /* skip tier on any failure */
+  const byId = new Map<string, Item>();
+  for (const s of allSongs) {
+    const it = toItem(s);
+    if (it) byId.set(s.id, it);
   }
 
-  // Priority 2 — member favorites
-  if (opts.userId) {
-    try {
-      const { data: favs } = await supabase
-        .from('user_favorites')
-        .select('song_id')
-        .eq('user_id', opts.userId);
-      (favs || []).forEach((f: any) => push(f.song_id));
-    } catch {
-      /* skip tier */
+  const seen = new Set<string>();
+  const take = (ids: string[]) => {
+    const out: Item[] = [];
+    for (const id of ids) {
+      const it = byId.get(id);
+      if (it && !seen.has(id)) { seen.add(id); out.push(it); }
     }
-  }
-
-  // Priority 3 — everything else (already newest-first)
-  const p3 = withSheet.filter((s) => !seen.has(s.id));
-  return { p12: priority, p3 };
+    return out;
+  };
+  const event = take(eventIds);
+  const fav = take(favIds);
+  const rest = [...byId.values()].filter((it) => !seen.has(it.song.id)).map((it) => ({ ...it, gated: true }));
+  return { event, fav, rest, online: songsOnline && !!manifest };
 }
 
-async function countCached(
-  cache: Cache,
-  songs: Array<{ sheet_music_url: string | null; updated_at?: string | null }>
-): Promise<number> {
-  let n = 0;
-  for (const s of songs) {
-    if (s.sheet_music_url && (await cache.match(cacheUrl(s.sheet_music_url, s.updated_at)))) n++;
+// ── Saved-copy state ──
+type State = 'current' | 'stale' | 'missing';
+
+async function stateOf(cache: Cache, it: Item): Promise<State> {
+  const r = await cache.match(it.key, { ignoreVary: true });
+  if (!r) return 'missing';
+  if (it.etag === null) return 'current'; // offline: can't compare, the saved copy is what we have
+  return r.headers.get(ETAG_HEADER) === it.etag ? 'current' : 'stale';
+}
+
+// Remove saved copies that no song points to any more (song deleted, sheet
+// moved, songs.updated_at changed → new key). Only with a complete online plan.
+async function prune(cache: Cache, plan: Plan): Promise<number> {
+  if (!plan.online) return 0;
+  const keep = new Set([...plan.event, ...plan.fav, ...plan.rest].map((it) => it.key));
+  let removed = 0;
+  for (const req of await cache.keys()) {
+    if (!keep.has(req.url)) {
+      await cache.delete(req, { ignoreVary: true });
+      removed++;
+    }
   }
-  return n;
+  return removed;
 }
 
 // ── Queue runner (concurrency BATCH_SIZE, paused while offline) ──
 let running = false;
 
-async function runQueue(queue: Song[]): Promise<void> {
-  if (running || !CACHES_OK || queue.length === 0) return;
+async function fetchWithTimeout(url: string): Promise<Response> {
+  const ctrl = new AbortController();
+  const t = window.setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  try { return await fetch(url, { signal: ctrl.signal, cache: 'no-store' }); } finally { window.clearTimeout(t); }
+}
+
+async function downloadOne(cache: Cache, it: Item): Promise<boolean> {
+  try {
+    const res = await fetchWithTimeout(downloadUrl(it));
+    if (res.status !== 200) return false;
+    const body = await res.blob();
+    await cache.put(it.key, new Response(body, {
+      status: 200,
+      headers: {
+        'Content-Type': res.headers.get('content-type') || 'application/pdf',
+        [ETAG_HEADER]: it.etag || '',
+      },
+    }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export interface RunResult { total: number; cached: number; failed: number }
+
+async function runQueue(queue: Item[], gateForWifi: boolean): Promise<RunResult> {
+  const cache = await caches.open(PDF_CACHE);
+  let pending: Item[] = [];
+  let cached = 0;
+  for (const it of queue) {
+    if ((await stateOf(cache, it)) === 'current') cached++;
+    else pending.push(it);
+  }
+  setProgress({ total: queue.length, cached, failed: 0, downloading: pending.length > 0 });
+
+  // Two passes: anything that failed in pass 1 (blip, timeout) is retried once.
+  for (let pass = 0; pass < 2 && pending.length; pass++) {
+    const failed: Item[] = [];
+    for (let i = 0; i < pending.length; ) {
+      await waitWhileOffline(); // pause while offline, resume on 'online'
+      // A batch never mixes event songs/favorites with rest-of-library songs:
+      // otherwise an event song paired with a gated song would wait for Wi-Fi too.
+      let end = i + 1;
+      while (end < pending.length && end - i < BATCH_SIZE && pending[end].gated === pending[i].gated) end++;
+      const batch = pending.slice(i, end);
+      if (gateForWifi && batch[0].gated) await waitForWifi();
+      const ok = await Promise.all(batch.map((it) => downloadOne(cache, it)));
+      ok.forEach((good, k) => (good ? setProgress({ cached: progress.cached + 1 }) : failed.push(batch[k])));
+      i = end;
+      if (i < pending.length) await sleep(BATCH_PAUSE_MS);
+    }
+    pending = failed;
+    setProgress({ failed: failed.length });
+  }
+  return { total: progress.total, cached: progress.cached, failed: progress.failed };
+}
+
+async function sync(opts: BackgroundCacheOpts, gateForWifi: boolean): Promise<RunResult> {
+  if (!CACHES_OK) return { total: 0, cached: 0, failed: 0 };
+  while (running) await sleep(500);
   running = true;
   try {
-    const cache = await getPdfCache();
-
-    const pending: Song[] = [];
-    let cached = 0;
-    for (const song of queue) {
-      if (await cache.match(cacheUrl(song.sheet_music_url!, song.updated_at))) cached++;
-      else pending.push(song);
+    const plan = await buildPlan(opts);
+    const cache = await caches.open(PDF_CACHE);
+    await prune(cache, plan);
+    const full = isFullLibraryEnabled();
+    const queue = [...plan.event, ...plan.fav];
+    if (full) {
+      queue.push(...plan.rest);
+    } else {
+      // Not chosen: keep what is already saved current, add nothing new.
+      for (const it of plan.rest) if ((await stateOf(cache, it)) === 'stale') queue.push(it);
     }
-    setProgress({ total: queue.length, cached, downloading: pending.length > 0 });
-
-    for (let i = 0; i < pending.length; i += BATCH_SIZE) {
-      await waitWhileOffline(); // pause immediately when offline, resume on online
-      const batch = pending.slice(i, i + BATCH_SIZE);
-      await Promise.all(
-        batch.map(async (song) => {
-          const url = cacheUrl(song.sheet_music_url!, song.updated_at);
-          try {
-            if (await cache.match(url)) {
-              setProgress({ cached: progress.cached + 1 });
-              return;
-            }
-            const res = await fetch(url);
-            if (res.ok) {
-              await cache.put(url, res.clone());
-              setProgress({ cached: progress.cached + 1 });
-            }
-          } catch {
-            /* leave uncached; retried next session */
-          }
-        })
-      );
-      if (i + BATCH_SIZE < pending.length) await sleep(BATCH_PAUSE_MS);
-    }
+    if (!queue.length) return { total: 0, cached: 0, failed: 0 };
+    const result = await runQueue(queue, gateForWifi && !isFullDone());
+    if (full && plan.online && result.total > 0 && result.cached >= result.total) storageSet(FULL_DONE_KEY, '1');
+    return result;
   } finally {
-    setProgress({ downloading: false });
+    setProgress({ downloading: false, waitingForWifi: false });
     running = false;
   }
+}
+
+// ── Saved data for offline pages ──
+
+/** Favorite song ids saved for the signed-in person (null if never saved). */
+export async function getSavedFavoriteIds(): Promise<string[] | null> {
+  const uid = await getAuthUid().catch(() => null);
+  if (!uid) return null;
+  return ((await getOfflineData(favKey(uid)).catch(() => null)) as string[] | null) || null;
+}
+
+/**
+ * An upcoming event and its setlist from the saved snapshot, shaped like the
+ * event pages' own queries (event row; event_songs rows with a `songs` object,
+ * in created_at order). null if this event wasn't saved on this device.
+ */
+export async function getSavedEvent(eventId: string): Promise<{ event: any; eventSongs: any[] } | null> {
+  const uid = await getAuthUid().catch(() => null);
+  if (!uid || !eventId) return null;
+  const snap = (await getOfflineData(setlistKey(uid)).catch(() => null)) as SetlistSnapshot | null;
+  const event = snap?.events?.find((e) => e.id === eventId);
+  if (!event) return null;
+  const songs = ((await getOfflineData('songs').catch(() => null)) as Song[] | null) || [];
+  const byId = new Map(songs.map((s) => [s.id, s]));
+  const eventSongs = snap!.rows
+    .filter((r) => r.event_id === eventId && byId.has(r.song_id))
+    .sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')))
+    .map((r) => ({ id: r.id, song_id: r.song_id, songs: byId.get(r.song_id) }));
+  return { event, eventSongs };
 }
 
 // ── Public API ──
 let autoStarted = false;
 
 /**
- * Auto background caching. Starts 8s after app load, online only. Caches ONLY
- * priority tiers 1–2 (upcoming-event setlist + favorites), regardless of
- * connection type — the full library is opt-in via the Profile "Download all
- * now" button. Safe to call repeatedly — runs at most once/session.
+ * Called by the member, admin and super-admin layouts once someone is signed
+ * in. Once per app open:
+ * waits until online, then syncs (prune → event songs, favorites, changed saved
+ * files; plus the rest of the library only if this device chose it).
  */
 export function startBackgroundCache(opts: BackgroundCacheOpts = {}): void {
   if (autoStarted || !CACHES_OK) return;
   autoStarted = true;
+  // Ask the browser not to evict saved sheets under storage pressure.
+  try { navigator.storage?.persist?.(); } catch { /* best-effort */ }
   window.setTimeout(async () => {
-    if (!navigator.onLine) return; // try again on the next app load
     try {
-      const { p12 } = await buildQueue(opts);
-      await runQueue(p12); // tiers 1-2 only
+      await waitWhileOffline();
+      await sync(opts, true);
     } catch {
       /* never surface background errors to the user */
     }
@@ -254,30 +466,36 @@ export function startBackgroundCache(opts: BackgroundCacheOpts = {}): void {
 }
 
 /**
- * Force-download the entire queue regardless of connection type. Backs the
- * "Download all now" button on the member Profile page.
+ * "Download all now / Resume / Retry" (components/OfflineSongsCard): this device chooses the full
+ * library, and it downloads now without waiting for Wi-Fi (explicit tap).
  */
-export async function downloadAllNow(opts: BackgroundCacheOpts = {}): Promise<void> {
-  if (!CACHES_OK) return;
-  const { p12, p3 } = await buildQueue(opts);
-  await runQueue([...p12, ...p3]);
+export async function downloadAllNow(opts: BackgroundCacheOpts = {}): Promise<RunResult> {
+  if (!CACHES_OK) throw new Error('Offline storage is not available in this browser');
+  storageSet(FULL_LIBRARY_KEY, '1');
+  wifiOverride = true;
+  try { await navigator.storage?.persist?.(); } catch { /* best-effort */ }
+  return sync(opts, false);
 }
 
 /**
- * READ-ONLY offline status: how many songs are already in the PDF cache, out of
- * the total that have a sheet. Opens the cache and runs cache.match only — ZERO
- * fetches, ZERO downloads. Safe to call on page mount (e.g. the Profile page).
+ * READ-ONLY status for the offline songs card: how many sheets are saved AND current,
+ * for upcoming-event songs and for the whole library. No downloads.
  */
 export async function getCacheStatus(
   opts: BackgroundCacheOpts = {}
 ): Promise<{ priority: { cached: number; total: number }; full: { cached: number; total: number } }> {
   const empty = { priority: { cached: 0, total: 0 }, full: { cached: 0, total: 0 } };
   if (!CACHES_OK) return empty;
-  const { p12, p3 } = await buildQueue(opts); // read-only (DB reads); no fetches
-  const all = [...p12, ...p3];
-  const cache = await getPdfCache();
+  const plan = await buildPlan(opts);
+  const cache = await caches.open(PDF_CACHE);
+  const count = async (items: Item[]) => {
+    let n = 0;
+    for (const it of items) if ((await stateOf(cache, it)) === 'current') n++;
+    return n;
+  };
+  const all = [...plan.event, ...plan.fav, ...plan.rest];
   return {
-    priority: { cached: await countCached(cache, p12), total: p12.length }, // Sunday-ready (tiers 1-2)
-    full: { cached: await countCached(cache, all), total: all.length },     // whole library
+    priority: { cached: await count(plan.event), total: plan.event.length }, // "Event songs ready"
+    full: { cached: await count(all), total: all.length },
   };
 }
