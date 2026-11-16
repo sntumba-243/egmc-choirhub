@@ -2,9 +2,10 @@
  * choirhub.us — automatic failover worker
  * ────────────────────────────────────────────────────────────────────────────
  * Sits in front of choirhub.us (bound via a Workers Route). Every request goes
- * to Vercel (the live app) first. If Vercel is DOWN — network error, timeout, or
- * a 5xx server error — the same path is served from the certified static mirror
- * on Workers instead, so the site stays up.
+ * to Vercel (the live app) first. If Vercel is DOWN — network error, timeout, a
+ * 5xx server error, or a Cloudflare origin error (520–526, 530) — the same path
+ * is served from the certified static mirror on Workers instead, so the site
+ * stays up.
  *
  * This is a SEPARATE worker from the mirror itself. It does not need any code
  * from the mirror; it just proxies to two URLs.
@@ -17,7 +18,11 @@
 const PRIMARY = 'https://egmc.vercel.app';                          // live app (Vercel)
 const MIRROR  = 'https://egmc-choirhub.sethntumba1430.workers.dev'; // static fallback
 const TIMEOUT_MS = 5000;                          // give Vercel this long before failing over
-const FAILOVER_STATUS = new Set([500, 502, 503, 504]); // server outages only — NOT 4xx (app-level)
+// Server outages only — NOT 4xx (app-level). 520–526 and 530 are the errors
+// Cloudflare itself returns when it can't reach or talk to the origin; without
+// them the worker passed those errors through instead of failing over (found in
+// the failover drill).
+const FAILOVER_STATUS = new Set([500, 502, 503, 504, 520, 521, 522, 523, 524, 525, 526, 530]);
 
 export default {
   async fetch(request) {
@@ -37,7 +42,8 @@ export default {
       const resp = await fetch(primaryReq, { signal: ac.signal, redirect: 'manual' });
       clearTimeout(timer);
 
-      // 5xx → Vercel is broken server-side; serve the mirror. 4xx are app-level
+      // 5xx / Cloudflare origin error → Vercel is unreachable or broken
+      // server-side; serve the mirror. 4xx are app-level
       // (404, 401, …) and would be identical on the mirror, so pass them through.
       if (FAILOVER_STATUS.has(resp.status)) return failover(mirrorReq, resp);
 
