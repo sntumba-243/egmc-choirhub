@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Palette } from 'lucide-react';
+import { OfflineSongsCard } from '../../components/OfflineSongsCard';
 
 // Google Drive Sync lives on /super-admin/settings (GoogleDriveSyncCard) —
 // song writes are super-admin only.
@@ -12,6 +13,9 @@ export const AdminSettings: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
+
+      {/* Offline sheet music: status + "Download all now" (same as member Profile) */}
+      <OfflineSongsCard />
 
       {/* Church Theme */}
       <Link to={themePath} className="block bg-white rounded-xl shadow-sm p-4 border border-gray-200 hover:shadow-md hover:border-gray-300 transition-all group">

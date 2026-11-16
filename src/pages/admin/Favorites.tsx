@@ -11,12 +11,16 @@ import SheetMusicViewer from '../../components/SheetMusicViewer';
 import { formatEventDates } from '../../lib/eventDates';
 import { dbErrorMessage } from '../../lib/dbError';
 import { fetchSetlistEditableEvents, type PickableEvent } from '../../lib/setlistEvents';
+import { getAuthUid } from '../../lib/authUid';
+import { getOfflineData } from '../../lib/offlineCache';
+import { getSavedFavoriteIds } from '../../lib/backgroundCache';
 interface Song {
   id: string;
   title: string;
   composer: string;
   language: string;
   sheet_music_url?: string;
+  updated_at?: string;
 }
 
 export const AdminFavorites = () => {
@@ -36,19 +40,30 @@ export const AdminFavorites = () => {
     fetchFavorites();
   }, []);
 
+  // user_favorites.user_id is the AUTH user id (RLS: auth.uid() = user_id) —
+  // not user.id, which is members.id and differs for many accounts.
   const fetchFavorites = async () => {
     if (!user) return;
     
     try {
+      const authUid = await getAuthUid();
+      if (!authUid) throw new Error('Not signed in');
       const { data, error } = await supabase
         .from('user_favorites')
         .select(`
           song_id,
           songs (*)
         `)
-        .eq('user_id', user.id);
+        .eq('user_id', authUid);
 
-      if (error) throw error;
+      if (error) {
+        // Offline: favorites + song list saved on this device (lib/backgroundCache).
+        const [ids, all] = await Promise.all([getSavedFavoriteIds(), getOfflineData('songs') as Promise<Song[] | null>]);
+        if (!ids || !all) throw error;
+        const byId = new Map(all.map(s => [s.id, s]));
+        setFavorites(ids.map(id => byId.get(id)).filter(Boolean) as Song[]);
+        return;
+      }
 
       const favSongs = data?.map((fav: any) => fav.songs).filter(Boolean) || [];
       setFavorites(favSongs);
@@ -85,10 +100,12 @@ export const AdminFavorites = () => {
     if (!user) return;
 
     try {
+      const authUid = await getAuthUid();
+      if (!authUid) throw new Error('Not signed in');
       const { error } = await supabase
         .from('user_favorites')
         .delete()
-        .eq('user_id', user.id)
+        .eq('user_id', authUid)
         .eq('song_id', songId);
 
       if (error) throw error;

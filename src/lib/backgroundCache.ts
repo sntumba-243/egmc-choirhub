@@ -1,16 +1,21 @@
 // Offline sheet music: what each device saves, and keeping it current.
 //
-// On every app open (member portal) while online, this:
+// On every app open while online — member, admin and super-admin portals alike
+// (each layout calls startBackgroundCache) — this:
 //   1. fetches, in ONE request each: the song list, the bucket manifest
 //      (partition_manifest(): file name + etag), upcoming events + their
-//      setlists, and the member's favorites;
+//      setlists, and the signed-in person's favorites — and keeps a snapshot of
+//      the song list, the upcoming events + setlists and the favorites in
+//      IndexedDB (lib/offlineCache) so Repertoire, event setlists and Favorites
+//      render offline;
 //   2. drops saved copies of songs that no longer exist (or whose sheet moved);
 //   3. downloads, in this order:
-//        • songs on ALL upcoming events the member can see — always;
-//        • the member's favorites — always;
+//        • songs on ALL upcoming events the person can see — always;
+//        • their favorites — always;
 //        • any OTHER song already saved on this device whose file changed;
 //        • the rest of the library — ONLY if this device chose the full
-//          library (Profile "Download all now"). Never automatic: the library
+//          library ("Download all now": member Profile, admin / super-admin
+//          Settings — components/OfflineSongsCard). Never automatic: the library
 //          is ~175 MB per device and Storage egress is metered.
 // A chosen full download that gets interrupted resumes on the next online open
 // (saved files are skipped — never restarts from zero). Those automatic
@@ -32,6 +37,7 @@
 import { supabase } from './supabase';
 import { fetchAllSongs, getOfflineData, putOfflineData } from './offlineCache';
 import { storageGet, storageSet } from './safeStorage';
+import { getAuthUid } from './authUid';
 
 // ── Types ──
 export interface CacheProgress {
@@ -186,38 +192,59 @@ async function fetchManifest(): Promise<Map<string, string> | null> {
   }
 }
 
-// Songs on the setlists of ALL upcoming events the member can see. RLS on
-// `events` already limits this to their church's events + global events
-// targeted at their church (and event visibility rules). Ordered by event date,
-// then setlist order.
-async function upcomingEventSongIds(): Promise<string[]> {
+// Offline snapshots are per signed-in person (favorites and visible events
+// differ). Key = auth user id — NOT user.id from the app, which is members.id and
+// differs from the auth id for about half the accounts (lib/authUid).
+const favKey = (uid: string) => 'favorites:' + uid;
+const setlistKey = (uid: string) => 'setlists:' + uid;
+
+interface SetlistSnapshot {
+  events: any[];                                                  // full event rows
+  rows: Array<{ id: string; event_id: string; song_id: string; song_order: number | null; created_at: string | null }>;
+}
+
+// Songs on the setlists of ALL upcoming events this person can see. RLS on
+// `events` decides which: a member/admin sees their church's events + global
+// events targeted at it; a super admin sees every church's. Ordered by event
+// date, then setlist order. Also saves the events + setlists for offline use.
+async function upcomingEventSongIds(uid: string | null): Promise<string[]> {
   const { data: events, error } = await supabase
     .from('events')
-    .select('id, date')
+    .select('*')
     .gte('last_date', localYmd())
     .order('date', { ascending: true })
     .limit(500);
-  if (error || !events?.length) return [];
+  if (error || !events) return [];
   const rank = new Map((events as any[]).map((e, i) => [e.id, i]));
-  const { data: rows, error: e2 } = await supabase
-    .from('event_songs')
-    .select('event_id, song_id, song_order')
-    .in('event_id', [...rank.keys()]);
-  if (e2 || !rows) return [];
-  return (rows as any[])
+  let rows: SetlistSnapshot['rows'] = [];
+  if (events.length) {
+    const { data, error: e2 } = await supabase
+      .from('event_songs')
+      .select('id, event_id, song_id, song_order, created_at')
+      .in('event_id', [...rank.keys()]);
+    if (e2 || !data) return [];
+    rows = data as SetlistSnapshot['rows'];
+  }
+  if (uid) putOfflineData(setlistKey(uid), { events, rows } satisfies SetlistSnapshot).catch(() => {});
+  return rows
+    .slice()
     .sort((a, b) => (rank.get(a.event_id)! - rank.get(b.event_id)!) || ((a.song_order ?? 0) - (b.song_order ?? 0)))
     .map((r) => r.song_id);
 }
 
-async function favoriteSongIds(userId?: string): Promise<string[]> {
-  if (!userId) return [];
-  const { data, error } = await supabase.from('user_favorites').select('song_id').eq('user_id', userId);
+// user_favorites.user_id is the AUTH user id (RLS: auth.uid() = user_id).
+async function favoriteSongIds(uid: string | null): Promise<string[]> {
+  if (!uid) return [];
+  const { data, error } = await supabase.from('user_favorites').select('song_id').eq('user_id', uid);
   if (error || !data) return [];
-  return (data as any[]).map((f) => f.song_id);
+  const ids = (data as any[]).map((f) => f.song_id);
+  putOfflineData(favKey(uid), ids).catch(() => {});
+  return ids;
 }
 
 // ── Build the prioritized, de-duplicated plan ──
-async function buildPlan(opts: BackgroundCacheOpts): Promise<Plan> {
+// opts is unused since favorites are keyed by the auth id (getAuthUid), not opts.userId (members.id).
+async function buildPlan(_opts: BackgroundCacheOpts): Promise<Plan> {
   // Whole library, newest first. Online: also refresh the offline list snapshot
   // (what Repertoire renders offline). Offline: use that snapshot.
   let allSongs: Song[] | null = null;
@@ -231,10 +258,11 @@ async function buildPlan(opts: BackgroundCacheOpts): Promise<Plan> {
   }
   if (!allSongs) return { event: [], fav: [], rest: [], online: false };
 
+  const uid = await getAuthUid().catch(() => null);
   const [manifest, eventIds, favIds] = await Promise.all([
     fetchManifest(),
-    upcomingEventSongIds().catch(() => [] as string[]),
-    favoriteSongIds(opts.userId).catch(() => [] as string[]),
+    upcomingEventSongIds(uid).catch(() => [] as string[]),
+    favoriteSongIds(uid).catch(() => [] as string[]),
   ]);
 
   const toItem = (s: Song): Item | null => {
@@ -384,11 +412,41 @@ async function sync(opts: BackgroundCacheOpts, gateForWifi: boolean): Promise<Ru
   }
 }
 
+// ── Saved data for offline pages ──
+
+/** Favorite song ids saved for the signed-in person (null if never saved). */
+export async function getSavedFavoriteIds(): Promise<string[] | null> {
+  const uid = await getAuthUid().catch(() => null);
+  if (!uid) return null;
+  return ((await getOfflineData(favKey(uid)).catch(() => null)) as string[] | null) || null;
+}
+
+/**
+ * An upcoming event and its setlist from the saved snapshot, shaped like the
+ * event pages' own queries (event row; event_songs rows with a `songs` object,
+ * in created_at order). null if this event wasn't saved on this device.
+ */
+export async function getSavedEvent(eventId: string): Promise<{ event: any; eventSongs: any[] } | null> {
+  const uid = await getAuthUid().catch(() => null);
+  if (!uid || !eventId) return null;
+  const snap = (await getOfflineData(setlistKey(uid)).catch(() => null)) as SetlistSnapshot | null;
+  const event = snap?.events?.find((e) => e.id === eventId);
+  if (!event) return null;
+  const songs = ((await getOfflineData('songs').catch(() => null)) as Song[] | null) || [];
+  const byId = new Map(songs.map((s) => [s.id, s]));
+  const eventSongs = snap!.rows
+    .filter((r) => r.event_id === eventId && byId.has(r.song_id))
+    .sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')))
+    .map((r) => ({ id: r.id, song_id: r.song_id, songs: byId.get(r.song_id) }));
+  return { event, eventSongs };
+}
+
 // ── Public API ──
 let autoStarted = false;
 
 /**
- * Called by the member layout once the member is signed in. Once per app open:
+ * Called by the member, admin and super-admin layouts once someone is signed
+ * in. Once per app open:
  * waits until online, then syncs (prune → event songs, favorites, changed saved
  * files; plus the rest of the library only if this device chose it).
  */
@@ -408,7 +466,7 @@ export function startBackgroundCache(opts: BackgroundCacheOpts = {}): void {
 }
 
 /**
- * Profile "Download all now / Resume / Retry": this device chooses the full
+ * "Download all now / Resume / Retry" (components/OfflineSongsCard): this device chooses the full
  * library, and it downloads now without waiting for Wi-Fi (explicit tap).
  */
 export async function downloadAllNow(opts: BackgroundCacheOpts = {}): Promise<RunResult> {
@@ -420,7 +478,7 @@ export async function downloadAllNow(opts: BackgroundCacheOpts = {}): Promise<Ru
 }
 
 /**
- * READ-ONLY status for the Profile page: how many sheets are saved AND current,
+ * READ-ONLY status for the offline songs card: how many sheets are saved AND current,
  * for upcoming-event songs and for the whole library. No downloads.
  */
 export async function getCacheStatus(

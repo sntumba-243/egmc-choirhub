@@ -8,6 +8,7 @@ import { useChurch } from '../../contexts/ChurchContext';
 import SheetMusicViewer from '../../components/SheetMusicViewer';
 import { createSongSearcher } from '../../lib/smartSearch';
 import { getOfflineData, putOfflineData } from '../../lib/offlineCache';
+import { getAuthUid } from '../../lib/authUid';
 
 const PAGE_SIZE = 20;
 
@@ -206,11 +207,6 @@ export const MemberRepertoire = () => {
     const count = rows.length;
     if (paginate) rows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
     return { data: rows, count };
-  };
-
-  const getAuthUid = async (): Promise<string | null> => {
-    const { data: { session } } = await supabase.auth.getSession();
-    return session?.user?.id || null;
   };
 
   const fetchFavorites = async (): Promise<Set<string> | undefined> => {

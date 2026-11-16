@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { GoogleDriveSyncCard } from '../../components/GoogleDriveSyncCard';
+import { OfflineSongsCard } from '../../components/OfflineSongsCard';
 
 interface InactiveChurch {
   id: string;
@@ -37,6 +38,11 @@ export default function SuperAdminSettings() {
   return (
     <div className="p-6 max-w-2xl">
       <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mb-6">Settings</h1>
+
+      {/* Offline sheet music: status + "Download all now" (same as member Profile) */}
+      <div className="mb-6">
+        <OfflineSongsCard />
+      </div>
 
       {/* Google Drive Sync — inserts into the global repertoire */}
       <div className="mb-6">
