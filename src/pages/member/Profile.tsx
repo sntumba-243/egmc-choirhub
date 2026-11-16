@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { offlineStorage, OfflineSong } from '../../lib/offlineStorage';
 import { practiceLogService, PracticeLog } from '../../lib/practiceLog';
-import { getCacheStatus, downloadAllNow, subscribeCacheProgress } from '../../lib/backgroundCache';
+import { getCacheStatus, downloadAllNow, subscribeCacheProgress, isFullLibraryEnabled } from '../../lib/backgroundCache';
 import toast from 'react-hot-toast';
 
 export const MemberProfile: React.FC = () => {
@@ -41,8 +41,9 @@ export const MemberProfile: React.FC = () => {
   }, [user]);
 
   // READ-ONLY on mount: report how many songs are saved and current, then track
-  // live progress. The download itself starts automatically from the member
-  // layout (lib/backgroundCache); the button here only resumes/retries now.
+  // live progress. Event songs + favorites are saved automatically by the member
+  // layout (lib/backgroundCache); the FULL library only after this button is
+  // tapped ("Download all now"), then Resume/Retry if it is interrupted.
   useEffect(() => {
     let unsub = () => {};
     const opts = { userId: user?.id, churchId: (user as any)?.church_id };
@@ -331,7 +332,7 @@ export const MemberProfile: React.FC = () => {
             ? `Downloading… ${progress.cached}/${progress.total}`
             : status.full.total > 0 && status.full.cached >= status.full.total
             ? 'All saved'
-            : status.full.cached > 0
+            : isFullLibraryEnabled()
             ? (lastFailed > 0 ? 'Retry' : 'Resume')
             : 'Download all now'}
         </button>

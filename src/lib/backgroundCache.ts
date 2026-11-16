@@ -1,18 +1,22 @@
-// Offline sheet music: automatic full-library download + keeping it current.
+// Offline sheet music: what each device saves, and keeping it current.
 //
 // On every app open (member portal) while online, this:
 //   1. fetches, in ONE request each: the song list, the bucket manifest
 //      (partition_manifest(): file name + etag), upcoming events + their
 //      setlists, and the member's favorites;
 //   2. drops saved copies of songs that no longer exist (or whose sheet moved);
-//   3. downloads what is missing or out of date, in this order:
-//        event songs (ALL upcoming events the member can see) → favorites → rest.
-// The first full download starts by itself after sign-in (no prompt). If it is
-// interrupted it resumes on the next online open — saved files are skipped, so
-// it never restarts from zero. Where the browser reports a cellular connection
-// (Android Chrome), the rest of the library waits for Wi-Fi until the first
-// full download has completed once; event songs and favorites go right away.
-// iPhone/iPad don't report the connection type, so they download anyway.
+//   3. downloads, in this order:
+//        • songs on ALL upcoming events the member can see — always;
+//        • the member's favorites — always;
+//        • any OTHER song already saved on this device whose file changed;
+//        • the rest of the library — ONLY if this device chose the full
+//          library (Profile "Download all now"). Never automatic: the library
+//          is ~175 MB per device and Storage egress is metered.
+// A chosen full download that gets interrupted resumes on the next online open
+// (saved files are skipped — never restarts from zero). Those automatic
+// resumes wait for Wi-Fi where the browser reports a cellular connection
+// (Android Chrome) until the full library has completed once; event songs and
+// favorites never wait. A tap on Profile always downloads right away.
 //
 // CHANGE DETECTION: songs are usually fixed by replacing the PDF in the bucket
 // under the SAME name without touching the songs row, so the cache key (URL +
@@ -69,6 +73,10 @@ export interface BackgroundCacheOpts {
 // STABLE name shared with public/service-worker.js (PDF_CACHE).
 const PDF_CACHE = 'egmc-pdfs';
 export const ETAG_HEADER = 'X-ChoirHub-ETag';
+// Set when the member taps "Download all now" on Profile: from then on this
+// device keeps the WHOLE library (new songs included). Without it, only event
+// songs, favorites and already-saved songs are kept.
+const FULL_LIBRARY_KEY = 'choirhub_offline_full_library';
 // Set once the whole library has been saved on this device (ends the Wi-Fi wait).
 const FULL_DONE_KEY = 'choirhub_offline_full_done';
 const BUCKET_PATH = '/storage/v1/object/public/choirhub_partitions/';
@@ -161,6 +169,7 @@ async function waitForWifi(): Promise<void> {
 }
 
 const isFullDone = () => storageGet(FULL_DONE_KEY) === '1';
+export const isFullLibraryEnabled = () => storageGet(FULL_LIBRARY_KEY) === '1';
 
 // ── Data for the plan (one request per kind, never one per song) ──
 async function fetchManifest(): Promise<Map<string, string> | null> {
@@ -357,10 +366,17 @@ async function sync(opts: BackgroundCacheOpts, gateForWifi: boolean): Promise<Ru
     const plan = await buildPlan(opts);
     const cache = await caches.open(PDF_CACHE);
     await prune(cache, plan);
-    const queue = [...plan.event, ...plan.fav, ...plan.rest];
+    const full = isFullLibraryEnabled();
+    const queue = [...plan.event, ...plan.fav];
+    if (full) {
+      queue.push(...plan.rest);
+    } else {
+      // Not chosen: keep what is already saved current, add nothing new.
+      for (const it of plan.rest) if ((await stateOf(cache, it)) === 'stale') queue.push(it);
+    }
     if (!queue.length) return { total: 0, cached: 0, failed: 0 };
     const result = await runQueue(queue, gateForWifi && !isFullDone());
-    if (plan.online && result.total > 0 && result.cached >= result.total) storageSet(FULL_DONE_KEY, '1');
+    if (full && plan.online && result.total > 0 && result.cached >= result.total) storageSet(FULL_DONE_KEY, '1');
     return result;
   } finally {
     setProgress({ downloading: false, waitingForWifi: false });
@@ -373,13 +389,13 @@ let autoStarted = false;
 
 /**
  * Called by the member layout once the member is signed in. Once per app open:
- * waits until online, then syncs (prune → download missing/changed, priority
- * order). The first run on a device downloads the whole library automatically.
+ * waits until online, then syncs (prune → event songs, favorites, changed saved
+ * files; plus the rest of the library only if this device chose it).
  */
 export function startBackgroundCache(opts: BackgroundCacheOpts = {}): void {
   if (autoStarted || !CACHES_OK) return;
   autoStarted = true;
-  // Ask the browser not to evict ~500 sheets under storage pressure.
+  // Ask the browser not to evict saved sheets under storage pressure.
   try { navigator.storage?.persist?.(); } catch { /* best-effort */ }
   window.setTimeout(async () => {
     try {
@@ -392,11 +408,12 @@ export function startBackgroundCache(opts: BackgroundCacheOpts = {}): void {
 }
 
 /**
- * Profile "Download all now / Resume / Retry": run now, without waiting for Wi-Fi
- * (the member asked for it explicitly).
+ * Profile "Download all now / Resume / Retry": this device chooses the full
+ * library, and it downloads now without waiting for Wi-Fi (explicit tap).
  */
 export async function downloadAllNow(opts: BackgroundCacheOpts = {}): Promise<RunResult> {
   if (!CACHES_OK) throw new Error('Offline storage is not available in this browser');
+  storageSet(FULL_LIBRARY_KEY, '1');
   wifiOverride = true;
   try { await navigator.storage?.persist?.(); } catch { /* best-effort */ }
   return sync(opts, false);
