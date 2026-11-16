@@ -17,6 +17,24 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+export const NOT_LINKED_MESSAGE = "This account isn't linked to a church";
+
+// The signed-in person's member row, matched by email IGNORING letter case:
+// Auth stores login emails lowercase, while older member rows kept the case
+// they were typed with ("Emmatshiband@…"); an exact match found nothing and the
+// app silently stayed on the sign-in page. (The DB now lowercases on write —
+// migration 20261117000000 — but the lookup no longer depends on it.)
+// maybeSingle: "no row" is { data: null, error: null }, distinct from a
+// network error (which the offline restore handles).
+const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => '\\' + c);
+async function findMemberByEmail(client: any, email: string | undefined) {
+  const q = client.from('members').select('*');
+  const e = (email || '').trim();
+  return typeof q.ilike === 'function'
+    ? q.ilike('email', escapeLike(e)).maybeSingle()
+    : q.eq('email', e.toLowerCase()).maybeSingle(); // Neon failover client: no ilike; stored emails are lowercase
+}
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<NeonUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -56,14 +74,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (!session?.user) {
           restoreOffline(sessionError);
         } else {
-          const { data: memberData, error: memberError } = await supabase
-            .from('members')
-            .select('*')
-            .eq('email', session.user.email)
-            .single();
+          const { data: memberData, error: memberError } = await findMemberByEmail(supabase, session.user.email);
 
           if (!memberData) {
-            restoreOffline(memberError);
+            if (!restoreOffline(memberError) && !memberError) {
+              // Signed in, online, but no member row: not linked to a church.
+              // Sign out so the person isn't left on a page that does nothing.
+              await supabase.auth.signOut().catch(() => {});
+              clearOfflineUser();
+              toast.error(NOT_LINKED_MESSAGE);
+            }
           } else {
             const { data: userData } = await supabase
               .from('users')
@@ -124,13 +144,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (error) throw error;
 
         if (data.user) {
-          const { data: memberData } = await supabase
-            .from('members')
-            .select('*')
-            .eq('email', data.user.email)
-            .single();
+          const { data: memberData, error: memberError } = await findMemberByEmail(supabase, data.user.email);
 
-          if (memberData) {
+          if (!memberData) {
+            // Password accepted but there is no member row for this login.
+            // Previously nothing happened (the sign-in page just stayed).
+            await supabase.auth.signOut().catch(() => {});
+            throw new Error(memberError ? 'Could not load your account. Please try again.' : NOT_LINKED_MESSAGE);
+          }
+
+          {
             const { data: userData } = await supabase
               .from('users')
               .select('is_super_admin')

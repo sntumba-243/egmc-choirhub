@@ -80,7 +80,10 @@ export const MemberForm: React.FC = () => {
     return `${firstInitial}${cleanLast}`;
   };
 
-  const createAuthUser = async (email: string, password: string, userRole: string) => {
+  // create-member builds the WHOLE account (login + users row + members row with
+  // a member_id) and undoes every step if one fails — so a password is only
+  // shown for an account that fully exists.
+  const createAccount = async (email: string, password: string, userRole: string, memberIdValue: string) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
@@ -97,12 +100,17 @@ export const MemberForm: React.FC = () => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
+            complete: true,
             email,
             password,
             name: `${firstName} ${lastName}`.trim(),
+            first_name: firstName.trim(),
+            last_name: lastName.trim(),
+            member_id: memberIdValue,
+            phone: phone || null,
             role: userRole,
             voice_part: voicePart,
-            status: 'active',
+            status,
             church_id: churchId,
           }),
         }
@@ -114,7 +122,7 @@ export const MemberForm: React.FC = () => {
       }
 
       const result = await response.json();
-      return result.data;
+      return result;
     } catch (error) {
       console.error('Auth creation error:', error);
       throw error;
@@ -143,13 +151,12 @@ export const MemberForm: React.FC = () => {
       const token = session?.access_token;
       if (!token) throw new Error('Not authenticated');
 
-      // Look up the auth user_id from the users table by email
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('email', email)
-        .single();
-      if (userError || !userData) throw new Error('No auth account found for this member');
+      // The member's LOGIN id (not looked up by exact email — email case used to
+      // differ between members and logins). DB function, admins of the
+      // member's church / super admins only.
+      const { data: loginId, error: loginError } = await (supabase as any).rpc('login_id_for_member', { p_member: memberId });
+      if (loginError || !loginId) throw new Error('No login found for this member');
+      const userData = { id: loginId as string };
 
       const newPassword = generateMemorablePassword();
 
@@ -192,11 +199,14 @@ export const MemberForm: React.FC = () => {
         return;
       }
 
+      // Emails are stored trimmed + lowercase (logins are lowercase; the DB
+      // trigger normalize_email enforces the same).
+      const cleanEmail = email.trim().toLowerCase();
       const memberData: any = {
         first_name: firstName,
         last_name: lastName,
         member_id: generateMemberId(firstName, lastName),
-        email,
+        email: cleanEmail,
         phone,
         voice_part: voicePart,
         role,
@@ -214,27 +224,30 @@ export const MemberForm: React.FC = () => {
         toast.success('Member updated');
         navigate(isSuperAdmin ? '/super-admin/members' : '/admin/members');
       } else {
-        // The create-member edge function also inserts the public.users row
-        // (service role); clients have no write access to users under RLS.
         if (createAuthAccount) {
+          // One call creates login + users row + members row; nothing is left
+          // behind if it fails, and the password is shown only on success.
           try {
             const newPassword = generateMemorablePassword();
-            setGeneratedPassword(newPassword);
-            await createAuthUser(email, newPassword, role);
+            const result = await createAccount(cleanEmail, newPassword, role, memberData.member_id);
+            setEmail(cleanEmail);
+            setGeneratedPassword(result.password || newPassword);
+            setShowPasswordModal(true);
           } catch (authError: any) {
-            console.error('Auth creation failed:', authError);
-            toast.error(`Auth account failed: ${authError.message}`);
+            console.error('Account creation failed:', authError);
+            toast.error(`Account not created: ${authError.message}`);
             setLoading(false);
-            return;
           }
+          return;
         }
 
+        // Member without a login (no account requested): member row only.
         const { error } = await supabase
           .from('members')
           .insert([memberData]);
         if (error) throw error;
-
-        setShowPasswordModal(true);
+        toast.success('Member added (no login)');
+        navigate(churchIdParam ? `/super-admin/churches/${churchIdParam}` : isSuperAdmin ? '/super-admin/members' : '/admin/members');
       }
     } catch (error: any) {
       console.error('Error:', error);

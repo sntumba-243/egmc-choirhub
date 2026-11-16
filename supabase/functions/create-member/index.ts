@@ -1,141 +1,242 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+// create-member — an admin creates a member's account.
+//
+// AUTHORIZATION (through `members`, same as reset-password — never
+// `public.users.role` alone, which survives member deletion):
+//   • caller must have a members row (by login email, case-insensitive)
+//   • super admin (members.role = 'super_admin' or users.is_super_admin): any church
+//   • church admin (members.role = 'admin'): only their own church
+//   • nobody creates super admins here
+//
+// EMAIL: trimmed + lowercased (Auth stores logins lowercase; the DB trigger
+// normalize_email does the same for members/users).
+//
+// TWO REQUEST SHAPES
+//   • complete (`complete: true`, current app): creates the WHOLE account — login,
+//     public.users row, members row (with a member_id) — and undoes every step
+//     if any step fails. The password is returned only after all succeeded.
+//     With `if_exists: 'link'` (super admin "Add Admin"), an EXISTING login is
+//     linked instead: its member row in that church is created or promoted to
+//     the requested role. The password is NOT changed (`existing: true`).
+//   • legacy (no `complete`): login + users row only; the caller inserts the
+//     members row itself. Kept so the deployed app keeps working until the
+//     'account-fixes' app changes are live. Remove once they are.
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const DEFAULT_PASSWORD = 'egmc@Choir';
+const json = (body: unknown, status: number) =>
+  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+
+const DEFAULT_PASSWORD = 'egmc@Choir'
+// public.users.role CHECK constraint (super_admin is never created here).
+const ALLOWED_ROLES = ['admin', 'member', 'guest']
+const VOICE_PARTS = ['Soprano', 'Alto', 'Tenor', 'Bass']
+
+const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => '\\' + c)
+const normEmail = (e: unknown) => (typeof e === 'string' ? e.trim().toLowerCase() : '')
+
+interface Caller { memberId: string | null; role: string | null; churchId: string | null; isSuper: boolean }
+
+async function resolveCaller(admin: SupabaseClient, authId: string, email: string): Promise<Caller> {
+  const [{ data: member }, { data: userRow }] = await Promise.all([
+    admin.from('members').select('id, role, church_id').ilike('email', escapeLike(email)).maybeSingle(),
+    admin.from('users').select('is_super_admin').eq('id', authId).maybeSingle(),
+  ])
+  return {
+    memberId: member?.id ?? null,
+    role: member?.role ?? null,
+    churchId: member?.church_id ?? null,
+    isSuper: !!member && (member.role === 'super_admin' || userRow?.is_super_admin === true),
+  }
+}
+
+// "Teresa Nsoki" → "TNsoki" (same rule as the member form); suffix 2, 3, … if taken.
+async function uniqueMemberId(admin: SupabaseClient, wanted: string | null, first: string, last: string, email: string): Promise<string> {
+  const clean = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]/g, '')
+  let base = clean(wanted || '')
+  if (!base) {
+    const f = clean(first), l = clean(last)
+    base = f && l ? f.charAt(0).toUpperCase() + l.charAt(0).toUpperCase() + l.slice(1).toLowerCase()
+      : clean(email.split('@')[0]) || 'Member'
+  }
+  for (let n = 1; n < 100; n++) {
+    const candidate = n === 1 ? base : `${base}${n}`
+    const [{ data: m }, { data: u }] = await Promise.all([
+      admin.from('members').select('id').eq('member_id', candidate).maybeSingle(),
+      admin.from('users').select('id').ilike('member_id', escapeLike(candidate)).maybeSingle(),
+    ])
+    if (!m && !u) return candidate
+  }
+  throw new Error('Could not find a free member ID')
+}
+
+async function findLoginByEmail(admin: SupabaseClient, email: string): Promise<{ id: string } | null> {
+  // public.users mirrors every login created by this app (id = auth id).
+  const { data: u } = await admin.from('users').select('id').eq('email', email).maybeSingle()
+  if (u) return u
+  // Fallback: page through Auth (logins without a users row).
+  for (let page = 1; page <= 20; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 })
+    if (error || !data?.users?.length) return null
+    const hit = data.users.find((x) => (x.email || '').toLowerCase() === email)
+    if (hit) return { id: hit.id }
+    if (data.users.length < 1000) return null
+  }
+  return null
+}
 
 serve(async (req) => {
-  // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+
+  const admin = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
 
   try {
     const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    if (!authHeader) return json({ error: 'Missing authorization header' }, 401)
+    const { data: { user }, error: userError } = await admin.auth.getUser(authHeader.replace('Bearer ', ''))
+    if (userError || !user?.email) return json({ error: 'Unauthorized' }, 401)
+
+    const caller = await resolveCaller(admin, user.id, user.email)
+    if (!caller.memberId || (!caller.isSuper && caller.role !== 'admin')) {
+      return json({ error: 'Only admins can create members' }, 403)
     }
 
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    )
+    const body = await req.json()
+    const email = normEmail(body.email)
+    const role = (body.role || 'member') as string
+    const churchId = (body.church_id || null) as string | null
+    const name = (typeof body.name === 'string' ? body.name : '').trim()
+    const firstName = (typeof body.first_name === 'string' ? body.first_name : name.split(' ')[0] || '').trim()
+    const lastName = (typeof body.last_name === 'string' ? body.last_name : name.split(' ').slice(1).join(' ')).trim()
+    const voicePart = VOICE_PARTS.includes(body.voice_part) ? body.voice_part : null
+    const status = body.status === 'inactive' ? 'inactive' : 'active'
 
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token)
-    
-    if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: 'A valid email is required' }, 400)
+    if (!ALLOWED_ROLES.includes(role)) {
+      return json({ error: `Role "${role}" can't be used for an account. Choose Member, Admin or Guest.` }, 400)
+    }
+    if (!churchId) return json({ error: 'church_id is required' }, 400)
+    if (!caller.isSuper && churchId !== caller.churchId) {
+      return json({ error: 'Admins can only add members to their own church' }, 403)
+    }
+    const { data: church } = await admin.from('churches').select('id').eq('id', churchId).maybeSingle()
+    if (!church) return json({ error: 'Church not found' }, 400)
+
+    console.log('create-member:', { mode: body.complete ? 'complete' : 'legacy', role, church_id: churchId, by: caller.memberId })
+
+    // ── Existing login? ──
+    const existing = await findLoginByEmail(admin, email)
+    if (existing) {
+      if (!(body.complete && body.if_exists === 'link')) {
+        return json({ error: 'An account with this email already exists', code: 'account_exists' }, 409)
+      }
+      // Link / promote. The password is never touched here.
+      const { data: member } = await admin.from('members').select('id, church_id, role').eq('email', email).maybeSingle()
+      if (member && member.church_id !== churchId) {
+        return json({ error: 'This person already belongs to another church', code: 'other_church' }, 409)
+      }
+      if (member?.role === 'super_admin') return json({ error: 'This account is a super admin' }, 409)
+      if (member) {
+        const { error } = await admin.from('members').update({ role, status: 'active' }).eq('id', member.id)
+        if (error) throw error
+      } else {
+        const memberId = await uniqueMemberId(admin, body.member_id || null, firstName, lastName, email)
+        const { error } = await admin.from('members').insert({
+          id: existing.id, member_id: memberId, first_name: firstName, last_name: lastName, email,
+          role, status: 'active', church_id: churchId, voice_part: voicePart, phone: body.phone || null,
+        })
+        if (error) throw error
+      }
+      const { error: upErr } = await admin.from('users').upsert(
+        { id: existing.id, email, name: name || `${firstName} ${lastName}`.trim() || email, role, church_id: churchId, status: 'active' },
+        { onConflict: 'id' })
+      if (upErr) throw upErr
+      const { error: metaErr } = await admin.auth.admin.updateUserById(existing.id, { app_metadata: { role } })
+      if (metaErr) throw metaErr
+      return json({ success: true, existing: true, user_id: existing.id, password: null }, 200)
     }
 
-    const { data: userData } = await supabaseAdmin
-      .from('users')
-      .select('role, is_super_admin')
-      .eq('email', user.email)
-      .single()
-
-    if (!userData || (userData.role !== 'admin' && userData.role !== 'super_admin' && !userData.is_super_admin)) {
-      return new Response(
-        JSON.stringify({ error: 'Only admins can create members' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    const {
-      email,
-      password,
-      name,
-      member_id,
-      role,
-      voice_part,
-      status,
-      church_id
-    } = await req.json()
-
-    if (!email || !name) {
-      return new Response(
-        JSON.stringify({ error: 'Email and name are required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    const finalPassword = password || DEFAULT_PASSWORD
-    const useDefaultPassword = !password
-
-    console.log('Creating member:', { email, name, member_id, role, church_id, useDefaultPassword })
-
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password: finalPassword,
-      email_confirm: true,
-      user_metadata: { name, voice_part },
-      app_metadata: { role: role || 'member' }
-    })
-
-    if (authError) {
-      console.error('Auth error:', authError)
-      throw authError
-    }
-
-    if (!authData.user) {
-      throw new Error('Failed to create user')
-    }
-
-    console.log('Auth user created:', authData.user.id)
-
-    const { data: dbData, error: dbError } = await supabaseAdmin
-      .from('users')
-      .insert({
-        id: authData.user.id,
+    // ── New account ──
+    const finalPassword = (typeof body.password === 'string' && body.password) || DEFAULT_PASSWORD
+    const useDefaultPassword = !body.password
+    const undo: Array<() => Promise<unknown>> = []
+    try {
+      const { data: authData, error: authError } = await admin.auth.admin.createUser({
         email,
-        name,
-        member_id: member_id || null,
-        role: role || 'member',
-        voice_part: voice_part || null,
-        status: status || 'active',
-        church_id: church_id || null,
+        password: finalPassword,
+        email_confirm: true,
+        user_metadata: { name: name || `${firstName} ${lastName}`.trim(), voice_part: voicePart },
+        app_metadata: { role },
+      })
+      if (authError || !authData?.user) throw authError || new Error('Failed to create login')
+      const authId = authData.user.id
+      undo.push(() => admin.auth.admin.deleteUser(authId))
+
+      const { error: usersError } = await admin.from('users').insert({
+        id: authId,
+        email,
+        name: name || `${firstName} ${lastName}`.trim() || email,
+        member_id: null,
+        role,
+        voice_part: voicePart,
+        status,
+        church_id: churchId,
         must_change_password: useDefaultPassword,
         last_password_change: useDefaultPassword ? null : new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
       })
-      .select()
-      .single()
+      if (usersError) throw usersError
+      undo.push(() => admin.from('users').delete().eq('id', authId))
 
-    if (dbError) {
-      console.error('Database error:', dbError)
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
-      throw dbError
-    }
+      let memberRow = null
+      if (body.complete) {
+        const memberId = await uniqueMemberId(admin, body.member_id || null, firstName, lastName, email)
+        const { data, error: memberError } = await admin.from('members').insert({
+          id: authId, // member row id = login id for new accounts
+          member_id: memberId,
+          first_name: firstName,
+          last_name: lastName,
+          email,
+          phone: body.phone || null,
+          voice_part: voicePart,
+          role,
+          status,
+          church_id: churchId,
+          must_change_password: useDefaultPassword,
+        }).select().single()
+        if (memberError) throw memberError
+        memberRow = data
+      }
 
-    console.log('Database record created:', dbData)
-
-    return new Response(
-      JSON.stringify({
+      console.log('create-member: created', { user_id: authId, member: memberRow?.member_id ?? null })
+      return json({
         success: true,
-        data: dbData,
+        existing: false,
+        user_id: authId,
+        data: { id: authId, email, role, church_id: churchId },
+        member: memberRow,
         password: useDefaultPassword ? DEFAULT_PASSWORD : finalPassword,
-        mustChangePassword: useDefaultPassword
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
-
+        mustChangePassword: useDefaultPassword,
+      }, 200)
+    } catch (err) {
+      console.error('create-member: failed, undoing', err)
+      for (const step of undo.reverse()) {
+        try { await step() } catch (e) { console.error('create-member: undo step failed', e) }
+      }
+      throw err
+    }
   } catch (error) {
     console.error('Error creating member:', error)
-    return new Response(
-      JSON.stringify({ error: error.message || 'Failed to create member' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    const msg = (error as any)?.message || 'Failed to create member'
+    const code = (error as any)?.code
+    return json({ error: code === '23505' ? 'That email or member ID is already in use' : msg }, code === '23505' ? 409 : 500)
   }
 })

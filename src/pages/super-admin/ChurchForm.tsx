@@ -4,7 +4,7 @@ import { getDbClient, supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Church, ArrowLeft, Save, Upload, Image as ImageIcon, UserPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { generateMemorablePassword } from '../../lib/passwordUtils';
+import { createAccount, normalizeEmail, resetPasswordFor } from '../../lib/accounts';
 
 export const ChurchForm = () => {
   const navigate = useNavigate();
@@ -22,6 +22,8 @@ export const ChurchForm = () => {
   const [assigningAdmin, setAssigningAdmin] = useState(false);
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [existingAccount, setExistingAccount] = useState(false);
+  const [adminLoginId, setAdminLoginId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: '',
     short_name: '',
@@ -107,12 +109,11 @@ export const ChurchForm = () => {
         toast.success('Church created!');
       }
 
-      // Assign admin if email provided
-      if (adminEmail.trim() && churchId) {
-        await assignAdmin(churchId);
-      }
-
-      if (!showPasswordModal) {
+      // Assign admin if email provided. Stay on this page while the
+      // confirmation window is open (the old check read stale state and left
+      // the page at once, so the password could vanish before it was copied).
+      const outcome = adminEmail.trim() && churchId ? await assignAdmin(churchId) : 'none';
+      if (outcome === 'none') {
         navigate('/super-admin/churches');
       }
     } catch (error: any) {
@@ -150,98 +151,57 @@ export const ChurchForm = () => {
     }
   };
 
-  const assignAdmin = async (churchId: string) => {
-    if (!adminEmail.trim()) return;
+  // Admin for the church: ONE create-member call builds the whole account
+  // (login + users row + members row with a member_id) or nothing. An email that
+  // already has a login is linked/promoted instead and keeps its password.
+  // Returns what the confirmation window should show.
+  const assignAdmin = async (churchId: string): Promise<'password' | 'existing' | 'none'> => {
+    if (!adminEmail.trim()) return 'none';
     setAssigningAdmin(true);
     try {
-      const db = getDbClient();
-      const email = adminEmail.trim().toLowerCase();
-      
-      // Check if user already exists
-      const { data: existingUser } = await db
-        .from('users')
-        .select('id')
-        .eq('email', email)
-        .maybeSingle();
-
-      if (existingUser) {
-        // User exists — add/promote as admin
-        const { data: existingMember } = await db
-          .from('members')
-          .select('id, role')
-          .eq('email', email)
-          .eq('church_id', churchId)
-          .maybeSingle();
-
-        if (existingMember) {
-          await db.from('members').update({ role: 'admin' }).eq('id', existingMember.id);
-          toast.success(`${email} promoted to admin`);
-        } else {
-          await db.from('members').insert({
-                        church_id: churchId,
-            member_id: email.split('@')[0].charAt(0).toUpperCase() + 'Admin',
-            role: 'admin',
-            voice_part: 'Soprano',
-            status: 'active'
-          });
-          toast.success(`${email} added as admin`);
-        }
-      } else {
-        // User doesn't exist — create via Edge Function
-        const password = generateMemorablePassword();
-        
-        const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData.session?.access_token;
-        if (!token) throw new Error('Not authenticated');
-
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-member`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              email,
-              password,
-              name: email.split('@')[0],
-              role: 'admin',
-              voice_part: 'Soprano',
-              status: 'active',
-              church_id: churchId,
-            }),
-          }
-        );
-
-        if (!response.ok) {
-          const err = await response.json();
-          throw new Error(err.error || 'Failed to create admin account');
-        }
-
-        // Link to church via members table
-        const result = await response.json();
-        if (result.data?.id) {
-          await db.from('members').insert({
-            first_name: email.split('@')[0],
-            last_name: 'Admin',
-            email: email,
-            church_id: churchId,
-            role: 'admin',
-            voice_part: 'Soprano',
-            status: 'active',
-          });
-        }
-
-        setGeneratedPassword(password);
+      const email = normalizeEmail(adminEmail);
+      const result = await createAccount({
+        email,
+        churchId,
+        role: 'admin',
+        name: email.split('@')[0],
+        voicePart: 'Soprano',
+        linkExisting: true,
+      });
+      setAdminEmail(result.email);
+      setAdminLoginId(result.userId);
+      if (result.existing) {
+        setGeneratedPassword(null);
+        setExistingAccount(true);
         setShowPasswordModal(true);
-        toast.success(`Admin account created for ${email}`);
+        toast.success(`${result.email} is now admin (existing account)`);
+        return 'existing';
       }
+      setExistingAccount(false);
+      setGeneratedPassword(result.password);
+      setShowPasswordModal(true);
+      toast.success(`Admin account created for ${result.email}`);
+      return 'password';
     } catch (error: any) {
       console.error('Admin assign error:', error);
-      toast.error(error.message || 'Failed to assign admin');
+      toast.error(`Admin not added: ${error.message || 'unknown error'}`);
+      return 'none';
     } finally {
       setAssigningAdmin(false);
+    }
+  };
+
+  // "Existing account — password unchanged": optional reset from the same window.
+  const resetAdminPassword = async () => {
+    if (!adminLoginId) return;
+    if (!confirm(`Set a new password for ${adminEmail}? Their current password will stop working.`)) return;
+    try {
+      const pw = await resetPasswordFor(adminLoginId);
+      setGeneratedPassword(pw);
+      setExistingAccount(false);
+      toast.success('New password set');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to reset password');
     }
   };
 
@@ -414,7 +374,7 @@ export const ChurchForm = () => {
         </div>
 
         <div className="flex gap-3 pt-4">
-          <button type="submit" disabled={saving}
+          <button type="submit" disabled={saving || assigningAdmin}
             className="flex items-center gap-2 px-6 py-2.5 bg-slate-800 text-white rounded-lg font-medium hover:bg-slate-700 disabled:bg-gray-400">
             <Save className="w-4 h-4" />
             {saving ? 'Saving...' : isEdit ? 'Update Church' : 'Create Church'}
@@ -426,15 +386,15 @@ export const ChurchForm = () => {
         </div>
       </form>
       {/* Generated Password Modal */}
-      {showPasswordModal && generatedPassword && (
+      {showPasswordModal && (generatedPassword || existingAccount) && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl">
             <div className="text-center mb-4">
               <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <UserPlus className="w-6 h-6 text-green-600" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900">Admin Account Created</h3>
-              <p className="text-sm text-gray-500 mt-1">Share these credentials with the admin</p>
+              <h3 className="text-lg font-bold text-gray-900">{existingAccount ? 'Admin Added' : 'Admin Account Created'}</h3>
+              <p className="text-sm text-gray-500 mt-1">{existingAccount ? 'This email already had an account' : 'Share these credentials with the admin'}</p>
             </div>
             
             <div className="bg-gray-50 rounded-lg p-4 space-y-3 mb-4">
@@ -442,13 +402,23 @@ export const ChurchForm = () => {
                 <p className="text-xs text-gray-500 font-medium">Email</p>
                 <p className="text-sm font-mono font-semibold text-gray-900">{adminEmail}</p>
               </div>
+              {existingAccount ? (
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Password</p>
+                <p className="text-sm text-gray-800">Existing account — password unchanged. They sign in with their current password.</p>
+                <button type="button" onClick={resetAdminPassword}
+                  className="mt-2 text-xs px-2 py-1 bg-slate-100 text-slate-700 rounded font-medium hover:bg-slate-200">
+                  Reset password instead
+                </button>
+              </div>
+              ) : (
               <div>
                 <p className="text-xs text-gray-500 font-medium">Temporary Password</p>
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-mono font-semibold text-gray-900 bg-slate-50 px-2 py-1 rounded border border-slate-200">{generatedPassword}</p>
                   <button
                     onClick={() => {
-                      navigator.clipboard.writeText(generatedPassword);
+                      navigator.clipboard.writeText(generatedPassword || '');
                       toast.success('Password copied!');
                     }}
                     className="text-xs px-2 py-1 bg-slate-100 text-slate-700 rounded font-medium hover:bg-slate-200"
@@ -457,14 +427,16 @@ export const ChurchForm = () => {
                   </button>
                 </div>
               </div>
+              )}
             </div>
 
-            <p className="text-xs text-red-500 mb-4">⚠️ This password will not be shown again. Please save it now.</p>
+            {!existingAccount && <p className="text-xs text-red-500 mb-4">⚠️ This password will not be shown again. Please save it now.</p>}
 
             <button
               onClick={() => {
                 setShowPasswordModal(false);
                 setGeneratedPassword(null);
+                setExistingAccount(false);
                 navigate('/super-admin/churches');
               }}
               className="w-full py-2.5 bg-slate-800 text-white rounded-lg font-medium hover:bg-slate-700 text-sm"

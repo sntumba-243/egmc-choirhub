@@ -4,7 +4,7 @@ import { getDbClient, supabase } from '../../lib/supabase';
 import { createSearcher, MEMBER_KEYS } from '../../lib/smartSearch';
 import { Church, Users, Music, Calendar, ArrowLeft, Edit, Shield, ShieldOff, Trash2, Clock, MapPin, Plus, UserPlus, X, KeyRound, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { generateMemorablePassword } from '../../lib/passwordUtils';
+import { createAccount, loginIdForMember, normalizeEmail, resetPasswordFor } from '../../lib/accounts';
 
 import { eventRangeLabel, isEventPast } from '../../lib/eventDates';
 interface ChurchData {
@@ -54,6 +54,9 @@ export const ChurchDetail = () => {
   const [addingAdmin, setAddingAdmin] = useState(false);
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
   const [createdAdminEmail, setCreatedAdminEmail] = useState<string>('');
+  const [createdAdminLoginId, setCreatedAdminLoginId] = useState<string | null>(null);
+  const [existingAccount, setExistingAccount] = useState(false);
+  const [passwordTitle, setPasswordTitle] = useState('Admin Account Created');
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetting, setResetting] = useState(false);
@@ -168,51 +171,17 @@ export const ChurchDetail = () => {
     }
   };
 
-  const resetPassword = async (memberEmail: string) => {
+  // Reset by LOGIN id, resolved from the member row (never by exact email —
+  // letter case used to differ between members and logins).
+  const resetPassword = async (memberRowId: string, memberEmail: string) => {
     if (!confirm(`Reset password for ${memberEmail}?`)) return;
     try {
-      const password = generateMemorablePassword();
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-      if (!token) throw new Error('Not authenticated');
-
-      // Find auth user by email to get their auth id
-      const db = getDbClient();
-      const { data: userData } = await db
-        .from('users')
-        .select('id')
-        .eq('email', memberEmail)
-        .maybeSingle();
-
-      if (!userData) {
-        toast.error('User not found in database');
-        return;
-      }
-
-      // Use Edge Function to reset password
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reset-password`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            user_id: userData.id,
-            new_password: password,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        // Fallback: try admin API directly won't work from client
-        // Show the password and let super admin update manually
-        toast.error('Password reset requires edge function. Deploying...');
-        return;
-      }
-
+      const loginId = await loginIdForMember(memberRowId);
+      const password = await resetPasswordFor(loginId);
       setCreatedAdminEmail(memberEmail);
+      setCreatedAdminLoginId(loginId);
+      setExistingAccount(false);
+      setPasswordTitle('Password Reset');
       setGeneratedPassword(password);
       setShowPasswordModal(true);
       toast.success('Password reset!');
@@ -222,111 +191,57 @@ export const ChurchDetail = () => {
     }
   };
 
+  // ONE create-member call: a new login gets the whole account (login + users
+  // row + members row) or nothing; an existing login is linked / promoted and
+  // KEEPS its password (the window says so and offers a reset). A password is
+  // shown only after everything succeeded.
   const assignAdmin = async () => {
     if (!adminEmail.trim()) { toast.error('Email is required'); return; }
+    if (!id) return;
     setAddingAdmin(true);
     try {
-      const db = getDbClient();
-      const email = adminEmail.trim().toLowerCase();
-
-      // Check if user already exists
-      const { data: existingUser } = await db
-        .from('users')
-        .select('id')
-        .eq('email', email)
-        .maybeSingle();
-
-      if (existingUser) {
-        // User exists — add/promote as admin for this church
-        const { data: existingMember } = await db
-          .from('members')
-          .select('id, role')
-          .eq('email', email)
-          .eq('church_id', id)
-          .maybeSingle();
-
-        if (existingMember) {
-          await db.from('members').update({ role: 'admin' }).eq('id', existingMember.id);
-          toast.success(`${email} promoted to admin`);
-        } else {
-          await db.from('members').insert({
-            church_id: id,
-            email: email,
-            first_name: email.split('@')[0],
-            last_name: '',
-            member_id: email.split('@')[0].charAt(0).toUpperCase() + 'Admin',
-            role: 'admin',
-            voice_part: 'Soprano',
-            status: 'active'
-          });
-          toast.success(`${email} added as admin`);
-        }
-        setShowAddAdmin(false);
-        setAdminEmail('');
-        setAdminName('');
-        fetchAll();
-      } else {
-        // Create new user via Edge Function
-        const password = generateMemorablePassword();
-
-        const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData.session?.access_token;
-        if (!token) throw new Error('Not authenticated');
-
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-member`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              email,
-              password,
-              name: adminName.trim() || email.split('@')[0],
-              role: 'admin',
-              voice_part: 'Soprano',
-              status: 'active',
-              church_id: id,
-            }),
-          }
-        );
-
-        if (!response.ok) {
-          const err = await response.json();
-          throw new Error(err.error || 'Failed to create admin');
-        }
-
-        const result = await response.json();
-        if (result.data?.id) {
-          const nameForId = adminName.trim() || email.split('@')[0];
-          const memberId = nameForId.split(' ').map((w: string) => w.charAt(0).toUpperCase()).join('') + Math.floor(Math.random() * 1000);
-          await db.from('members').insert({
-            church_id: id,
-            email: email,
-            first_name: adminName.trim() ? adminName.trim().split(' ')[0] : email.split('@')[0],
-            last_name: adminName.trim() ? adminName.trim().split(' ').slice(1).join(' ') : '',
-            member_id: memberId,
-            role: 'admin',
-            voice_part: 'Soprano',
-            status: 'active',
-          });
-        }
-
-        setCreatedAdminEmail(adminEmail.trim().toLowerCase());
-        setGeneratedPassword(password);
-        setShowAddAdmin(false);
-        setShowPasswordModal(true);
-        setAdminEmail('');
-        setAdminName('');
-        fetchAll();
-      }
+      const email = normalizeEmail(adminEmail);
+      const name = adminName.trim();
+      const result = await createAccount({
+        email,
+        churchId: id,
+        role: 'admin',
+        name: name || email.split('@')[0],
+        firstName: name ? name.split(' ')[0] : email.split('@')[0],
+        lastName: name ? name.split(' ').slice(1).join(' ') : '',
+        voicePart: 'Soprano',
+        linkExisting: true,
+      });
+      setCreatedAdminEmail(result.email);
+      setCreatedAdminLoginId(result.userId);
+      setExistingAccount(result.existing);
+      setPasswordTitle(result.existing ? 'Admin Added' : 'Admin Account Created');
+      setGeneratedPassword(result.password);
+      setShowAddAdmin(false);
+      setShowPasswordModal(true);
+      setAdminEmail('');
+      setAdminName('');
+      toast.success(result.existing ? `${result.email} is now admin (existing account)` : `Admin account created for ${result.email}`);
+      fetchAll();
     } catch (error: any) {
       console.error('Admin assign error:', error);
-      toast.error(error.message || 'Failed to assign admin');
+      toast.error(`Admin not added: ${error.message || 'unknown error'}`);
     } finally {
       setAddingAdmin(false);
+    }
+  };
+
+  const resetCreatedAdminPassword = async () => {
+    if (!createdAdminLoginId) return;
+    if (!confirm(`Set a new password for ${createdAdminEmail}? Their current password will stop working.`)) return;
+    try {
+      const pw = await resetPasswordFor(createdAdminLoginId);
+      setGeneratedPassword(pw);
+      setExistingAccount(false);
+      setPasswordTitle('Password Reset');
+      toast.success('New password set');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to reset password');
     }
   };
 
@@ -662,7 +577,7 @@ export const ChurchDetail = () => {
                   {member.is_super_admin ? 'Remove SA' : 'Make SA'}
                 </button>
                 <button
-                  onClick={() => resetPassword(member.email)}
+                  onClick={() => resetPassword(member.id, member.email)}
                   className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium text-blue-600 hover:bg-blue-50 min-h-[44px]"
                   title="Reset password"
                 >
@@ -815,37 +730,48 @@ export const ChurchDetail = () => {
       )}
 
       {/* Password Modal */}
-      {showPasswordModal && generatedPassword && (
+      {showPasswordModal && (generatedPassword || existingAccount) && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl">
             <div className="text-center mb-4">
               <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <UserPlus className="w-6 h-6 text-green-600" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900">Admin Account Created</h3>
-              <p className="text-sm text-gray-500 mt-1">Share these credentials with the admin</p>
+              <h3 className="text-lg font-bold text-gray-900">{passwordTitle}</h3>
+              <p className="text-sm text-gray-500 mt-1">{existingAccount ? 'This email already had an account' : 'Share these credentials'}</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-4 space-y-3 mb-4">
               <div>
                 <p className="text-xs text-gray-500 font-medium">Email</p>
                 <p className="text-sm font-mono font-semibold text-gray-900">{createdAdminEmail}</p>
               </div>
+              {existingAccount ? (
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Password</p>
+                <p className="text-sm text-gray-800">Existing account — password unchanged. They sign in with their current password.</p>
+                <button type="button" onClick={resetCreatedAdminPassword}
+                  className="mt-2 text-xs px-2 py-1 bg-slate-100 text-slate-700 rounded font-medium hover:bg-slate-200">
+                  Reset password instead
+                </button>
+              </div>
+              ) : (
               <div>
                 <p className="text-xs text-gray-500 font-medium">Temporary Password</p>
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-mono font-semibold text-gray-900 bg-slate-50 px-2 py-1 rounded border border-slate-200">{generatedPassword}</p>
                   <button
-                    onClick={() => { navigator.clipboard.writeText(generatedPassword); toast.success('Password copied!'); }}
+                    onClick={() => { navigator.clipboard.writeText(generatedPassword || ''); toast.success('Password copied!'); }}
                     className="text-xs px-2 py-1 bg-slate-100 text-slate-700 rounded font-medium hover:bg-slate-200"
                   >
                     Copy
                   </button>
                 </div>
               </div>
+              )}
             </div>
-            <p className="text-xs text-red-500 mb-4">⚠️ This password will not be shown again. Please save it now.</p>
+            {!existingAccount && <p className="text-xs text-red-500 mb-4">⚠️ This password will not be shown again. Please save it now.</p>}
             <button
-              onClick={() => { setShowPasswordModal(false); setGeneratedPassword(null); }}
+              onClick={() => { setShowPasswordModal(false); setGeneratedPassword(null); setExistingAccount(false); }}
               className="w-full py-2.5 bg-slate-800 text-white rounded-lg font-medium hover:bg-slate-700 text-sm"
             >
               Done
@@ -906,7 +832,7 @@ export const ChurchDetail = () => {
             </button>
             <button
               onClick={() => {
-                resetPassword(currentMember.email);
+                resetPassword(currentMember.id, currentMember.email);
                 setMemberMenuId(null);
                 setMemberMenuPos(null);
               }}
