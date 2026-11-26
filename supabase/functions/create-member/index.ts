@@ -7,7 +7,8 @@ import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-
 // `public.users.role` alone, which survives member deletion):
 //   • caller must have a members row (by login email, case-insensitive)
 //   • super admin (members.role = 'super_admin' or users.is_super_admin): any church
-//   • church admin (members.role = 'admin'): only their own church
+//   • church admin (members.role = 'admin'): only their own church, never
+//     creates or promotes an admin, never re-roles another admin
 //   • nobody creates super admins here
 //
 // EMAIL: trimmed + lowercased (Auth stores logins lowercase; the DB trigger
@@ -124,6 +125,11 @@ serve(async (req) => {
     if (!ALLOWED_ROLES.includes(role)) {
       return json({ error: `Role "${role}" can't be used for an account. Choose Member, Admin or Guest.` }, 400)
     }
+    // Only a super admin creates admins or promotes anyone to admin (DB trigger
+    // members_guard_privileged enforces the same for direct writes).
+    if (!caller.isSuper && role === 'admin') {
+      return json({ error: 'Only a super admin can make someone an admin', reason: 'grant_admin' }, 403)
+    }
     if (!churchId) return json({ error: 'church_id is required' }, 400)
     if (!caller.isSuper && churchId !== caller.churchId) {
       return json({ error: 'Admins can only add members to their own church' }, 403)
@@ -152,6 +158,10 @@ serve(async (req) => {
         return json({ error: 'This person already belongs to another church', code: 'other_church' }, 409)
       }
       if (member?.role === 'super_admin') return json({ error: 'This account is a super admin', reason: 'target_is_super_admin' }, 403)
+      // Linking re-roles and re-activates the member: never another admin unless super admin.
+      if (!caller.isSuper && member?.role === 'admin' && member.id !== caller.memberId) {
+        return json({ error: 'Only a super admin can change another admin', reason: 'target_is_admin' }, 403)
+      }
       if (member) {
         const { error } = await admin.from('members').update({ role, status: 'active' }).eq('id', member.id)
         if (error) throw error
