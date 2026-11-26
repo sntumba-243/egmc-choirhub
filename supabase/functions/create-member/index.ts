@@ -140,11 +140,18 @@ serve(async (req) => {
         return json({ error: 'An account with this email already exists', code: 'account_exists' }, 409)
       }
       // Link / promote. The password is never touched here.
+      // Never a super admin (same full definition as reset-password: member role
+      // OR users.is_super_admin on the login) — only a super admin may change one,
+      // and nobody re-roles a super admin through this path.
+      const { data: targetUser } = await admin.from('users').select('is_super_admin').eq('id', existing.id).maybeSingle()
+      if (targetUser?.is_super_admin === true) {
+        return json({ error: 'This account is a super admin', reason: 'target_is_super_admin' }, 403)
+      }
       const { data: member } = await admin.from('members').select('id, church_id, role').eq('email', email).maybeSingle()
       if (member && member.church_id !== churchId) {
         return json({ error: 'This person already belongs to another church', code: 'other_church' }, 409)
       }
-      if (member?.role === 'super_admin') return json({ error: 'This account is a super admin' }, 409)
+      if (member?.role === 'super_admin') return json({ error: 'This account is a super admin', reason: 'target_is_super_admin' }, 403)
       if (member) {
         const { error } = await admin.from('members').update({ role, status: 'active' }).eq('id', member.id)
         if (error) throw error
