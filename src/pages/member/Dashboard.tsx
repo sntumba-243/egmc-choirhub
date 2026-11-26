@@ -6,6 +6,7 @@ import { useChurch } from '../../contexts/ChurchContext';
 import { supabase } from '../../lib/supabase';
 import { getChurchNow, getChurchToday } from '../../lib/dateUtils';
 import { eventCoversDay, formatEventDates, isMultiDay } from '../../lib/eventDates';
+import { formatEventTime } from '../../lib/eventTime';
 
 export const MemberDashboard = () => {
   const { user } = useAuth();
@@ -108,14 +109,6 @@ export const MemberDashboard = () => {
   const getEventMonth = (d: string) => parseDate(d).toLocaleDateString('en-US', { month: 'short' });
   const getEventDay = (d: string) => parseDate(d).getDate();
 
-  const formatTime = (t: string) => {
-    if (!t) return '';
-    const [h, m] = t.split(':');
-    const hour = parseInt(h, 10);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const h12 = hour % 12 || 12;
-    return `${h12}:${m} ${ampm}`;
-  };
 
   const v = (n: number) => loading ? '–' : n;
 
@@ -177,7 +170,7 @@ export const MemberDashboard = () => {
             <div className="absolute rounded-full" style={{ bottom: '-20px', left: '-20px', width: '80px', height: '80px', background: 'rgba(255,255,255,0.06)' }} />
             <p style={{ fontSize: '10px', opacity: 0.85, textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: 600 }}>Next Event</p>
             <p className="relative z-10" style={{ fontSize: '19px', fontWeight: 700, margin: '6px 0 4px' }}>{nextEvent.title}</p>
-            <p className="relative z-10" style={{ fontSize: '12px', opacity: 0.9 }}>{isMultiDay(nextEvent) && eventCoversDay(nextEvent, getChurchToday(church?.timezone)) ? `Happening now · ${formatEventDates(nextEvent, formatEventDate)}` : formatEventDates(nextEvent, formatEventDate)}{nextEvent.time ? ` · ${formatTime(nextEvent.time)}` : ''}{nextEvent.location ? ` · ${nextEvent.location}` : ''}</p>
+            <p className="relative z-10" style={{ fontSize: '12px', opacity: 0.9 }}>{isMultiDay(nextEvent) && eventCoversDay(nextEvent, getChurchToday(church?.timezone)) ? `Happening now · ${formatEventDates(nextEvent, formatEventDate)}` : formatEventDates(nextEvent, formatEventDate)}{nextEvent.time ? ` · ${formatEventTime(nextEvent.time)}` : ''}{nextEvent.location ? ` · ${nextEvent.location}` : ''}</p>
             <div className="absolute flex items-center justify-center"
               style={{ bottom: '18px', right: '18px', width: '34px', height: '34px', background: 'rgba(255,255,255,0.18)', borderRadius: '50%' }}>
               <ChevronRight className="w-4 h-4" />

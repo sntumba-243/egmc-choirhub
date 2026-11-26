@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useChurch } from '../../contexts/ChurchContext';
 import { eventCoversDay, eventRangeLabel } from '../../lib/eventDates';
+import { formatEventTime } from '../../lib/eventTime';
 
 interface EventLite {
   id: string;
@@ -51,14 +52,6 @@ const dayNumber = (dateStr: string) =>
 const monthShort = (dateStr: string) =>
   new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
 
-const formatTime = (t?: string | null) => {
-  if (!t) return '';
-  const [hh, mm] = t.split(':');
-  const h = parseInt(hh, 10);
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const display = h % 12 || 12;
-  return `${display}:${mm} ${ampm}`;
-};
 
 const formatHeaderDate = () => {
   const d = new Date();
@@ -247,7 +240,7 @@ export default function AttendanceLanding() {
               <div className="text-lg font-semibold mt-1">{todayEvent.title}</div>
               <div className="text-sm mt-0.5" style={{ opacity: 0.75 }}>
                 {eventRangeLabel(todayEvent) ? `${eventRangeLabel(todayEvent)} · ` : ''}
-                {formatTime(todayEvent.time)}
+                {formatEventTime(todayEvent.time)}
                 {todayEvent.location ? ` · ${todayEvent.location}` : ''}
               </div>
               <button
@@ -318,7 +311,7 @@ export default function AttendanceLanding() {
                       <div className="text-sm font-medium text-gray-900 truncate">{ev.title}</div>
                       <div className="text-xs text-gray-400 mt-1 truncate">
                         {eventRangeLabel(ev) ? `${eventRangeLabel(ev)} · ` : ''}
-                        {formatTime(ev.time)}
+                        {formatEventTime(ev.time)}
                         {ev.location ? ` · ${ev.location}` : ''}
                       </div>
                     </div>

@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { generateMemorablePassword } from '../../lib/passwordUtils';
 
 import { eventRangeLabel, isEventPast } from '../../lib/eventDates';
+import { formatEventTime } from '../../lib/eventTime';
 interface ChurchData {
   id: string;
   name: string;
@@ -536,7 +537,7 @@ export const ChurchDetail = () => {
                     <p className="font-medium text-sm break-words line-clamp-2">{event.title}</p>
                     <p className="text-xs text-gray-500 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                       {eventRangeLabel(event) && <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {eventRangeLabel(event)}</span>}
-                      <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {event.time}</span>
+                      <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {formatEventTime(event.time)}</span>
                       <span className="flex items-center gap-1 min-w-0"><MapPin className="w-3 h-3 flex-shrink-0" /> <span className="truncate">{event.location}</span></span>
                     </p>
                   </div>
