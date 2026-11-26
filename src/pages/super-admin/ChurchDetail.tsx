@@ -532,16 +532,16 @@ export const ChurchDetail = () => {
                       {new Date(event.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' })}
                     </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">{event.title}</p>
-                    <p className="text-xs text-gray-500 flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm break-words line-clamp-2">{event.title}</p>
+                    <p className="text-xs text-gray-500 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                       {eventRangeLabel(event) && <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {eventRangeLabel(event)}</span>}
                       <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {event.time}</span>
-                      <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {event.location}</span>
+                      <span className="flex items-center gap-1 min-w-0"><MapPin className="w-3 h-3 flex-shrink-0" /> <span className="truncate">{event.location}</span></span>
                     </p>
                   </div>
                   {event.is_global && (
-                    <span className="text-xs bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded-full">Global</span>
+                    <span className="flex-shrink-0 text-xs bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded-full">Global</span>
                   )}
                 </div>
               ))}
@@ -563,9 +563,9 @@ export const ChurchDetail = () => {
                       {new Date(event.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' })}
                     </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-sm text-gray-600">{event.title}</p>
-                    <p className="text-xs text-gray-400">{event.location}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm text-gray-600 break-words line-clamp-2">{event.title}</p>
+                    <p className="text-xs text-gray-400 truncate">{event.location}</p>
                   </div>
                 </div>
               ))}

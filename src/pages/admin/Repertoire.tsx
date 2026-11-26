@@ -540,11 +540,11 @@ export const AdminRepertoire = () => {
           return (
             <div
               key={song.id}
-              className={`flex items-center gap-3 px-3 py-3 border-b border-gray-100 last:border-b-0 transition ${isSel ? 'bg-indigo-50' : ''}`}
+              className={`flex items-center gap-0 px-1 py-1.5 sm:gap-1 sm:px-2 border-b border-gray-100 last:border-b-0 transition ${isSel ? 'bg-indigo-50' : ''}`}
             >
               {/* Checkbox \u2014 admin only, 44x44 tap target */}
               <label
-                className="min-w-[44px] min-h-[44px] flex items-center justify-center cursor-pointer flex-shrink-0"
+                className="w-11 h-11 flex items-center justify-center cursor-pointer flex-shrink-0"
                 onClick={(e) => e.stopPropagation()}
               >
                 <input
@@ -558,27 +558,27 @@ export const AdminRepertoire = () => {
               {/* Star/favorite \u2014 44x44 tap target */}
               <button
                 onClick={(e) => toggleFavorite(song.id, e)}
-                className="min-w-[44px] min-h-[44px] flex items-center justify-center flex-shrink-0 text-base leading-none"
+                className="w-11 h-11 flex items-center justify-center flex-shrink-0 text-base leading-none"
                 aria-label={isFav ? 'Remove favorite' : 'Add favorite'}
               >
                 <span className={isFav ? 'text-yellow-500' : 'text-gray-300'}>{isFav ? '\u2605' : '\u2606'}</span>
               </button>
 
               {/* Title + composer \u2014 matches member portal */}
-              <div className="flex-1 min-w-0 cursor-pointer" onClick={() => song.sheet_music_url && handleViewPDF(song)}>
-                <div className={`text-sm font-semibold ${song.sheet_music_url ? 'text-gray-900 active:text-orange-600' : 'text-gray-900'}`} style={{ whiteSpace: 'normal', overflow: 'visible' }}>{song.title}</div>
-                <div className="text-sm text-gray-400" style={{ whiteSpace: 'normal', overflow: 'visible' }}>{song.composer}</div>
+              <div className="flex-1 min-w-0 px-1 cursor-pointer" onClick={() => song.sheet_music_url && handleViewPDF(song)}>
+                <div className={`text-sm font-semibold leading-5 break-words line-clamp-2 ${song.sheet_music_url ? 'text-gray-900 active:text-orange-600' : 'text-gray-900'}`} title={song.title}>{song.title}</div>
+                {song.composer && <div className="text-sm leading-5 text-gray-400 truncate">{song.composer}</div>}
               </div>
 
               {/* Language badge \u2014 matches member portal */}
-              <span className={`w-6 h-6 flex items-center justify-center rounded-full text-sm font-bold text-white flex-shrink-0 ${getLangColor(song.language)}`}>
+              <span className={`w-6 h-6 mx-1 flex items-center justify-center rounded-full text-sm font-bold text-white flex-shrink-0 ${getLangColor(song.language)}`}>
                 {(song.language || '?').slice(0, 1)}
               </span>
 
               {/* Status \u2014 admin: tappable to cycle (uses existing handleStatusCycle which persists to church_song_status) */}
               <button
                 onClick={(e) => handleStatusCycle(song.id, song.learning_status, e)}
-                className="flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center text-base leading-none hover:scale-110 active:scale-95 transition-transform"
+                className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-base leading-none hover:scale-110 active:scale-95 transition-transform"
                 title="Tap to change status"
               >
                 {song.learning_status === 'learned' ? '\u2705' : song.learning_status === 'learning' ? '\uD83D\uDCDA' : '\u23F3'}
@@ -587,7 +587,7 @@ export const AdminRepertoire = () => {
               {/* 3-dot menu trigger \u2014 visible to all (dropdown contents role-gated) */}
               <button
                 onClick={(e) => handleMenuOpen(e, song.id)}
-                className="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-300 hover:text-gray-500 flex-shrink-0"
+                className="w-11 h-11 flex items-center justify-center text-gray-300 hover:text-gray-500 flex-shrink-0"
                 aria-label="Song options"
               >
                 <svg width="4" height="16" viewBox="0 0 4 16" fill="currentColor">
