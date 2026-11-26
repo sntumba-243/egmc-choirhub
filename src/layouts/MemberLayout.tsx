@@ -6,6 +6,7 @@ import { useActivityTracker } from '../hooks/useActivityTracker';
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { startBackgroundCache } from '../lib/backgroundCache';
+import OfflineSaveStatus from '../components/OfflineSaveStatus';
 
 export default function MemberLayout() {
   const location = useLocation();
@@ -17,10 +18,10 @@ export default function MemberLayout() {
 
   useEffect(() => { setSidebarOpen(false); }, [location]);
 
-  // Offline sheet music: on each app open, quietly save upcoming-event songs and
-  // favorites, and refresh saved copies whose file changed. The full library is
-  // downloaded only if the member chose it on Profile. Member portal only; at
-  // most once per app open. See lib/backgroundCache.
+  // Offline sheet music: on each app open, save/refresh song PDFs in the
+  // background (whole library on first sign-in, event songs and favorites
+  // first, then only new/changed files). At most once per app open. See
+  // lib/backgroundCache.
   useEffect(() => {
     if (user?.id) {
       startBackgroundCache({ userId: user.id, churchId: (user as any)?.church_id || church?.id });
@@ -175,6 +176,8 @@ export default function MemberLayout() {
           <Outlet />
         </div>
       </main>
+
+      <OfflineSaveStatus />
 
 
       <style>{`

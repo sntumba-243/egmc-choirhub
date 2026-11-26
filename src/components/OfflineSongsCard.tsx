@@ -2,15 +2,15 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
-import { getCacheStatus, downloadAllNow, subscribeCacheProgress, isFullLibraryEnabled } from '../lib/backgroundCache';
+import { getCacheStatus, downloadAllNow, subscribeCacheProgress } from '../lib/backgroundCache';
 
 // Offline sheet music status + "Download all now" — the same card on the member
 // Profile, admin Settings and super-admin Settings.
 //
 // READ-ONLY on mount: reports how many songs are saved and current, then tracks
-// live progress. Event songs + favorites are saved automatically by each portal's
-// layout (lib/backgroundCache); the FULL library only after the button is tapped
-// ("Download all now"), then Resume/Retry if it is interrupted.
+// live progress. The whole library is saved automatically by each portal's
+// layout (lib/backgroundCache: event songs → favorites → rest); the button
+// starts it now (no Wi-Fi wait), or resumes/retries it.
 export const OfflineSongsCard: React.FC = () => {
   const { user } = useAuth();
   const [status, setStatus] = useState({ priority: { cached: 0, total: 0 }, full: { cached: 0, total: 0 } });
@@ -92,7 +92,7 @@ export const OfflineSongsCard: React.FC = () => {
           ? `Downloading… ${progress.cached}/${progress.total}`
           : status.full.total > 0 && status.full.cached >= status.full.total
           ? 'All saved'
-          : isFullLibraryEnabled()
+          : status.full.cached > 0
           ? (lastFailed > 0 ? 'Retry' : 'Resume')
           : 'Download all now'}
       </button>

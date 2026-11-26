@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { startBackgroundCache } from '../lib/backgroundCache';
+import OfflineSaveStatus from '../components/OfflineSaveStatus';
 
 export default function SuperAdminLayout() {
   const location = useLocation();
@@ -23,11 +24,10 @@ export default function SuperAdminLayout() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Offline sheet music, same as the member portal: on each app open, quietly
-  // save upcoming-event songs and favorites (and their setlists / favorites
-  // lists for offline pages), and refresh saved copies whose file changed. The
-  // full library only if this device chose it in Settings. At most once per app
-  // open. See lib/backgroundCache.
+  // Offline sheet music, same as the member portal: on each app open, save
+  // the whole library in the background (event songs and favorites first, plus
+  // their setlists / favorites lists for offline pages), then only new/changed
+  // files. At most once per app open. See lib/backgroundCache.
   useEffect(() => {
     if (user?.id) {
       startBackgroundCache({ userId: user.id, churchId: (user as any)?.church_id });
@@ -163,6 +163,8 @@ export default function SuperAdminLayout() {
           <Outlet />
         </div>
       </main>
+
+      <OfflineSaveStatus />
     </div>
   );
 }

@@ -9,19 +9,17 @@
 //      IndexedDB (lib/offlineCache) so Repertoire, event setlists and Favorites
 //      render offline;
 //   2. drops saved copies of songs that no longer exist (or whose sheet moved);
-//   3. downloads, in this order:
-//        • songs on ALL upcoming events the person can see — always;
-//        • their favorites — always;
-//        • any OTHER song already saved on this device whose file changed;
-//        • the rest of the library — ONLY if this device chose the full
-//          library ("Download all now": member Profile, admin / super-admin
-//          Settings — components/OfflineSongsCard). Never automatic: the library
-//          is ~175 MB per device and Storage egress is metered.
-// A chosen full download that gets interrupted resumes on the next online open
-// (saved files are skipped — never restarts from zero). Those automatic
-// resumes wait for Wi-Fi where the browser reports a cellular connection
-// (Android Chrome) until the full library has completed once; event songs and
-// favorites never wait. A tap on Profile always downloads right away.
+//   3. downloads what is missing or out of date, in this order:
+//        event songs (ALL upcoming events the member can see) → favorites → rest.
+// The first full download starts by itself after sign-in (no prompt) — the
+// whole library on every device (Supabase Pro, 250 GB egress; it was opt-in on
+// the Free plan, a5daf7e). If it is interrupted it resumes on the next online
+// open — saved files are skipped, so it never restarts from zero. Where the
+// browser reports a cellular connection (Android Chrome), the rest of the
+// library waits for Wi-Fi until the first full download has completed once;
+// event songs and favorites go right away. iPhone/iPad don't report the
+// connection type, so they download anyway. A tap on "Download all now"
+// (Profile / Settings) always downloads right away.
 //
 // CHANGE DETECTION: songs are usually fixed by replacing the PDF in the bucket
 // under the SAME name without touching the songs row, so the cache key (URL +
@@ -79,9 +77,9 @@ export interface BackgroundCacheOpts {
 // STABLE name shared with public/service-worker.js (PDF_CACHE).
 const PDF_CACHE = 'egmc-pdfs';
 export const ETAG_HEADER = 'X-ChoirHub-ETag';
-// Set when the member taps "Download all now" on Profile: from then on this
-// device keeps the WHOLE library (new songs included). Without it, only event
-// songs, favorites and already-saved songs are kept.
+// Legacy (opt-in era): set when a device tapped "Download all now". Every
+// device now keeps the whole library, so nothing reads it; still written so a
+// rollback to the opt-in build keeps those devices on the full library.
 const FULL_LIBRARY_KEY = 'choirhub_offline_full_library';
 // Set once the whole library has been saved on this device (ends the Wi-Fi wait).
 const FULL_DONE_KEY = 'choirhub_offline_full_done';
@@ -175,7 +173,6 @@ async function waitForWifi(): Promise<void> {
 }
 
 const isFullDone = () => storageGet(FULL_DONE_KEY) === '1';
-export const isFullLibraryEnabled = () => storageGet(FULL_LIBRARY_KEY) === '1';
 
 // ── Data for the plan (one request per kind, never one per song) ──
 async function fetchManifest(): Promise<Map<string, string> | null> {
@@ -394,17 +391,10 @@ async function sync(opts: BackgroundCacheOpts, gateForWifi: boolean): Promise<Ru
     const plan = await buildPlan(opts);
     const cache = await caches.open(PDF_CACHE);
     await prune(cache, plan);
-    const full = isFullLibraryEnabled();
-    const queue = [...plan.event, ...plan.fav];
-    if (full) {
-      queue.push(...plan.rest);
-    } else {
-      // Not chosen: keep what is already saved current, add nothing new.
-      for (const it of plan.rest) if ((await stateOf(cache, it)) === 'stale') queue.push(it);
-    }
+    const queue = [...plan.event, ...plan.fav, ...plan.rest];
     if (!queue.length) return { total: 0, cached: 0, failed: 0 };
     const result = await runQueue(queue, gateForWifi && !isFullDone());
-    if (full && plan.online && result.total > 0 && result.cached >= result.total) storageSet(FULL_DONE_KEY, '1');
+    if (plan.online && result.total > 0 && result.cached >= result.total) storageSet(FULL_DONE_KEY, '1');
     return result;
   } finally {
     setProgress({ downloading: false, waitingForWifi: false });
@@ -445,10 +435,9 @@ export async function getSavedEvent(eventId: string): Promise<{ event: any; even
 let autoStarted = false;
 
 /**
- * Called by the member, admin and super-admin layouts once someone is signed
- * in. Once per app open:
- * waits until online, then syncs (prune → event songs, favorites, changed saved
- * files; plus the rest of the library only if this device chose it).
+ * Called by each portal layout once signed in. Once per app open: waits until
+ * online, then syncs (prune → download missing/changed, priority order). The
+ * first run on a device downloads the whole library automatically.
  */
 export function startBackgroundCache(opts: BackgroundCacheOpts = {}): void {
   if (autoStarted || !CACHES_OK) return;
