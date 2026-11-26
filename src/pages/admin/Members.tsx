@@ -6,6 +6,7 @@ import { User, Search, Plus, Edit, Trash2, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { useChurch } from '../../contexts/ChurchContext';
+import { DeviceAccessPanel } from '../../components/DeviceAccessPanel';
 
 interface Member {
   id: string;
@@ -339,6 +340,8 @@ export const AdminMembers = () => {
           })}
         </div>
       )}
+
+      <DeviceAccessPanel isSuperAdmin={isSuperAdmin} />
     </div>
   );
 };

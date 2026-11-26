@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getDbClient } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { SecurityAlertsCard } from '../../components/SecurityAlertsCard';
 import { Church, Users, Music, Calendar, Shield, Plus, ArrowRight } from 'lucide-react';
 
 interface ChurchStats {
@@ -100,6 +101,8 @@ export const SuperAdminDashboard = () => {
           <p className="text-xs text-gray-600">Manage all churches and repertoire</p>
         </div>
       </div>
+
+      <SecurityAlertsCard />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {statCards.map((stat) => {

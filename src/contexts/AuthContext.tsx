@@ -7,6 +7,7 @@ import { neonAuth, NeonUser } from '../lib/neonAuth';
 import { autoFailover } from '../lib/autoFailover';
 import { Sentry } from '../lib/sentry';
 import toast from 'react-hot-toast';
+import { checkDevice, deviceRefusalMessage } from '../lib/deviceLimit';
 
 interface AuthContextType {
   user: NeonUser | null;
@@ -50,8 +51,45 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     window.addEventListener('database-failover', handleFailover);
-    return () => window.removeEventListener('database-failover', handleFailover);
+
+    // Signed out elsewhere (revoked session: the refresh fails and supabase-js
+    // emits SIGNED_OUT) → leave the app instead of failing quietly.
+    let unsubscribe: (() => void) | undefined;
+    if (!useNeon) {
+      try {
+        const { data } = getDbClient().auth.onAuthStateChange((event: string) => {
+          if (event === 'SIGNED_OUT') {
+            setUser((prev) => {
+              if (prev) {
+                clearOfflineUser();
+                Sentry.setUser(null);
+                navigate('/login');
+              }
+              return null;
+            });
+          }
+        });
+        unsubscribe = () => data?.subscription?.unsubscribe();
+      } catch { /* failover client has no auth events */ }
+    }
+
+    return () => {
+      window.removeEventListener('database-failover', handleFailover);
+      unsubscribe?.();
+    };
   }, []);
+
+  // Device limit: refused or revoked → sign this device out (local only, so the
+  // other devices stay signed in) and say why.
+  const enforceDevice = async (supabase: any): Promise<string | null> => {
+    const r = await checkDevice(supabase);
+    const msg = deviceRefusalMessage(r);
+    if (msg) {
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+      clearOfflineUser();
+    }
+    return msg;
+  };
 
   const checkUser = async () => {
     try {
@@ -71,7 +109,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           if (cached) { setUser(cached); Sentry.setUser({ id: cached.id, email: cached.email, role: cached.role }); }
           return !!cached;
         };
-        if (!session?.user) {
+        const deviceRefused = session?.user ? await enforceDevice(supabase) : null;
+        if (deviceRefused) {
+          toast.error(deviceRefused, { duration: 8000 });
+        } else if (!session?.user) {
           restoreOffline(sessionError);
         } else {
           const { data: memberData, error: memberError } = await findMemberByEmail(supabase, session.user.email);
@@ -144,6 +185,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (error) throw error;
 
         if (data.user) {
+          const deviceRefused = await enforceDevice(supabase);
+          if (deviceRefused) throw new Error(deviceRefused);
+
           const { data: memberData, error: memberError } = await findMemberByEmail(supabase, data.user.email);
 
           if (!memberData) {

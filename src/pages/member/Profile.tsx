@@ -6,6 +6,7 @@ import { offlineStorage, OfflineSong } from '../../lib/offlineStorage';
 import { practiceLogService, PracticeLog } from '../../lib/practiceLog';
 import { OfflineSongsCard } from '../../components/OfflineSongsCard';
 import toast from 'react-hot-toast';
+import { MyDevicesCard } from '../../components/MyDevicesCard';
 
 export const MemberProfile: React.FC = () => {
   const { user } = useAuth();
@@ -230,6 +231,8 @@ export const MemberProfile: React.FC = () => {
       </div>
 
       {/* Practice Stats */}
+      <MyDevicesCard />
+
       <div className="bg-white rounded-xl border border-gray-200 p-4">
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Practice Stats</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
