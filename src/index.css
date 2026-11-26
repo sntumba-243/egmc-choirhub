@@ -49,6 +49,43 @@ body { overflow-wrap: anywhere; }
     user-select: none;
   }
 
+  /* iOS/iPadOS Safari gives date/time inputs a native grey pill, centred text and an
+     intrinsic min-width wider than half a phone/iPad card, so in a two-column row
+     they refuse to shrink and spill over the neighbouring field and the card edge.
+     Strip the native look and let them size like every other input. Kept in the
+     base layer so per-input utilities (padding, bg, border colour) still win. */
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"] {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    height: 2.375rem; /* same as a py-2 text-sm text input: 20px line + 16px pad + 2px border */
+    line-height: 1.25rem;
+    text-align: left;
+    background-color: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    color: inherit;
+  }
+  input[type="date"]::-webkit-date-and-time-value,
+  input[type="time"]::-webkit-date-and-time-value,
+  input[type="datetime-local"]::-webkit-date-and-time-value {
+    text-align: left;
+    margin: 0;
+  }
+  input[type="date"]::-webkit-datetime-edit,
+  input[type="time"]::-webkit-datetime-edit,
+  input[type="datetime-local"]::-webkit-datetime-edit {
+    padding: 0;
+    line-height: 1.25rem;
+  }
+
   @supports (-webkit-touch-callout: none) {
     body {
       min-height: -webkit-fill-available;

@@ -336,8 +336,8 @@ export const EventForm: React.FC = () => {
             className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500"
           />
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
+            <div className="min-w-0">
               <label htmlFor="event-from" className="block text-xs font-medium text-gray-600 mb-1">From *</label>
               <div className="relative">
                 <Calendar className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -347,11 +347,11 @@ export const EventForm: React.FC = () => {
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
                   required
-                  className="w-full pl-8 pr-2 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  className="w-full pl-9 pr-2 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
             </div>
-            <div>
+            <div className="min-w-0">
               <label htmlFor="event-to" className="block text-xs font-medium text-gray-600 mb-1">To <span className="text-gray-400">(optional)</span></label>
               <div className="relative">
                 <Calendar className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -361,7 +361,7 @@ export const EventForm: React.FC = () => {
                   value={endDate}
                   min={date || undefined}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className={`w-full pl-8 pr-2 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500 ${endDateError(date, endDate) ? 'border-red-400' : ''}`}
+                  className={`w-full pl-9 pr-2 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500 ${endDateError(date, endDate) ? 'border-red-400' : ''}`}
                 />
               </div>
             </div>
@@ -370,22 +370,22 @@ export const EventForm: React.FC = () => {
             <p className="text-xs text-red-600 -mt-1">{endDateError(date, endDate)}</p>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="relative">
+          <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
+            <div className="relative min-w-0">
               <Clock className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="time"
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
                 required
-                className="w-full pl-8 pr-2 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                className="w-full pl-9 pr-2 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500"
               />
             </div>
 
             <select
               value={type}
               onChange={(e) => setType(e.target.value)}
-              className="w-full px-2 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500"
+              className="w-full min-w-0 px-2 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500"
             >
               <option value="">Type</option>
               <option value="Service">Service</option>
