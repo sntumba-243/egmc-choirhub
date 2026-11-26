@@ -9,7 +9,7 @@ import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-
 //   • caller must have a members row (by login email)
 //   • super admin (members.role = 'super_admin' or users.is_super_admin): any account
 //   • church admin (members.role = 'admin'): only accounts whose member row is in
-//     the SAME church, and never a super admin
+//     the SAME church, never a super admin, and never another admin
 //   • everyone else: 403
 // `dry_run: true` runs every check and returns the decision without changing
 // anything (used to verify authorization with real calls).
@@ -93,6 +93,10 @@ serve(async (req) => {
     if (!caller.isSuper) {
       if (target.isSuper) {
         return json({ error: 'Only a super admin can reset this account', reason: 'target_is_super_admin' }, 403)
+      }
+      // Another admin (not the caller): only a super admin may reset it.
+      if (target.role === 'admin' && target.memberId !== caller.memberId) {
+        return json({ error: 'Only a super admin can reset another admin\'s password', reason: 'target_is_admin' }, 403)
       }
       if (!target.memberId || !target.churchId || target.churchId !== caller.churchId) {
         return json({ error: 'You can only reset passwords for members of your own church', reason: 'different_church' }, 403)
