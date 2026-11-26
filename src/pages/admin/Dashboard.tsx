@@ -12,6 +12,7 @@ import { useChurch } from '../../contexts/ChurchContext';
 
 import { daysUntilEvent, eventRangeLabel, formatEventDates } from '../../lib/eventDates';
 import { fetchRsvps, countByEvent } from '../../lib/rsvps';
+import { formatEventTime } from '../../lib/eventTime';
 interface Stats {
   totalMembers: number;
   totalSongs: number;
@@ -504,7 +505,7 @@ export const AdminDashboard = () => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-gray-900 mb-0.5 text-sm">{event.title}</h3>
-                    <p className="text-xs text-gray-600">{eventRangeLabel(event) ? `${eventRangeLabel(event)} · ` : ''}{event.time}</p>
+                    <p className="text-xs text-gray-600">{eventRangeLabel(event) ? `${eventRangeLabel(event)} · ` : ''}{formatEventTime(event.time)}</p>
                     <p className="text-xs text-gray-600">📍 {event.location}</p>
                   </div>
                 </div>

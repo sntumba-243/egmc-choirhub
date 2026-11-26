@@ -138,25 +138,25 @@ export const SuperAdminDashboard = () => {
             <button
               key={church.id}
               onClick={() => navigate(`/super-admin/churches/${church.id}`)}
-              className="w-full bg-white rounded-lg p-4 border border-gray-100 hover:shadow-md transition-all text-left flex items-center justify-between"
+              className="w-full bg-white rounded-lg p-4 border border-gray-100 hover:shadow-md transition-all text-left flex items-center justify-between gap-2"
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
                 {church.logo_url ? (
-                  <img src={church.logo_url} alt={church.short_name} className="w-10 h-10 rounded-lg object-cover" />
+                  <img src={church.logo_url} alt={church.short_name} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
                 ) : (
                   <div
-                    className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm"
+                    className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
                     style={{ backgroundColor: church.primary_color || '#6366f1' }}
                   >
                     {church.short_name.substring(0, 2)}
                   </div>
                 )}
-                <div>
-                  <h3 className="font-semibold text-gray-900">{church.name}</h3>
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-gray-900 break-words line-clamp-2">{church.name}</h3>
                   <p className="text-xs text-gray-500">{church.memberCount} members</p>
                 </div>
               </div>
-              <ArrowRight className="w-4 h-4 text-gray-400" />
+              <ArrowRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
             </button>
           ))}
 

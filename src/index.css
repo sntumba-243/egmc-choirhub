@@ -13,8 +13,11 @@ html, body { overflow-x: hidden; max-width: 100vw; }
    UNBREAKABLE token in user data (a long email/member-id used as a name, a URL in
    a message, a no-space church/event name) forces its box wider than the screen.
    overflow-x:hidden would merely clip it while iOS still zooms out. Let such tokens
-   wrap. `anywhere` also lets flex/grid items shrink below their longest word. */
-body { overflow-wrap: anywhere; }
+   wrap. `break-word` (not `anywhere`): a word is only split when it alone is wider
+   than its line, so ordinary text in narrow columns (e.g. repertoire titles) wraps
+   between words instead of breaking mid-word. Unlike `anywhere` it does not lower
+   min-content width, so flex/grid children that must shrink need `min-w-0`. */
+body { overflow-wrap: break-word; }
 
 @layer base {
   * {
@@ -47,6 +50,43 @@ body { overflow-wrap: anywhere; }
     cursor: pointer;
     -webkit-user-select: none;
     user-select: none;
+  }
+
+  /* iOS/iPadOS Safari gives date/time inputs a native grey pill, centred text and an
+     intrinsic min-width wider than half a phone/iPad card, so in a two-column row
+     they refuse to shrink and spill over the neighbouring field and the card edge.
+     Strip the native look and let them size like every other input. Kept in the
+     base layer so per-input utilities (padding, bg, border colour) still win. */
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"] {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    height: 2.375rem; /* same as a py-2 text-sm text input: 20px line + 16px pad + 2px border */
+    line-height: 1.25rem;
+    text-align: left;
+    background-color: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    color: inherit;
+  }
+  input[type="date"]::-webkit-date-and-time-value,
+  input[type="time"]::-webkit-date-and-time-value,
+  input[type="datetime-local"]::-webkit-date-and-time-value {
+    text-align: left;
+    margin: 0;
+  }
+  input[type="date"]::-webkit-datetime-edit,
+  input[type="time"]::-webkit-datetime-edit,
+  input[type="datetime-local"]::-webkit-datetime-edit {
+    padding: 0;
+    line-height: 1.25rem;
   }
 
   @supports (-webkit-touch-callout: none) {

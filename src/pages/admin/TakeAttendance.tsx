@@ -14,6 +14,7 @@ import {
   getRSVPsForEvent,
   type MemberAttendanceRow,
 } from '../../lib/attendanceService';
+import { formatEventTime } from '../../lib/eventTime';
 
 type Phase = 'selector' | 'prompt' | 'sheet' | 'saved';
 
@@ -62,14 +63,6 @@ const formatLongDate = (dateString: string) => {
   });
 };
 
-const formatTime = (timeString?: string | null) => {
-  if (!timeString) return '';
-  const [hh, mm] = timeString.split(':');
-  const hour = parseInt(hh, 10);
-  const ampm = hour >= 12 ? 'PM' : 'AM';
-  const displayHour = hour % 12 || 12;
-  return `${displayHour}:${mm} ${ampm}`;
-};
 
 const initialsOf = (first: string, last: string) =>
   `${(first || '').charAt(0)}${(last || '').charAt(0)}`.toUpperCase() || '?';
@@ -477,7 +470,7 @@ export default function TakeAttendance() {
                       <h3 className="text-sm font-semibold text-gray-900 truncate">{ev.title}</h3>
                       <div className="text-xs text-gray-500 mt-0.5">
                         {eventRangeLabel(ev) && <span className="mr-2">{eventRangeLabel(ev)}</span>}
-                        {ev.time && <span>{formatTime(ev.time)}</span>}
+                        {ev.time && <span>{formatEventTime(ev.time)}</span>}
                         {ev.type && <span className="ml-2 text-gray-400">{ev.type}</span>}
                       </div>
                     </div>
@@ -522,7 +515,7 @@ export default function TakeAttendance() {
           <div className="flex-1 min-w-0">
             <div className="text-white text-lg font-semibold">{selectedEvent.title}</div>
             <div className="text-gray-300 text-sm mt-1">
-              {formatEventDates(selectedEvent, formatLongDate)}{selectedEvent.time ? ` · ${formatTime(selectedEvent.time)}` : ''}
+              {formatEventDates(selectedEvent, formatLongDate)}{selectedEvent.time ? ` · ${formatEventTime(selectedEvent.time)}` : ''}
             </div>
           </div>
         </div>

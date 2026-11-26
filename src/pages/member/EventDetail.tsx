@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import { formatEventDates } from '../../lib/eventDates';
 import { fetchRsvps } from '../../lib/rsvps';
 import { getSavedEvent } from '../../lib/backgroundCache';
+import { formatEventTime, hasKnownComposer } from '../../lib/eventTime';
 interface Event {
   id: string;
   title: string;
@@ -188,13 +189,6 @@ export const EventDetail = () => {
     return date.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
   };
 
-  const formatTime = (timeStr: string) => {
-    const [hours, minutes] = timeStr.split(':');
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:${minutes} ${ampm}`;
-  };
 
   if (loading) {
     return <div className="flex justify-center p-8">
@@ -236,14 +230,14 @@ export const EventDetail = () => {
               <Clock className="w-4 h-4 text-purple-600" />
               <div className="min-w-0">
                 <div className="text-xs text-gray-600">Time</div>
-                <div className="text-sm font-semibold text-gray-900">{formatTime(event.time)}</div>
+                <div className="text-sm font-semibold text-gray-900">{formatEventTime(event.time)}</div>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-green-600" />
               <div className="min-w-0">
                 <div className="text-xs text-gray-600">Location</div>
-                <div className="text-sm font-semibold text-gray-900 truncate">{event.location}</div>
+                <div className="text-sm font-semibold text-gray-900 break-words line-clamp-2">{event.location}</div>
               </div>
             </div>
           </div>
@@ -276,7 +270,7 @@ export const EventDetail = () => {
                           <h4 className={`text-sm font-semibold text-gray-900 truncate ${song.sheet_music_url ? 'hover:text-orange-700' : ''}`}>
                             {song.title}
                           </h4>
-                          <p className="text-xs text-gray-700 truncate">{song.composer}</p>
+                          {hasKnownComposer(song.composer) && <p className="text-xs text-gray-700 truncate">{song.composer}</p>}
                         </div>
                       </div>
 

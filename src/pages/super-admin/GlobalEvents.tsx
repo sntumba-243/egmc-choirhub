@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Calendar, Plus, Clock, MapPin, Trash2, Edit, Globe, Music, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { endDateError, eventRangeLabel, formatEventDates, isEventPast } from '../../lib/eventDates';
+import { formatEventTime } from '../../lib/eventTime';
 
 interface GlobalEvent {
   id: string;
@@ -289,34 +290,34 @@ export const GlobalEvents = () => {
       {showForm && (
         <form onSubmit={handleSubmit} className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
           <h3 className="font-bold text-lg">{editingId ? 'Edit Event' : 'Create Global Event'}</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="sm:col-span-2">
+          <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4">
+            <div className="min-w-0 sm:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Event Title *</label>
               <input type="text" value={form.title} onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500" required />
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="block text-sm font-medium text-gray-700 mb-1">From *</label>
               <input type="date" value={form.date} onChange={(e) => setForm(f => ({ ...f, date: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500" required />
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="block text-sm font-medium text-gray-700 mb-1">To <span className="text-gray-400 font-normal">(optional)</span></label>
               <input type="date" value={endDate} min={form.date || undefined} onChange={(e) => setEndDate(e.target.value)}
                 className={`w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-slate-500 ${endDateError(form.date, endDate) ? 'border-red-400' : 'border-gray-300'}`} />
               {endDateError(form.date, endDate) && <p className="text-xs text-red-600 mt-1">{endDateError(form.date, endDate)}</p>}
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="block text-sm font-medium text-gray-700 mb-1">Time *</label>
               <input type="time" value={form.time} onChange={(e) => setForm(f => ({ ...f, time: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500" required />
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="block text-sm font-medium text-gray-700 mb-1">Location *</label>
               <input type="text" value={form.location} onChange={(e) => setForm(f => ({ ...f, location: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500" required />
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
               <select value={form.type} onChange={(e) => setForm(f => ({ ...f, type: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500">
@@ -394,10 +395,10 @@ export const GlobalEvents = () => {
                 {selectedSongIds.map(id => {
                   const song = allSongs.find(s => s.id === id);
                   return song ? (
-                    <span key={id} className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-800 rounded-full text-xs font-medium">
-                      {song.title}
+                    <span key={id} className="inline-flex items-center gap-1 max-w-full min-w-0 px-2 py-1 bg-slate-100 text-slate-800 rounded-full text-xs font-medium">
+                      <span className="min-w-0 truncate">{song.title}</span>
                       <button type="button" onClick={() => setSelectedSongIds(prev => prev.filter(s => s !== id))}
-                        className="text-slate-600 hover:text-slate-800 font-bold">×</button>
+                        className="flex-shrink-0 text-slate-600 hover:text-slate-800 font-bold">×</button>
                     </span>
                   ) : null;
                 })}
@@ -420,8 +421,8 @@ export const GlobalEvents = () => {
                     }`}>
                       {selectedSongIds.includes(song.id) ? '✓' : '' }
                     </span>
-                    <span className="truncate">{song.title}</span>
-                    {song.composer && <span className="text-gray-400 text-xs ml-auto">{song.composer}</span>}
+                    <span className="min-w-0 truncate">{song.title}</span>
+                    {song.composer && <span className="min-w-0 max-w-[45%] truncate text-gray-400 text-xs ml-auto">{song.composer}</span>}
                   </button>
                 ))}
             </div>
@@ -446,8 +447,8 @@ export const GlobalEvents = () => {
           </h2>
           <div className="space-y-2">
             {upcoming.map((event) => (
-              <div key={event.id} className="bg-white rounded-lg p-4 border border-gray-100 flex items-center justify-between cursor-pointer hover:border-slate-200 transition" onClick={() => navigate(`/super-admin/events/${event.id}`)}>
-                <div className="flex items-center gap-3">
+              <div key={event.id} className="bg-white rounded-lg p-4 border border-gray-100 flex items-center justify-between gap-2 cursor-pointer hover:border-slate-200 transition" onClick={() => navigate(`/super-admin/events/${event.id}`)}>
+                <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="bg-slate-100 rounded-lg p-2 text-center flex-shrink-0 w-12">
                     <div className="text-lg font-bold text-slate-700">
                       {new Date(event.date + 'T00:00:00').getDate()}
@@ -456,15 +457,15 @@ export const GlobalEvents = () => {
                       {new Date(event.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' })}
                     </div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900 text-sm flex items-center gap-1">
-                      {event.title}
-                      <span className="text-xs bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded-full" title={targetTitle(event.id)}>{targetLabel(event.id)}</span>
+                  <div className="min-w-0">
+                    <h3 className="font-semibold text-gray-900 text-sm flex flex-wrap items-center gap-x-1 gap-y-0.5">
+                      <span className="min-w-0 break-words line-clamp-2">{event.title}</span>
+                      <span className="flex-shrink-0 whitespace-nowrap text-xs bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded-full" title={targetTitle(event.id)}>{targetLabel(event.id)}</span>
                     </h3>
-                    <p className="text-xs text-gray-500 flex items-center gap-2">
+                    <p className="text-xs text-gray-500 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                       {eventRangeLabel(event) && <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {eventRangeLabel(event)}</span>}
-                      <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {event.time}</span>
-                      <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {event.location}</span>
+                      <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {formatEventTime(event.time)}</span>
+                      <span className="flex items-center gap-1 min-w-0"><MapPin className="w-3 h-3 flex-shrink-0" /> <span className="truncate">{event.location}</span></span>
                     </p>
                   </div>
                 </div>
@@ -487,8 +488,8 @@ export const GlobalEvents = () => {
           <h2 className="text-base font-bold mb-2 text-gray-400">Past Events ({past.length})</h2>
           <div className="space-y-2 opacity-60">
             {past.map((event) => (
-              <div key={event.id} className="bg-white rounded-lg p-4 border border-gray-100 flex items-center justify-between">
-                <div className="flex items-center gap-3">
+              <div key={event.id} className="bg-white rounded-lg p-4 border border-gray-100 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="bg-gray-100 rounded-lg p-2 text-center flex-shrink-0 w-12">
                     <div className="text-lg font-bold text-gray-500">
                       {new Date(event.date + 'T00:00:00').getDate()}
@@ -497,15 +498,15 @@ export const GlobalEvents = () => {
                       {new Date(event.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' })}
                     </div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-600 text-sm flex items-center gap-1">
-                      {event.title}
-                      <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full" title={targetTitle(event.id)}>{targetLabel(event.id)}</span>
+                  <div className="min-w-0">
+                    <h3 className="font-semibold text-gray-600 text-sm flex flex-wrap items-center gap-x-1 gap-y-0.5">
+                      <span className="min-w-0 break-words line-clamp-2">{event.title}</span>
+                      <span className="flex-shrink-0 whitespace-nowrap text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full" title={targetTitle(event.id)}>{targetLabel(event.id)}</span>
                     </h3>
-                    <p className="text-xs text-gray-400">{formatEventDates(event, d => d)} • {event.location}</p>
+                    <p className="text-xs text-gray-400 truncate">{formatEventDates(event, d => d)} • {event.location}</p>
                   </div>
                 </div>
-                <button onClick={() => handleDelete(event.id)} className="p-1.5 hover:bg-red-50 rounded text-red-400">
+                <button onClick={() => handleDelete(event.id)} className="flex-shrink-0 p-1.5 hover:bg-red-50 rounded text-red-400">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>

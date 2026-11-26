@@ -11,6 +11,7 @@ import { formatEventDates } from '../../lib/eventDates';
 import { dbErrorMessage } from '../../lib/dbError';
 import { fetchRsvps } from '../../lib/rsvps';
 import { getSavedEvent } from '../../lib/backgroundCache';
+import { formatEventTime, hasKnownComposer } from '../../lib/eventTime';
 interface Event {
   id: string;
   title: string;
@@ -295,7 +296,7 @@ export const AdminEventDetail = () => {
             <Clock className="w-4 h-4 text-purple-600" />
             <div className="min-w-0">
               <p className="text-xs text-gray-600">Time</p>
-              <p className="text-sm font-semibold text-gray-900">{event.time}</p>
+              <p className="text-sm font-semibold text-gray-900">{formatEventTime(event.time)}</p>
             </div>
           </div>
 
@@ -303,7 +304,7 @@ export const AdminEventDetail = () => {
             <MapPin className="w-4 h-4 text-green-600" />
             <div className="min-w-0">
               <p className="text-xs text-gray-600">Location</p>
-              <p className="text-sm font-semibold text-gray-900 truncate">{event.location}</p>
+              <p className="text-sm font-semibold text-gray-900 break-words line-clamp-2">{event.location}</p>
             </div>
           </div>
         </div>
@@ -361,7 +362,7 @@ export const AdminEventDetail = () => {
                       <h4 className={`text-sm font-semibold text-gray-900 truncate ${song.sheet_music_url ? 'hover:text-indigo-700' : ''}`}>
                         {song.title}
                       </h4>
-                      <p className="text-xs text-gray-700 truncate">{song.composer}</p>
+                      {hasKnownComposer(song.composer) && <p className="text-xs text-gray-700 truncate">{song.composer}</p>}
                     </div>
                   </div>
 

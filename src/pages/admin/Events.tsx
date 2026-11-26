@@ -9,6 +9,7 @@ import { useChurch } from '../../contexts/ChurchContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchRsvps, countByEvent } from '../../lib/rsvps';
 import { dbErrorMessage, dbErrorReason } from '../../lib/dbError';
+import { formatEventTime } from '../../lib/eventTime';
 
 interface Event {
   id: string;
@@ -215,13 +216,6 @@ export const AdminEvents = () => {
     });
   };
 
-  const formatTime = (timeString: string) => {
-    const [hours, minutes] = timeString.split(':');
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:${minutes} ${ampm}`;
-  };
 
   const sortedEvents = getSortedEvents();
   if (loading) return <div className="p-8 text-center">Loading events...</div>;
@@ -288,7 +282,7 @@ export const AdminEvents = () => {
                 </div>
                 <div className="flex items-center gap-1.5 text-gray-700">
                   <div className="flex-shrink-0 w-5 h-5 rounded-lg bg-purple-500 flex items-center justify-center shadow-sm"><Clock className="w-3 h-3 text-white" strokeWidth={2.5} /></div>
-                  <span className="text-xs">{formatTime(event.time)}</span>
+                  <span className="text-xs">{formatEventTime(event.time)}</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-gray-700">
                   <div className="flex-shrink-0 w-5 h-5 rounded-lg bg-teal-500 flex items-center justify-center shadow-sm"><MapPin className="w-3 h-3 text-white" strokeWidth={2.5} /></div>
@@ -369,7 +363,7 @@ export const AdminEvents = () => {
                       {event.description && <div className="text-xs text-gray-500 truncate max-w-xs mt-0.5">{event.description}</div>}
                     </td>
                     <td className="px-3 sm:px-4 py-3 whitespace-nowrap"><div className="flex items-center gap-2"><div className="w-6 h-6 rounded-lg bg-blue-500 flex items-center justify-center shadow-sm flex-shrink-0"><Calendar className="w-3 h-3 text-white" strokeWidth={2.5} /></div><span className="text-xs font-medium text-gray-700">{formatEventDates(event, formatDate)}</span></div></td>
-                    <td className="px-3 sm:px-4 py-3 whitespace-nowrap"><div className="flex items-center gap-2"><div className="w-6 h-6 rounded-lg bg-purple-500 flex items-center justify-center shadow-sm flex-shrink-0"><Clock className="w-3 h-3 text-white" strokeWidth={2.5} /></div><span className="text-xs text-gray-700">{formatTime(event.time)}</span></div></td>
+                    <td className="px-3 sm:px-4 py-3 whitespace-nowrap"><div className="flex items-center gap-2"><div className="w-6 h-6 rounded-lg bg-purple-500 flex items-center justify-center shadow-sm flex-shrink-0"><Clock className="w-3 h-3 text-white" strokeWidth={2.5} /></div><span className="text-xs text-gray-700">{formatEventTime(event.time)}</span></div></td>
                     <td className="px-3 sm:px-4 py-3 whitespace-nowrap"><div className="flex items-center gap-2"><div className="w-6 h-6 rounded-lg bg-teal-500 flex items-center justify-center shadow-sm flex-shrink-0"><MapPin className="w-3 h-3 text-white" strokeWidth={2.5} /></div><span className="text-xs text-gray-700">{event.location}</span></div></td>
                     <td className="px-3 sm:px-4 py-3 whitespace-nowrap">{event.type && <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-700 shadow-sm">{event.type}</span>}</td>
                     <td className="px-3 sm:px-4 py-3 whitespace-nowrap">{event.requires_rsvp ? (<div className="flex items-center justify-center gap-1"><Users className="w-4 h-4 text-green-600" /><span className="text-xs font-semibold text-green-600">{rsvpCounts[event.id] || 0}</span>{(rsvpCounts[event.id] || 0) > 0 && <button onClick={(e) => { e.stopPropagation(); handleResetRsvps(event.id, event.title); }} className="ml-1 text-xs text-red-500 hover:text-red-600 font-medium p-2 min-h-[44px] min-w-[44px]">Reset</button>}</div>) : <span className="text-xs text-gray-400">-</span>}</td>

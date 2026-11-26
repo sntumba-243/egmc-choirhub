@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Calendar, Clock, MapPin, Users, Grid, List, ArrowUpDown, CheckCircle, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { fetchRsvps, countByEvent } from '../../lib/rsvps';
+import { formatEventTime } from '../../lib/eventTime';
 
 interface Event {
   id: string;
@@ -166,13 +167,6 @@ export const MemberEvents = () => {
     });
   };
 
-  const formatTime = (timeString: string) => {
-    const [hours, minutes] = timeString.split(':');
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:${minutes} ${ampm}`;
-  };
 
   const sortedEvents = getSortedEvents();
 
@@ -255,7 +249,7 @@ export const MemberEvents = () => {
                     <div className="flex-shrink-0 w-5 h-5 rounded-lg bg-purple-500 flex items-center justify-center shadow-sm">
                       <Clock className="w-3 h-3 text-white" strokeWidth={2.5} />
                     </div>
-                    <span className="text-xs">{formatTime(event.time)}</span>
+                    <span className="text-xs">{formatEventTime(event.time)}</span>
                   </div>
                   
                   <div className="flex items-center gap-1.5 text-gray-700">
@@ -442,7 +436,7 @@ export const MemberEvents = () => {
                           <div className="w-6 h-6 rounded-lg bg-purple-500 flex items-center justify-center shadow-sm flex-shrink-0">
                             <Clock className="w-3 h-3 text-white" strokeWidth={2.5} />
                           </div>
-                          <span className="text-xs text-gray-700">{formatTime(event.time)}</span>
+                          <span className="text-xs text-gray-700">{formatEventTime(event.time)}</span>
                         </div>
                       </td>
                       <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
