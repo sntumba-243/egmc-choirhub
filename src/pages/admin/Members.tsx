@@ -322,12 +322,15 @@ export const AdminMembers = () => {
                   >
                     <Edit className="w-4 h-4" />
                   </button>
+                  {/* Only a super admin can remove an admin (enforced in the DB). */}
+                  {(isSuperAdmin || member.role !== 'admin') && (
                   <button
                     onClick={(e) => handleDelete(e, member.id, `${member.first_name} ${member.last_name}`)}
                     className="p-2 min-h-[44px] min-w-[44px] text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
+                  )}
                 </div>
                 )}
               </div>
