@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { createSearcher, MEMBER_KEYS } from '../../lib/smartSearch';
-import { User, Search, Plus, Edit, Trash2 } from 'lucide-react';
+import { User, Search, Plus, Edit, Trash2, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { useChurch } from '../../contexts/ChurchContext';
@@ -231,11 +231,15 @@ export const AdminMembers = () => {
         </div>
       ) : (
         <div className="space-y-2">
-          {filteredMembers.map((member) => (
+          {filteredMembers.map((member) => {
+            // A church admin can never change a super admin (enforced in the DB by
+            // members_guard_privileged); don't offer actions that would be refused.
+            const locked = !isSuperAdmin && member.role === 'super_admin';
+            return (
             <div
               key={member.id}
-              onClick={() => navigate(isSuperAdmin ? `/super-admin/members/${member.id}/edit` : `/admin/members/${member.id}/edit`)}
-              className="bg-white rounded-lg shadow-sm hover:shadow-md transition-all p-3 cursor-pointer border border-gray-100"
+              onClick={locked ? undefined : () => navigate(isSuperAdmin ? `/super-admin/members/${member.id}/edit` : `/admin/members/${member.id}/edit`)}
+              className={`bg-white rounded-lg shadow-sm transition-all p-3 border border-gray-100 ${locked ? '' : 'hover:shadow-md cursor-pointer'}`}
             >
               <div className="flex items-start justify-between gap-3">
                 {/* Avatar */}
@@ -299,6 +303,15 @@ export const AdminMembers = () => {
                 </div>
 
                 {/* Actions */}
+                {locked ? (
+                  <div
+                    className="flex items-center gap-1 flex-shrink-0 min-h-[44px] px-2 text-xs text-gray-400"
+                    title="Super admin: only a super admin can change this account"
+                  >
+                    <Lock className="w-4 h-4" />
+                    <span className="hidden sm:inline">Super admin</span>
+                  </div>
+                ) : (
                 <div className="flex gap-1 flex-shrink-0">
                   <button
                     onClick={(e) => {
@@ -309,16 +322,21 @@ export const AdminMembers = () => {
                   >
                     <Edit className="w-4 h-4" />
                   </button>
+                  {/* Only a super admin can remove an admin (enforced in the DB). */}
+                  {(isSuperAdmin || member.role !== 'admin') && (
                   <button
                     onClick={(e) => handleDelete(e, member.id, `${member.first_name} ${member.last_name}`)}
                     className="p-2 min-h-[44px] min-w-[44px] text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
+                  )}
                 </div>
+                )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

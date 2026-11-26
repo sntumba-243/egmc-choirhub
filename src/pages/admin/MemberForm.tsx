@@ -22,6 +22,8 @@ export const MemberForm: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [voicePart, setVoicePart] = useState('');
   const [role, setRole] = useState('member');
+  // Role as loaded from the DB (the select can change `role`).
+  const [loadedRole, setLoadedRole] = useState<string | null>(null);
   const [status, setStatus] = useState('active');
   const [loading, setLoading] = useState(false);
   const [createAuthAccount, setCreateAuthAccount] = useState(true);
@@ -66,6 +68,7 @@ export const MemberForm: React.FC = () => {
         setPhone(data.phone || '');
         setVoicePart(data.voice_part || '');
         setRole(data.role || 'member');
+        setLoadedRole(data.role || 'member');
         setStatus(data.status || 'active');
       }
     } catch (error) {
@@ -266,6 +269,31 @@ export const MemberForm: React.FC = () => {
     }
   };
 
+  // A church admin can never change a super admin (enforced in the DB by
+  // members_guard_privileged and in reset-password). Show a notice instead of a
+  // form whose role change, status, save and password reset would all be refused.
+  // Another admin's account (not the viewer's own): a church admin may edit the
+  // profile (name, phone, voice part) but not role, status, email or password
+  // (enforced in the DB and in reset-password).
+  const otherAdminLocked = !!memberId && !isSuperAdmin && loadedRole === 'admin' && memberId !== user?.id;
+
+  if (memberId && loadedRole === 'super_admin' && !isSuperAdmin) {
+    return (
+      <div className="max-w-3xl mx-auto space-y-6">
+        <div className="flex items-center gap-4">
+          <button onClick={() => navigate('/admin/members')} className="p-2 hover:bg-gray-100 rounded-lg" aria-label="Back to members">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <h1 className="text-3xl font-bold">{`${firstName} ${lastName}`.trim() || 'Super admin'}</h1>
+        </div>
+        <div className="bg-white rounded-xl shadow-md p-6 flex items-start gap-3">
+          <Lock className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-gray-700">This is a super admin account. Only a super admin can edit it, change its role or status, reset its password or remove it.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
@@ -314,7 +342,8 @@ export const MemberForm: React.FC = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+              disabled={otherAdminLocked}
+              className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50 disabled:text-gray-500"
             />
           </div>
         </div>
@@ -355,12 +384,17 @@ export const MemberForm: React.FC = () => {
             <select 
               value={role} 
               onChange={(e) => setRole(e.target.value)} 
-              className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+              disabled={otherAdminLocked}
+              className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50 disabled:text-gray-500"
             >
+              {role === 'super_admin' && <option value="super_admin" disabled>Super admin</option>}
               <option value="member">Member</option>
               <option value="guest">Guest</option>
               <option value="section leader">Section Leader</option>
-              <option value="admin">Admin</option>
+              {/* Only a super admin can grant the admin role. */}
+              {(isSuperAdmin || loadedRole === 'admin') && (
+                <option value="admin" disabled={!isSuperAdmin}>Admin</option>
+              )}
             </select>
             <p className="text-xs text-gray-500 mt-1">
               {role === 'admin' && '👑 Full access to admin features'}
@@ -374,7 +408,8 @@ export const MemberForm: React.FC = () => {
             <select 
               value={status} 
               onChange={(e) => setStatus(e.target.value)} 
-              className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+              disabled={otherAdminLocked}
+              className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50 disabled:text-gray-500"
             >
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
@@ -382,7 +417,11 @@ export const MemberForm: React.FC = () => {
           </div>
         </div>
 
-        {memberId && (
+        {otherAdminLocked && (
+          <p className="text-xs text-gray-500 -mt-2">This person is an admin. Only a super admin can change their role, status, email or password.</p>
+        )}
+
+        {memberId && !otherAdminLocked && (
           <div className="border-t pt-6">
             <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Password</label>
             <div className="flex items-center gap-3">
